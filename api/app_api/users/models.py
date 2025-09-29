@@ -19,6 +19,12 @@ class UserManager(BaseUserManager):
         user.is_admin = True
         user.save(using=self._db)
         return user
+    
+    def create_staffuser(self, username, password, first_name, last_name):
+        user = self.create_user(username, password, first_name, last_name)
+        user.is_staff = True
+        user.save(using=self._db)
+        return user
 
 class User(AbstractBaseUser):
     username = models.CharField(max_length=50, unique=True)
@@ -27,6 +33,7 @@ class User(AbstractBaseUser):
     password = models.CharField(max_length=128)  # Django hashes password
     is_active = models.BooleanField(default=True)
     is_admin = models.BooleanField(default=False)
+    is_staff = models.BooleanField(default=False)
 
     objects = UserManager()
 
@@ -38,6 +45,9 @@ class User(AbstractBaseUser):
 
 # class Avatar(models.Model):
 
+class Staff(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    email = models.EmailField()
 class Customer(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     email = models.EmailField()

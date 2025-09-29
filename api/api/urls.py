@@ -20,6 +20,7 @@ import app_api.users.view as user_views
 
 urlpatterns = [
     path('users/admin/register/', user_views.register_admin),
+    path('users/staff/register/', user_views.register_staff),
     path('users/login/', user_views.login_view),
     path('users/register/', user_views.register),
     path('users/logout/', user_views.logout_view),
