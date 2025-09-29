@@ -3,7 +3,7 @@ from django.contrib.auth import authenticate, login as auth_login, logout as aut
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction
-from .models import User, Customer
+from .models import Staff, User, Customer
 import json
 
 @csrf_exempt
@@ -24,7 +24,7 @@ def register(request):
             first_name=first_name,
             last_name=last_name
         )
-        # For every non-admin user, create a Customer record
+
         Customer.objects.create(
             user=user,
             email=email,
@@ -58,7 +58,7 @@ def register_admin(request):
     if User.objects.filter(username=username).exists():
         return JsonResponse({'error': 'Username already exists'}, status=409)
 
-    user = User.objects.create_superuser(
+    User.objects.create_superuser(
         username=username,
         password=password,
         first_name=first_name,
@@ -66,6 +66,33 @@ def register_admin(request):
     )
 
     return JsonResponse({'message': 'Admin user registered successfully'}, status=201)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def register_staff(request):
+    username = request.POST['username']
+    password = request.POST['password']
+    first_name = request.POST['first_name']
+    last_name = request.POST['last_name']
+    email = request.POST['email'].lower()
+
+    if User.objects.filter(username=username).exists():
+        return JsonResponse({'error': 'Username already exists'}, status=409)
+
+    with transaction.atomic():
+        user = User.objects.create_staffuser(
+            username=username,
+            password=password,
+            first_name=first_name,
+            last_name=last_name
+        )
+
+        Staff.objects.create(
+            user=user,
+            email=email
+        )
+
+    return JsonResponse({'message': 'Staff user registered successfully'}, status=201)
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -79,17 +106,23 @@ def login_view(request):
     user = authenticate(request, username=identifier, password=password)
 
     if user is None and '@' in identifier:
+        user_object = None
         try:
-            customer = Customer.objects.get(email=identifier.lower())
-            user = authenticate(request, username=customer.user.username, password=password)
+            user_object = Customer.objects.get(email=identifier.lower())
         except Customer.DoesNotExist:
-            user = None
+            try:
+                user_object = Staff.objects.get(email=identifier.lower())
+            except Staff.DoesNotExist:
+                user_object = None
+        if user_object is not None:
+            user = authenticate(request, username=user_object.user.username, password=password)
 
     if user is not None:
         auth_login(request, user)
         response = JsonResponse({
             'message': 'Login successful',
-            'is_admin': getattr(user, 'is_admin', False)
+            'is_admin': getattr(user, 'is_admin', False),
+            'is_staff': getattr(user, 'is_staff', False)
         }, status=200)
         response.set_cookie(
             'username',
