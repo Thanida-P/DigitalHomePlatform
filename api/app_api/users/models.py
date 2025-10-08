@@ -63,3 +63,10 @@ class Customer(models.Model):
     cart_id = models.IntegerField(null=True, blank=True)
     
     REQUIRED_FIELDS = ['email', 'phone_no']
+
+class Address(models.Model):
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='addresses')
+    address = models.TextField()
+    is_default = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)

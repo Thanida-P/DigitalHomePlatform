@@ -30,7 +30,7 @@ def parse_request_body(request):
         return {}
 
 
-def build_user_profile(user) -> Dict[str, Any]:
+def build_user_profile(user):
     profile = {
         'username': getattr(user, 'username', None),
         'first_name': getattr(user, 'first_name', None),
