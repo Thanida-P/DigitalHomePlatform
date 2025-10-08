@@ -8,7 +8,8 @@ from django.utils.dateparse import parse_date
 from .funcHelper import *
 import base64
 
-
+# Account Management
+# User(Customer) Registration
 @csrf_exempt
 @require_http_methods(["POST"])
 def register(request):
@@ -50,6 +51,7 @@ def register(request):
     )
     return response
 
+# Admin Registration
 @csrf_exempt
 @require_http_methods(["POST"])
 def register_admin(request):
@@ -70,6 +72,7 @@ def register_admin(request):
 
     return JsonResponse({'message': 'Admin user registered successfully'}, status=201)
 
+# Staff Registration
 @csrf_exempt
 @require_http_methods(["POST"])
 def register_staff(request):
@@ -97,6 +100,7 @@ def register_staff(request):
 
     return JsonResponse({'message': 'Staff user registered successfully'}, status=201)
 
+# Login
 @csrf_exempt
 @require_http_methods(["POST"])
 def login_view(request):
@@ -141,6 +145,7 @@ def login_view(request):
     else:
         return JsonResponse({'error': 'Invalid credentials'}, status=401)
 
+# Check Login Status
 @require_http_methods(["GET"])
 def is_logged_in(request):
     if hasattr(request, 'user') and request.user.is_authenticated:
@@ -150,6 +155,7 @@ def is_logged_in(request):
         return JsonResponse({'logged_in': False, 'username': username})
     return JsonResponse({'logged_in': False, 'username': None})
 
+# Logout
 @csrf_exempt
 @require_http_methods(["DELETE"])
 def logout_view(request):
@@ -160,6 +166,7 @@ def logout_view(request):
     response.delete_cookie('csrftoken')
     return response
 
+# Delete User
 @csrf_exempt
 @require_http_methods(["DELETE"])
 def delete_user(request):
@@ -183,14 +190,15 @@ def delete_user(request):
     response.delete_cookie('csrftoken')
     return response
 
+# Get User Profile
 @require_http_methods(["GET"])
 def get_users_profile(request):
-    # authentication guard
     if not hasattr(request, 'user') or not request.user.is_authenticated:
         return JsonResponse({'error': 'Authentication required'}, status=401)
 
     return JsonResponse({'user_profile': build_user_profile(request.user)}, status=200)
 
+# Update User Profile
 @csrf_exempt
 @require_http_methods(["PUT"])
 def update_user_profile(request):
@@ -242,6 +250,7 @@ def update_user_profile(request):
 
     return JsonResponse({'message': 'Profile updated successfully', 'user_profile': build_user_profile(user)}, status=200)
 
+# Upload Profile Picture
 @csrf_exempt
 @require_http_methods(["POST"])
 def upload_profile_picture(request):
@@ -275,6 +284,7 @@ def upload_profile_picture(request):
 
     return JsonResponse({'message': 'Profile picture uploaded successfully'}, status=200)
 
+# Change Password
 @csrf_exempt
 @require_http_methods(["PUT"])
 def change_password(request):

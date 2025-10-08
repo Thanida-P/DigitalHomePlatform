@@ -16,18 +16,24 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-import app_api.users.view as user_views
+import app_api.users.account_view as account_views
+import app_api.users.address_view as address_views
 
 urlpatterns = [
-    path('users/admin/register/', user_views.register_admin),
-    path('users/staff/register/', user_views.register_staff),
-    path('users/login/', user_views.login_view),
-    path('users/register/', user_views.register),
-    path('users/logout/', user_views.logout_view),
-    path('users/is_logged_in/', user_views.is_logged_in),
-    path('users/delete/', user_views.delete_user),
-    path('users/profile/', user_views.get_users_profile),
-    path('users/profile/update/', user_views.update_user_profile),
-    path('users/profile/upload_profile_picture/', user_views.upload_profile_picture),
-    path('users/change_password/', user_views.change_password),
+    path('users/admin/register/', account_views.register_admin),
+    path('users/staff/register/', account_views.register_staff),
+    path('users/login/', account_views.login_view),
+    path('users/register/', account_views.register),
+    path('users/logout/', account_views.logout_view),
+    path('users/is_logged_in/', account_views.is_logged_in),
+    path('users/delete/', account_views.delete_user),
+    path('users/profile/', account_views.get_users_profile),
+    path('users/profile/update/', account_views.update_user_profile),
+    path('users/profile/upload_profile_picture/', account_views.upload_profile_picture),
+    path('users/change_password/', account_views.change_password),
+    path('users/address/add/', address_views.add_address),
+    path('users/address/edit/', address_views.edit_address),
+    path('users/address/set_default/', address_views.set_default_address),
+    path('users/address/delete/', address_views.remove_address),
+    path('users/address/', address_views.get_addresses),
 ]
