@@ -52,6 +52,9 @@ class Customer(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     email = models.EmailField()
     phone_no = models.CharField(max_length=20)
+    gender = models.CharField(max_length=10, null=True, blank=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    profilePic = models.TextField(null=True, blank=True)  # Store base64 string
     address = models.JSONField(default=list)
     owned_digital_products = models.JSONField(default=list)
     purchased_history = models.JSONField(default=list)

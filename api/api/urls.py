@@ -25,4 +25,9 @@ urlpatterns = [
     path('users/register/', user_views.register),
     path('users/logout/', user_views.logout_view),
     path('users/is_logged_in/', user_views.is_logged_in),
+    path('users/delete/', user_views.delete_user),
+    path('users/profile/', user_views.get_users_profile),
+    path('users/profile/update/', user_views.update_user_profile),
+    path('users/profile/upload_profile_picture/', user_views.upload_profile_picture),
+    path('users/change_password/', user_views.change_password),
 ]

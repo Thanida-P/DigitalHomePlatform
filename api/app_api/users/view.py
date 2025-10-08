@@ -4,7 +4,10 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction
 from .models import Staff, User, Customer
-import json
+from django.utils.dateparse import parse_date
+from .funcHelper import *
+import base64
+
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -97,6 +100,9 @@ def register_staff(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def login_view(request):
+    if hasattr(request, 'user') and request.user.is_authenticated:
+        return JsonResponse({'error': 'Already logged in'}, status=403)
+
     identifier = request.POST['identifier']
     password = request.POST['password']
 
@@ -149,6 +155,147 @@ def is_logged_in(request):
 def logout_view(request):
     auth_logout(request)
     response = JsonResponse({'message': 'Logged out successfully'}, status=200)
+    response.delete_cookie('username')
+    response.delete_cookie('sessionid')
+    response.delete_cookie('csrftoken')
+    return response
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def delete_user(request):
+    if not hasattr(request, 'user') or not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    user = request.user
+    try:
+        if hasattr(user, 'staff'):
+            user.staff.delete()
+        elif hasattr(user, 'customer'):
+            user.customer.delete()
+    except (Staff.DoesNotExist, Customer.DoesNotExist):
+        pass
+
+    user.delete()
+    auth_logout(request)
+    response = JsonResponse({'message': 'User deleted successfully'}, status=200)
+    response.delete_cookie('username')
+    response.delete_cookie('sessionid')
+    response.delete_cookie('csrftoken')
+    return response
+
+@require_http_methods(["GET"])
+def get_users_profile(request):
+    # authentication guard
+    if not hasattr(request, 'user') or not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    return JsonResponse({'user_profile': build_user_profile(request.user)}, status=200)
+
+@csrf_exempt
+@require_http_methods(["PUT"])
+def update_user_profile(request):
+    if not hasattr(request, 'user') or not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    put_data = parse_request_body(request)
+
+    user = request.user
+    new_firstname = put_data.get('first_name')
+    new_lastname = put_data.get('last_name')
+    new_email = put_data.get('email')
+    new_phone_no = put_data.get('phone_no')
+    new_gender = put_data.get('gender')
+    new_date_of_birth = put_data.get('date_of_birth')
+
+    # parse date if provided as string
+    if isinstance(new_date_of_birth, str):
+        parsed = parse_date(new_date_of_birth)
+        if parsed is not None:
+            new_date_of_birth = parsed
+
+    try:
+        with transaction.atomic():
+            if new_firstname is not None:
+                user.first_name = new_firstname
+            if new_lastname is not None:
+                user.last_name = new_lastname
+            user.save()
+
+            if hasattr(user, 'customer'):
+                customer = user.customer
+                if new_email is not None:
+                    customer.email = new_email
+                if new_phone_no is not None:
+                    customer.phone_no = new_phone_no
+                if new_gender is not None:
+                    customer.gender = new_gender
+                if new_date_of_birth is not None:
+                    customer.date_of_birth = new_date_of_birth
+                customer.save()
+            elif hasattr(user, 'staff'):
+                staff = user.staff
+                if new_email is not None:
+                    staff.email = new_email
+                staff.save()
+    except Exception as e:
+        return JsonResponse({'error': 'Failed to update profile', 'detail': str(e)}, status=400)
+
+    return JsonResponse({'message': 'Profile updated successfully', 'user_profile': build_user_profile(user)}, status=200)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def upload_profile_picture(request):
+    if not hasattr(request, 'user') or not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    if 'profile_picture' not in request.FILES:
+        return JsonResponse({'error': 'No profile picture provided'}, status=400)
+
+    profile_picture = request.FILES['profile_picture']
+    if profile_picture.size > 5 * 1024 * 1024:  # 5MB limit
+        return JsonResponse({'error': 'Profile picture exceeds size limit of 5MB'}, status=400)
+
+    allowed_types = ['image/jpeg', 'image/png']
+    if profile_picture.content_type not in allowed_types:
+        return JsonResponse({'error': 'Invalid file type. Only JPEG and PNG are allowed.'}, status=400)
+
+    try:
+        image_data = profile_picture.read()
+        encoded_string = base64.b64encode(image_data).decode('utf-8')
+
+        user = request.user
+        if hasattr(user, 'customer'):
+            customer = user.customer
+            customer.profilePic = encoded_string
+            customer.save()
+        else:
+            return JsonResponse({'error': 'Only customers can upload profile pictures'}, status=403)
+    except Exception as e:
+        return JsonResponse({'error': 'Failed to upload profile picture', 'detail': str(e)}, status=400)
+
+    return JsonResponse({'message': 'Profile picture uploaded successfully'}, status=200)
+
+@csrf_exempt
+@require_http_methods(["PUT"])
+def change_password(request):
+    if not hasattr(request, 'user') or not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    put_data = parse_request_body(request)
+    current_password = put_data.get('current_password')
+    new_password = put_data.get('new_password')
+
+    if not current_password or not new_password:
+        return JsonResponse({'error': 'Current and new password required'}, status=400)
+
+    user = request.user
+    if not user.check_password(current_password):
+        return JsonResponse({'error': 'Current password is incorrect'}, status=403)
+
+    user.set_password(new_password)
+    user.save()
+    auth_logout(request)
+    response = JsonResponse({'message': 'Password changed successfully. Please log in again.'}, status=200)
     response.delete_cookie('username')
     response.delete_cookie('sessionid')
     response.delete_cookie('csrftoken')
