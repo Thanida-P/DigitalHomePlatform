@@ -49,6 +49,7 @@ from .pages.admin_dashboard import admin_dashboard
 from .pages.rooms.room import room_page
 from .pages.signup_admin import adminsignup_page
 from .state import DynamicState
+from .pages.threepipe import index
 
 
 app = rx.App()
@@ -73,6 +74,7 @@ app.add_page(adminsignup_page, route="/signup_admin")
 #app.add_page(room_page,route="/digitalHome")
 #app.add_page(room_page,route="/room")
 
+app.add_page(index, route="/threepipe")
 
 
 

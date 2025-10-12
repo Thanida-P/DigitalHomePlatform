@@ -11,44 +11,55 @@ from ..components.product_card import product_list
 from ..state import DynamicState
 
 def hover_photo(name: str, img: str, link: str) -> rx.Component:
-  
-    return rx.link(
-        rx.box(
-            rx.image(
-                src=img,
-                width="100%",
-                height="250px",        
-                object_fit="cover",
-               
-            ),
+    return rx.vstack(
+        rx.link(
             rx.box(
-                rx.button(
-                    name,
-                    background_color="rgba(0,0,0,0.7)",
-                    color="white",
-                    padding="30px 10px",
-                    cursor="pointer",  
-                    font_size="20px",
-                    font_weight = "bold",
-                    font_family="Racing Sans One",
-               
-                   
+                rx.image(
+                    src=img,
+                    width="100%",
+                    height="250px",
+                    object_fit="cover",
                 ),
-                position="absolute",
-                top="50%",
-                left="50%",
-                transform="translate(-50%, -50%)",
-                opacity="0",
-                transition="opacity 0.3s ease",
-                _hover={"opacity": "1"},
+                rx.box(
+                    rx.button(
+                        name,
+                        background_color="rgba(0,0,0,0.7)",
+                        color="white",
+                        padding="30px 10px",
+                        cursor="pointer",
+                        font_size="20px",
+                        font_weight="bold",
+                        font_family="Racing Sans One",
+                    ),
+                    position="absolute",
+                    top="50%",
+                    left="50%",
+                    transform="translate(-50%, -50%)",
+                    opacity="0",
+                    transition="opacity 0.3s ease",
+                    _hover={"opacity": "1"},
+                ),
+                position="relative",
+                overflow="hidden",
+                _hover={"cursor": "pointer"},
             ),
-
-            position="relative",
-            overflow="hidden",
-            _hover={"cursor": "pointer"},
+            href=link,
         ),
-        href=link,
+       rx.link(
+            rx.text(
+                name,
+                font_size="16px",
+                font_weight="bold",
+                color="#22282C",
+                text_align="center",
+                margin_top="8px",
+            ),
+            href=link,
+        ),
+        spacing="2",
+        align="center",
     )
+
 
 
 def product_spot(x: str, y: str, name: str, price: str, url: str) -> rx.Component:
