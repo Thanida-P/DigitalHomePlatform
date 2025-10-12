@@ -209,3 +209,7 @@ __marimo__/
 
 #Macos file
 .DS_Store
+
+#large files 
+frontend/assets/models
+*.mp4 
