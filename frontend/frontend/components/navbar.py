@@ -21,7 +21,7 @@ def navbar_page():
            
             nav_link("Digital Home", "/"),
             nav_link("Shop", "/shop"),
-            nav_link("Digital Room", "/digitalHome"),
+            nav_link("My Home", "/my_home"),
             nav_link("About", "/about"),
             spacing="6",
         ),
@@ -105,7 +105,7 @@ def navbar_page():
         rx.hstack(
             nav_link("Digital Home", "/"),
             nav_link("Shop", "/shop"),
-            nav_link("Digital Room", "/digitalHome"),
+            nav_link("My Home", "/my_home"),
             #nav_link("About", "/about"),
             spacing="6",
         ),

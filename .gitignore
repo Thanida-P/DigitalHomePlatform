@@ -213,3 +213,6 @@ __marimo__/
 #large files 
 frontend/assets/models
 *.mp4 
+
+# api settings
+api/api/settings.py
