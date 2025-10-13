@@ -210,9 +210,14 @@ __marimo__/
 #Macos file
 .DS_Store
 
-#large files 
-frontend/assets/models
-*.mp4 
-
 # api settings
 api/api/settings.py
+
+#frontend
+frontend/*.mp4 
+frontend/.web/
+frontend/**/*.py[cod]
+frontend/**/__pycache__/
+frontend/assets/external/
+frontend/.states
+frontend/*.db
