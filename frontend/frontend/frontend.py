@@ -45,7 +45,7 @@ from .pages.profile import profile_page
 from .pages.product_detail import product_detail_page
 from .pages.cart import cart_page
 from .pages.admin_dashboard import admin_dashboard
-#from .pages.digitalHome import room_page
+from .pages.my_home import my_digital_home_page
 from .pages.rooms.room import room_page
 from .pages.signup_admin import adminsignup_page
 from .state import DynamicState
@@ -70,8 +70,8 @@ app.add_page(product_detail_page,route="/product_detail")
 app.add_page(cart_page,route="/cart")
 app.add_page(admin_dashboard,route="/admin_dashboard")
 app.add_page(adminsignup_page, route="/signup_admin")
-#app.add_page(room_page,route="/digitalHome")
-#app.add_page(room_page,route="/room")
+app.add_page(my_digital_home_page,route="/my_home")
+app.add_page(room_page,route="/room")
 
 
 
