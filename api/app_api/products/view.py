@@ -2,7 +2,7 @@ from django.http import JsonResponse
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
-from .product_services import *
+from .product_func import *
 from django.http import FileResponse
 from zodb.zodb_management import *
 
@@ -26,11 +26,65 @@ def add_product(request):
             return JsonResponse({'error': 'Invalid input data'}, status=400)
 
         product = create_product(name, description, digital_price, physical_price, category, image, stock, model_files, scene_files, texture_files)
-    
+
         return JsonResponse({'message': 'Product created successfully', 'product_id': product.id}, status=201)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
+# @require_http_methods(["GET"])
+# def get_products(request):
+#     try:
+#         products = Product.objects.all()
+#         product_list = []
+#         for product in products:
+#             product_data = {
+#                 'id': product.id,
+#                 'name': product.name,
+#                 'description': product.description,
+#                 'digital_price': str(product.digital_price),
+#                 'physical_price': str(product.physical_price),
+#                 'category': product.category,
+#                 'image': product.image,
+#                 'stock': product.stock,
+#                 'reviews': product.reviews,
+#                 'created_at': product.created_at,
+#                 'updated_at': product.updated_at,
+#                 'model_id': product.model_id,
+#                 'display_scenes_ids': product.display_scenes,
+#                 'texture_id': product.texture_id if hasattr(product, 'texture_id') else None
+#             }
+#             product_list.append(product_data)
+#         return JsonResponse({'products': product_list}, status=200)
+#     except Exception as e:
+#         return JsonResponse({'error': str(e)}, status=500)
+
+@require_http_methods(["GET"])
+def get_product_detail(request, product_id):
+    try:
+        if not product_id:
+            return JsonResponse({'error': 'Product ID is required'}, status=400)
+        product = Product.objects.get(id=product_id)
+        product_data = {
+            'id': product.id,
+            'name': product.name,
+            'description': product.description,
+            'digital_price': str(product.digital_price),
+            'physical_price': str(product.physical_price),
+            'category': product.category,
+            'image': product.image,
+            'stock': product.stock,
+            'reviews': product.reviews,
+            'created_at': product.created_at,
+            'updated_at': product.updated_at,
+            'model_id': product.model_id,
+            'display_scenes_ids': product.display_scenes,
+            'texture_id': product.texture_id if hasattr(product, 'texture_id') else None
+        }
+        return JsonResponse({'product': product_data}, status=200)
+    except Product.DoesNotExist:
+        return JsonResponse({'error': 'Product not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 # testing endpoints for ZODB operations
 @csrf_exempt

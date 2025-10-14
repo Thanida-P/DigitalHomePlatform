@@ -38,6 +38,7 @@ urlpatterns = [
     path('users/address/delete/', address_views.remove_address),
     path('users/address/', address_views.get_addresses),
     path('products/add/', product_views.add_product),
+    path('products/get_product_detail/<int:product_id>/', product_views.get_product_detail),
     
     # For debugging purposes
     path('test/add_3d_model/', product_views.add_3d_model),
