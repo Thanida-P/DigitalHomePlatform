@@ -40,7 +40,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.gis',
     'app_api',
-    'app_api.users'
+    'app_api.users',
+    'app_api.products',
 ]
 
 MIDDLEWARE = [
@@ -81,18 +82,15 @@ DATABASES = {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
         'NAME': 'digitalhome_db',
         'USER': 'postgres',
-        'PASSWORD': '12345678',
+        'PASSWORD': 'Password123',
         'HOST': 'localhost',
         'PORT': '5432',
     }
 }
 
 # ZODB settings and GDAL library path
-GEOS_LIBRARY_PATH = r"C:/Program Files/GDAL/bin/geos_c.dll"
-GDAL_LIBRARY_PATH = r"C:/Program Files/GDAL/bin/gdal.dll"
-
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ZODB_FILE = os.path.join(BASE_DIR, 'data', 'zodb.fs')
+GEOS_LIBRARY_PATH = r"C:/OSGeo4W/bin/geos_c.dll"
+GDAL_LIBRARY_PATH = r"C:/OSGeo4W/bin/gdal311.dll"
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
