@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import path
 import app_api.users.account_view as account_views
 import app_api.users.address_view as address_views
+import app_api.products.view as product_views
 
 urlpatterns = [
     path('users/admin/register/', account_views.register_admin),
@@ -36,4 +37,14 @@ urlpatterns = [
     path('users/address/set_default/', address_views.set_default_address),
     path('users/address/delete/', address_views.remove_address),
     path('users/address/', address_views.get_addresses),
+    path('products/add/', product_views.add_product),
+    
+    # For debugging purposes
+    path('test/add_3d_model/', product_views.add_3d_model),
+    path('test/add_texture/', product_views.add_texture),
+    path('test/get_3d_model/<int:model_id>/', product_views.get_3d_model),
+    path('test/get_texture/<int:texture_id>/', product_views.get_texture),
+    path('test/add_display_scene/', product_views.add_display_scene),
+    path('test/get_display_scene/<int:display_scene_id>/', product_views.get_display_scene),
+
 ]

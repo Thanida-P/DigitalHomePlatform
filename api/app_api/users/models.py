@@ -61,6 +61,7 @@ class Customer(models.Model):
     credit_cards = models.JSONField(default=list)
     bank_accounts = models.JSONField(default=list)
     cart_id = models.IntegerField(null=True, blank=True)
+    digital_home = models.JSONField(default=list) # List of digital homes
     
     REQUIRED_FIELDS = ['email', 'phone_no']
 
