@@ -116,6 +116,7 @@ def remove_address(request):
     address.delete()
     return JsonResponse({'message': 'Address removed successfully'}, status=200)
 
+# Get Addresses
 @csrf_exempt
 @require_http_methods(["GET"])
 def get_addresses(request):
