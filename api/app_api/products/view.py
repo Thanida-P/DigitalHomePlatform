@@ -17,15 +17,16 @@ def add_product(request):
         physical_price = float(request.POST.get('physical_price', 0))
         category = request.POST.get('category')
         image = request.FILES.get('image')
+        product_type = request.POST.get('product_type')
         stock = int(request.POST.get('stock', 0))
         model_files = request.FILES.get('model_file')
         scene_files = request.FILES.getlist('scene_files')
         texture_files = request.FILES.getlist('texture_files') if 'texture_files' in request.FILES else None
 
-        if not all([name, description, category, image]) or (digital_price <= 0 and physical_price <= 0) or stock < 0 or not model_files:
+        if not all([name, description, category, product_type, image]) or stock < 0 or not model_files:
             return JsonResponse({'error': 'Invalid input data'}, status=400)
 
-        product = create_product(name, description, digital_price, physical_price, category, image, stock, model_files, scene_files, texture_files)
+        product = create_product(name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, texture_files)
 
         return JsonResponse({'message': 'Product created successfully', 'product_id': product.id}, status=201)
     except Exception as e:
@@ -71,6 +72,7 @@ def get_product_detail(request, product_id):
             'digital_price': str(product.digital_price),
             'physical_price': str(product.physical_price),
             'category': product.category,
+            'type': product.type,
             'image': product.image,
             'stock': product.stock,
             'reviews': product.reviews,

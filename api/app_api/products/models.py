@@ -19,6 +19,7 @@ class Product(models.Model):
     digital_price = models.DecimalField(max_digits=10, decimal_places=2)
     physical_price = models.DecimalField(max_digits=10, decimal_places=2)
     category = models.CharField(max_length=50)
+    type = models.CharField(max_length=50)
     image = models.TextField()
     stock = models.IntegerField()
     reviews = models.JSONField(default=list)
