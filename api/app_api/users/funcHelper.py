@@ -1,4 +1,3 @@
-from typing import Any, Dict
 from io import BytesIO
 from django.http.multipartparser import MultiPartParser
 from django.http import QueryDict
