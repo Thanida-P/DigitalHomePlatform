@@ -84,6 +84,7 @@ def create_Texture(texture_file, root, texture_id=None):
     )
 
     return texture_id
+
 def delete_texture(texture_id, root):
     textures = root.textures
     if not textures or f'texture_{texture_id}' not in textures:
@@ -263,6 +264,36 @@ def update_display_scene(display_scene_ids, model_files):
         
         transaction.commit()
         return new_display_scene_ids
+    except Exception:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        raise
+    finally:
+        connection.close()
+        
+def delete_product_3d_assets(model_id, display_scene_ids):
+    connection, root = get_connection()
+    try:
+        object_models = root.objectModels
+        if not object_models or f'model_{model_id}' not in object_models:
+            return 
+
+        model = object_models[f'model_{model_id}']
+        
+        for texture_id in model.get_textures():
+            delete_texture(texture_id, root)
+        
+        del object_models[f'model_{model_id}']
+        
+        display_scenes = root.displayScenes
+        if display_scenes:
+            for ds_id in display_scene_ids:
+                if f'display_scene_{ds_id}' in display_scenes:
+                    delete_display_scene(ds_id, root)
+        
+        transaction.commit()
     except Exception:
         try:
             transaction.abort()

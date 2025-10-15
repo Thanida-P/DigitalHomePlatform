@@ -54,11 +54,21 @@ def update_existing_product(product_id, name, description, digital_price, physic
         update_3d_model(product.model_id, model_files, texture_files)
 
     if scene_files:
-        print("Old Scenes:", product.display_scenes)
         display_scene_ids = update_display_scene(product.display_scenes, scene_files)
-        print("New Scenes:", display_scene_ids)
         product.display_scenes = display_scene_ids
 
     product.save()
-    print("Updated Product:", product)
     return product
+
+def delete_existing_product(product_id):
+    try:
+        product = Product.objects.get(id=product_id)
+        model_id = product.model_id
+        
+        if model_id is not None:
+            delete_product_3d_assets(model_id, product.display_scenes)
+        
+        product.delete()
+        return True
+    except Product.DoesNotExist:
+        return False

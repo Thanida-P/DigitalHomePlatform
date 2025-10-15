@@ -2,9 +2,9 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.http import QueryDict
+from django.http import FileResponse
 
 from .product_func import *
-from django.http import FileResponse
 
 # Add product
 @csrf_exempt
@@ -117,6 +117,24 @@ def get_product_detail(request, product_id):
         return JsonResponse({'error': 'Product not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def delete_product(request, product_id):
+    try:
+        if not hasattr(request, 'user') or not request.user.is_authenticated:
+            return JsonResponse({'error': 'Authentication required'}, status=401)
+        if not product_id:
+            return JsonResponse({'error': 'Product ID is required'}, status=400)
+        
+        delete_existing_product(product_id)
+        
+        return JsonResponse({'message': 'Product deleted successfully'}, status=200)
+    except Product.DoesNotExist:
+        return JsonResponse({'error': 'Product not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    
     
 @require_http_methods(["GET"])
 def get_3d_model(request, model_id):
@@ -133,30 +151,6 @@ def get_3d_model(request, model_id):
 
         response = FileResponse(blob.open('r'), as_attachment=True, filename=model.get_filename())
         return response
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
-    
-    
-@require_http_methods(["GET"])
-def get_display_scenes(request, product_id):
-    try:
-        # if not hasattr(request, 'user') or not request.user.is_authenticated:
-        #     return JsonResponse({'error': 'Authentication required'}, status=401)
-        product = Product.objects.get(id=product_id)
-        if not product:
-            return JsonResponse({'error': 'Product not found'}, status=404)
-
-        scenes = []
-        for scene_id in product.display_scenes:
-            scene = fetch_display_scene(scene_id)
-            if scene:
-                scenes.append({
-                    'scene_id': scene_id,
-                    'filename': scene.get_filename()
-                })
-        return JsonResponse({'display_scenes': scenes}, status=200)
-    except Product.DoesNotExist:
-        return JsonResponse({'error': 'Product not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
     
@@ -259,5 +253,28 @@ def get_texture(request, texture_id):
             return JsonResponse({'error': 'Texture not found'}, status=404)
 
         return JsonResponse({'texture_file': response}, status=200)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    
+@require_http_methods(["GET"])
+def get_display_scenes(request, product_id):
+    try:
+        if not hasattr(request, 'user') or not request.user.is_authenticated:
+            return JsonResponse({'error': 'Authentication required'}, status=401)
+        product = Product.objects.get(id=product_id)
+        if not product:
+            return JsonResponse({'error': 'Product not found'}, status=404)
+
+        scenes = []
+        for scene_id in product.display_scenes:
+            scene = fetch_display_scene(scene_id)
+            if scene:
+                scenes.append({
+                    'scene_id': scene_id,
+                    'filename': scene.get_filename()
+                })
+        return JsonResponse({'display_scenes': scenes}, status=200)
+    except Product.DoesNotExist:
+        return JsonResponse({'error': 'Product not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)

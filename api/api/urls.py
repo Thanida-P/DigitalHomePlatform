@@ -43,6 +43,7 @@ urlpatterns = [
     path('products/get_display_scene/<int:display_scene_id>/', product_views.get_display_scene),
     path('products/get_texture/<int:model_id>/', product_views.get_textures),
     path('products/update/', product_views.update_product),
+    path('products/delete/<int:product_id>/', product_views.delete_product),
     
     # For debugging purposes
     path('test/add_3d_model/', product_views.add_3d_model),
