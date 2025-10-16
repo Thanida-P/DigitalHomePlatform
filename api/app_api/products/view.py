@@ -81,30 +81,78 @@ def update_product(request):
     product = update_existing_product(product_id, name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, texture_files)
     return JsonResponse({'message': 'Product updated successfully', 'product_id': product.id}, status=200)
 
-# @require_http_methods(["GET"])
-# def get_products(request, search_query=None, category=None, min_price=None, max_price=None, format=None, sort_by=None):
-#     try:
-#         products = Product.objects.all()
-#         product_list = []
-#         for product in products:
-#             product_data = {
-#                 'id': product.id,
-#                 'name': product.name,
-#                 'digital_price': str(product.digital_price),
-#                 'physical_price': str(product.physical_price),
-#                 'image': product.image,
-#                 'reviews': product.reviews,
-#                 'rating': product.rating,
-#                 'created_at': product.created_at,
-#                 'updated_at': product.updated_at,
-#                 'model_id': product.model_id,
-#                 'display_scenes_ids': product.display_scenes,
-#                 'texture_id': product.texture_id if hasattr(product, 'texture_id') else None
-#             }
-#             product_list.append(product_data)
-#         return JsonResponse({'products': product_list}, status=200)
-#     except Exception as e:
-#         return JsonResponse({'error': str(e)}, status=500)
+@csrf_exempt
+@require_http_methods(["POST"])
+def get_products(request):
+    try:
+        products = Product.objects.all()
+        search_query = request.POST.get('search_query', None)
+        category = request.POST.get('category', None)
+        min_price = request.POST.get('min_price', None)
+        max_price = request.POST.get('max_price', None)
+        format = request.POST.get('format', None)
+        product_type =  request.POST.get('product_type', None)
+        sort_by = request.POST.get('sort_by', None)
+        print(category)
+        
+        product_list = []
+        for product in products:
+            if search_query is not None:
+                if search_query and search_query.lower() not in product.name.lower():
+                    continue
+            if category is not None and category.lower() != product.category.lower():
+                continue
+            if min_price is not None:
+                try:
+                    min_price_val = float(min_price)
+                    if (product.digital_price is not None and product.digital_price < min_price_val) and (product.physical_price is not None and product.physical_price < min_price_val):
+                        continue
+                except ValueError:
+                    return JsonResponse({'error': 'Invalid min_price value'}, status=400)
+            if max_price is not None:
+                try:
+                    max_price_val = float(max_price)
+                    if (product.digital_price is not None and product.digital_price > max_price_val) and (product.physical_price is not None and product.physical_price > max_price_val):
+                        continue
+                except ValueError:
+                    return JsonResponse({'error': 'Invalid max_price value'}, status=400)
+            if format is not None:
+                if format.lower() == 'digital' and not product.digital_available:
+                    continue
+                if format.lower() == 'physical' and not product.physical_available:
+                    continue
+                
+            if product_type is not None and product_type.lower() != product.type.lower():
+                continue
+
+            product_data = {
+                'id': product.id,
+                'name': product.name,
+                'digital_price': str(product.digital_price),
+                'physical_price': str(product.physical_price),
+                'image': product.image,
+                'rating': product.rating,
+                'product_type': product.type,
+                'created_at': product.created_at,
+            }
+            product_list.append(product_data)
+        if sort_by is not None:
+            if sort_by == 'popularity' or sort_by == None:
+                product_list.sort(key=lambda x: x['rating'], reverse=True)
+            elif sort_by == 'newest':
+                product_list.sort(key=lambda x: x['created_at'], reverse=True)
+            elif sort_by == 'digital_price_low_to_high':
+                product_list.sort(key=lambda x: float(x['digital_price']) if x['digital_price'] not in [None, 'None'] else float('inf'))
+            elif sort_by == 'digital_price_high_to_low':
+                product_list.sort(key=lambda x: float(x['digital_price']) if x['digital_price'] not in [None, 'None'] else float('-inf'), reverse=True)
+            elif sort_by == 'physical_price_low_to_high':
+                product_list.sort(key=lambda x: float(x['physical_price']) if x['physical_price'] not in [None, 'None'] else float('inf'))
+            elif sort_by == 'physical_price_high_to_low':
+                product_list.sort(key=lambda x: float(x['physical_price']) if x['physical_price'] not in [None, 'None'] else float('-inf'), reverse=True)
+    
+        return JsonResponse({'products': product_list}, status=200)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 @require_http_methods(["GET"])
 def get_product_detail(request, product_id):
