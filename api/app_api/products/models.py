@@ -15,6 +15,7 @@ class Product(models.Model):
     image = models.TextField()
     stock = models.IntegerField()
     reviews = models.JSONField(default=list)
+    rating = models.FloatField(default=0.0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     model_id = models.IntegerField(null=True, blank=True)  # Link to 3D model
