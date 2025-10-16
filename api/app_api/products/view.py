@@ -26,9 +26,9 @@ def add_product(request):
         texture_files = request.FILES.getlist('texture_files')
         digital_available_str = request.POST.get('digital_available', 'false')
         digital_available = digital_available_str.lower() == 'true'
-
         physical_available_str = request.POST.get('physical_available', 'false')
         physical_available = physical_available_str.lower() == 'true'
+        
         if not all([name, description, category, product_type, image]) or stock < 0 or not model_files:
             return JsonResponse({'error': 'Invalid input data'}, status=400)
 
@@ -64,9 +64,11 @@ def update_product(request):
     texture_files = request.FILES.getlist('texture_files')
     digital_available_str = request.POST.get('digital_available', 'false')
     digital_available = digital_available_str.lower() == 'true'
-
     physical_available_str = request.POST.get('physical_available', 'false')
     physical_available = physical_available_str.lower() == 'true'
+    
+    if not product_id:
+        return JsonResponse({'error': 'Product ID is required'}, status=400)
     if not all([name, description, category, product_type, image]) or stock < 0 or not model_files:
         return JsonResponse({'error': 'Invalid input data'}, status=400)
 
@@ -75,7 +77,7 @@ def update_product(request):
 
     if not digital_available and not physical_available:
         return JsonResponse({'error': 'At least one of digital or physical availability must be true'}, status=400)
-
+    
     product = update_existing_product(product_id, name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, texture_files)
     return JsonResponse({'message': 'Product updated successfully', 'product_id': product.id}, status=200)
 
@@ -90,10 +92,9 @@ def update_product(request):
 #                 'name': product.name,
 #                 'digital_price': str(product.digital_price),
 #                 'physical_price': str(product.physical_price),
-#                 'category': product.category,
 #                 'image': product.image,
-#                 'stock': product.stock,
 #                 'reviews': product.reviews,
+#                 'rating': product.rating,
 #                 'created_at': product.created_at,
 #                 'updated_at': product.updated_at,
 #                 'model_id': product.model_id,
@@ -125,6 +126,7 @@ def get_product_detail(request, product_id):
             'image': product.image,
             'stock': product.stock,
             'reviews': product.reviews,
+            'rating': product.rating,
             'created_at': product.created_at,
             'updated_at': product.updated_at,
             'model_id': product.model_id,

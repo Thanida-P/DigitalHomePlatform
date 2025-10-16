@@ -55,7 +55,6 @@ def update_existing_product(product_id, name, description, digital_price, physic
         product.digital_available = digital_available
     if physical_available is not None:
         product.physical_available = physical_available
-
     if model_files:
         update_3d_model(product.model_id, model_files, texture_files)
 
