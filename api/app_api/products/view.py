@@ -6,7 +6,6 @@ from django.http import FileResponse
 
 from .product_func import *
 
-# Add product
 @csrf_exempt
 @require_http_methods(["POST"])
 def add_product(request):
@@ -25,11 +24,21 @@ def add_product(request):
         model_files = request.FILES.get('model_file')
         scene_files = request.FILES.getlist('scene_files')
         texture_files = request.FILES.getlist('texture_files')
+        digital_available_str = request.POST.get('digital_available', 'false')
+        digital_available = digital_available_str.lower() == 'true'
 
+        physical_available_str = request.POST.get('physical_available', 'false')
+        physical_available = physical_available_str.lower() == 'true'
         if not all([name, description, category, product_type, image]) or stock < 0 or not model_files:
             return JsonResponse({'error': 'Invalid input data'}, status=400)
 
-        product = create_product(name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, texture_files)
+        if digital_price < 0 or physical_price < 0:
+            return JsonResponse({'error': 'Prices must be non-negative'}, status=400)
+
+        if not digital_available and not physical_available:
+            return JsonResponse({'error': 'At least one of digital or physical availability must be true'}, status=400)
+
+        product = create_product(name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, texture_files)
 
         return JsonResponse({'message': 'Product created successfully', 'product_id': product.id}, status=201)
     except Exception as e:
@@ -53,15 +62,25 @@ def update_product(request):
     model_files = request.FILES.get('model_file')
     scene_files = request.FILES.getlist('scene_files')
     texture_files = request.FILES.getlist('texture_files')
+    digital_available_str = request.POST.get('digital_available', 'false')
+    digital_available = digital_available_str.lower() == 'true'
 
+    physical_available_str = request.POST.get('physical_available', 'false')
+    physical_available = physical_available_str.lower() == 'true'
     if not all([name, description, category, product_type, image]) or stock < 0 or not model_files:
         return JsonResponse({'error': 'Invalid input data'}, status=400)
 
-    product = update_existing_product(product_id, name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, texture_files)
+    if digital_price < 0 or physical_price < 0:
+        return JsonResponse({'error': 'Prices must be non-negative'}, status=400)
+
+    if not digital_available and not physical_available:
+        return JsonResponse({'error': 'At least one of digital or physical availability must be true'}, status=400)
+
+    product = update_existing_product(product_id, name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, texture_files)
     return JsonResponse({'message': 'Product updated successfully', 'product_id': product.id}, status=200)
 
 # @require_http_methods(["GET"])
-# def get_products(request, search_query=None, category=None):
+# def get_products(request, search_query=None, category=None, min_price=None, max_price=None, format=None, sort_by=None):
 #     try:
 #         products = Product.objects.all()
 #         product_list = []
