@@ -3,21 +3,13 @@ from django.contrib.gis.db import models as gis_models
 
 SRID_3D = 4979
 
-class PointZMField(gis_models.GeometryField):
-    def __init__(self, *args, **kwargs):
-        kwargs.setdefault('srid', SRID_3D)
-        kwargs.setdefault('dim', 4)
-        super().__init__(*args, **kwargs)
-    
-    @property
-    def geom_type(self):
-        return 'POINTZM'
-
 class Product(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField()
-    digital_price = models.DecimalField(max_digits=10, decimal_places=2)
-    physical_price = models.DecimalField(max_digits=10, decimal_places=2)
+    digital_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, default=None)
+    physical_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, default=None)
+    digital_available = models.BooleanField(default=False)
+    physical_available = models.BooleanField(default=False)
     category = models.CharField(max_length=50)
     type = models.CharField(max_length=50)
     image = models.TextField()
@@ -33,9 +25,9 @@ class Product(models.Model):
     
 class OwnedProducts(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="owned_products")
-    positions = PointZMField()
-    rotation = gis_models.PointField(srid=SRID_3D, dim=3)
-    scale = models.FloatField(default=1.0)
+    positions = models.JSONField(default=dict)  # {'x': float, 'y': float, 'z': float, 't': float}
+    rotation = models.JSONField(default=dict)  # {'x': float, 'y': float, 'z': float}
+    scale = models.JSONField(default=dict)     # {'x': float, 'y': float, 'z': float}
     texture_id = models.IntegerField(null=True, blank=True)
     position_history = models.JSONField(default=list)
     
