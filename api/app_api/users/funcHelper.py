@@ -45,6 +45,7 @@ def build_user_profile(user):
             'phone_no': getattr(customer, 'phone_no', None),
             'gender': getattr(customer, 'gender', None),
             'date_of_birth': getattr(customer, 'date_of_birth', None),
+            'profile_pic': getattr(customer, 'profile_pic', None),
         })
     elif hasattr(user, 'staff'):
         staff = user.staff

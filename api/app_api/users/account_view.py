@@ -275,7 +275,7 @@ def upload_profile_picture(request):
         user = request.user
         if hasattr(user, 'customer'):
             customer = user.customer
-            customer.profilePic = encoded_string
+            customer.profile_pic = encoded_string
             customer.save()
         else:
             return JsonResponse({'error': 'Only customers can upload profile pictures'}, status=403)
