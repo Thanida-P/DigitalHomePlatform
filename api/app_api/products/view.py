@@ -93,7 +93,6 @@ def get_products(request):
         format = request.POST.get('format', None)
         product_type =  request.POST.get('product_type', None)
         sort_by = request.POST.get('sort_by', None)
-        print(category)
         
         product_list = []
         for product in products:
