@@ -18,6 +18,8 @@ from django.contrib import admin
 from django.urls import path
 import app_api.users.account_view as account_views
 import app_api.users.address_view as address_views
+import app_api.users.payment_view as payment_views
+import app_api.carts.view as cart_views
 import app_api.products.view as product_views
 
 urlpatterns = [
@@ -37,6 +39,12 @@ urlpatterns = [
     path('users/address/set_default/', address_views.set_default_address),
     path('users/address/delete/', address_views.remove_address),
     path('users/address/', address_views.get_addresses),
+    path('users/payment_methods/add_credit_card/', payment_views.add_credit_card),
+    path('users/payment_methods/', payment_views.list_credit_cards),
+    path('users/payment_methods/remove_credit_card/<int:pm_id>/', payment_views.remove_credit_card),
+    path('users/payment_methods/add_bank_account/', payment_views.add_bank_account),
+    path('users/payment_methods/list_bank_accounts/', payment_views.list_bank_accounts),
+    path('users/payment_methods/remove_bank_account/<int:ba_id>/', payment_views.remove_bank_account),
     path('products/add/', product_views.add_product),
     path('products/get_product_detail/<int:product_id>/', product_views.get_product_detail),
     path('products/get_3d_model/<int:model_id>/', product_views.get_3d_model),
@@ -45,6 +53,13 @@ urlpatterns = [
     path('products/update/', product_views.update_product),
     path('products/delete/<int:product_id>/', product_views.delete_product),
     path('products/list/', product_views.get_products),
+    path('products/categories/', product_views.get_all_categories),
+    path('products/types/', product_views.get_all_product_types),
+    path('carts/add_item/', cart_views.add_to_cart),
+    path('carts/remove_item/<int:cart_item_id>/', cart_views.remove_from_cart),
+    path('carts/view/', cart_views.view_cart),
+    path('carts/clear_cart/', cart_views.clear_cart),
+    path('carts/summary/', cart_views.get_cart_summary),
     
     # For debugging purposes
     path('test/add_3d_model/', product_views.add_3d_model),

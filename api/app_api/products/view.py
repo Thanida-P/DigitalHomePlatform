@@ -1,18 +1,16 @@
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
-from django.http import QueryDict
+from django.contrib.auth.decorators import login_required
 from django.http import FileResponse
 
 from .product_func import *
 
 @csrf_exempt
 @require_http_methods(["POST"])
+@login_required
 def add_product(request):
     try:
-        if not hasattr(request, 'user') or not request.user.is_authenticated:
-            return JsonResponse({'error': 'Authentication required'}, status=401)
-
         name = request.POST.get('name')
         description = request.POST.get('description')
         digital_price = float(request.POST.get('digital_price', 0))
@@ -46,43 +44,47 @@ def add_product(request):
 
 @csrf_exempt
 @require_http_methods(["POST"])
+@login_required
 def update_product(request):
-    if not hasattr(request, 'user') or not request.user.is_authenticated:
-        return JsonResponse({'error': 'Authentication required'}, status=401)
-    
-    product_id = request.POST.get('product_id')
-    name = request.POST.get('name')
-    description = request.POST.get('description')
-    digital_price = float(request.POST.get('digital_price', 0))
-    physical_price = float(request.POST.get('physical_price', 0))
-    category = request.POST.get('category')
-    image = request.FILES.get('image')
-    product_type = request.POST.get('product_type')
-    stock = int(request.POST.get('stock', 0))
-    model_files = request.FILES.get('model_file')
-    scene_files = request.FILES.getlist('scene_files')
-    texture_files = request.FILES.getlist('texture_files')
-    digital_available_str = request.POST.get('digital_available', 'false')
-    digital_available = digital_available_str.lower() == 'true'
-    physical_available_str = request.POST.get('physical_available', 'false')
-    physical_available = physical_available_str.lower() == 'true'
-    
-    if not product_id:
-        return JsonResponse({'error': 'Product ID is required'}, status=400)
-    if not all([name, description, category, product_type, image]) or stock < 0 or not model_files:
-        return JsonResponse({'error': 'Invalid input data'}, status=400)
+    try:
+        product_id = request.POST.get('product_id')
+        name = request.POST.get('name')
+        description = request.POST.get('description')
+        digital_price = float(request.POST.get('digital_price', 0))
+        physical_price = float(request.POST.get('physical_price', 0))
+        category = request.POST.get('category')
+        image = request.FILES.get('image')
+        product_type = request.POST.get('product_type')
+        stock = int(request.POST.get('stock', 0))
+        model_files = request.FILES.get('model_file')
+        scene_files = request.FILES.getlist('scene_files')
+        texture_files = request.FILES.getlist('texture_files')
+        digital_available_str = request.POST.get('digital_available', 'false')
+        digital_available = digital_available_str.lower() == 'true'
+        physical_available_str = request.POST.get('physical_available', 'false')
+        physical_available = physical_available_str.lower() == 'true'
+        
+        if not product_id:
+            return JsonResponse({'error': 'Product ID is required'}, status=400)
+        if not all([name, description, category, product_type, image]) or stock < 0 or not model_files:
+            return JsonResponse({'error': 'Invalid input data'}, status=400)
 
-    if digital_price < 0 or physical_price < 0:
-        return JsonResponse({'error': 'Prices must be non-negative'}, status=400)
+        if digital_price < 0 or physical_price < 0:
+            return JsonResponse({'error': 'Prices must be non-negative'}, status=400)
 
-    if not digital_available and not physical_available:
-        return JsonResponse({'error': 'At least one of digital or physical availability must be true'}, status=400)
-    
-    product = update_existing_product(product_id, name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, texture_files)
-    return JsonResponse({'message': 'Product updated successfully', 'product_id': product.id}, status=200)
+        if not digital_available and not physical_available:
+            return JsonResponse({'error': 'At least one of digital or physical availability must be true'}, status=400)
+        
+        product = update_existing_product(product_id, name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, texture_files)
+        return JsonResponse({'message': 'Product updated successfully', 'product_id': product.id}, status=200)
+    except Product.DoesNotExist:
+        return JsonResponse({'error': 'Product not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 @csrf_exempt
 @require_http_methods(["POST"])
+@login_required
 def get_products(request):
     try:
         products = Product.objects.all()
@@ -154,10 +156,9 @@ def get_products(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 @require_http_methods(["GET"])
+@login_required
 def get_product_detail(request, product_id):
     try:
-        if not hasattr(request, 'user') or not request.user.is_authenticated:
-            return JsonResponse({'error': 'Authentication required'}, status=401)
         if not product_id:
             return JsonResponse({'error': 'Product ID is required'}, status=400)
         product = Product.objects.get(id=product_id)
@@ -188,10 +189,9 @@ def get_product_detail(request, product_id):
 
 @csrf_exempt
 @require_http_methods(["DELETE"])
+@login_required
 def delete_product(request, product_id):
     try:
-        if not hasattr(request, 'user') or not request.user.is_authenticated:
-            return JsonResponse({'error': 'Authentication required'}, status=401)
         if not product_id:
             return JsonResponse({'error': 'Product ID is required'}, status=400)
         
@@ -205,10 +205,9 @@ def delete_product(request, product_id):
     
     
 @require_http_methods(["GET"])
+@login_required
 def get_3d_model(request, model_id):
     try:
-        if not hasattr(request, 'user') or not request.user.is_authenticated:
-            return JsonResponse({'error': 'Authentication required'}, status=401)
         model = fetch_3d_model(model_id)
         if not model:
             return JsonResponse({'error': 'Model not found'}, status=404)
@@ -223,10 +222,9 @@ def get_3d_model(request, model_id):
         return JsonResponse({'error': str(e)}, status=500)
     
 @require_http_methods(["GET"])
+@login_required
 def get_display_scene(request, display_scene_id):
     try:
-        if not hasattr(request, 'user') or not request.user.is_authenticated:
-            return JsonResponse({'error': 'Authentication required'}, status=401)
         scene = fetch_display_scene(display_scene_id)
         if not scene:
             return JsonResponse({'error': 'Scene not found'}, status=404)
@@ -241,10 +239,9 @@ def get_display_scene(request, display_scene_id):
         return JsonResponse({'error': str(e)}, status=500)
     
 @require_http_methods(["GET"])
+@login_required
 def get_textures(request, model_id):
     try:
-        if not hasattr(request, 'user') or not request.user.is_authenticated:
-            return JsonResponse({'error': 'Authentication required'}, status=401)
         model = fetch_3d_model(model_id)
         if not model:
             return JsonResponse({'error': 'Model not found'}, status=404)
@@ -258,13 +255,30 @@ def get_textures(request, model_id):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
     
+@require_http_methods(["GET"])
+@login_required
+def get_all_categories(request):
+    try:
+        categories = Product.objects.values_list('category', flat=True).distinct()
+        return JsonResponse({'categories': list(categories)}, status=200)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    
+@require_http_methods(["GET"])
+@login_required
+def get_all_product_types(request):
+    try:
+        product_types = Product.objects.values_list('type', flat=True).distinct()
+        return JsonResponse({'product_types': list(product_types)}, status=200)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    
 # testing endpoints for ZODB operations
 @csrf_exempt
 @require_http_methods(["POST"])
+@login_required
 def add_3d_model(request):
     try:
-        if not hasattr(request, 'user') or not request.user.is_authenticated:
-            return JsonResponse({'error': 'Authentication required'}, status=401)
         model_file = request.FILES.get('model_file')
         texture_files = request.FILES.getlist('texture_files')
         
@@ -279,10 +293,9 @@ def add_3d_model(request):
     
 @csrf_exempt
 @require_http_methods(["POST"])
+@login_required
 def add_texture(request):
     try:
-        if not hasattr(request, 'user') or not request.user.is_authenticated:
-            return JsonResponse({'error': 'Authentication required'}, status=401)
         texture_file = request.FILES.get('texture_file')
         
         if not texture_file:
@@ -296,10 +309,9 @@ def add_texture(request):
     
 @csrf_exempt
 @require_http_methods(["POST"])
+@login_required
 def add_display_scene(request):
     try:
-        if not hasattr(request, 'user') or not request.user.is_authenticated:
-            return JsonResponse({'error': 'Authentication required'}, status=401)
         scene_file = request.FILES.get('scene_file')
         
         if not scene_file:
@@ -312,10 +324,9 @@ def add_display_scene(request):
         return JsonResponse({'error': str(e)}, status=500)
     
 @require_http_methods(["GET"])
+@login_required
 def get_texture(request, texture_id):
     try:
-        if not hasattr(request, 'user') or not request.user.is_authenticated:
-            return JsonResponse({'error': 'Authentication required'}, status=401)
         response = fetch_texture(texture_id)
         if not response:
             return JsonResponse({'error': 'Texture not found'}, status=404)
@@ -325,10 +336,9 @@ def get_texture(request, texture_id):
         return JsonResponse({'error': str(e)}, status=500)
     
 @require_http_methods(["GET"])
+@login_required
 def get_display_scenes(request, product_id):
     try:
-        if not hasattr(request, 'user') or not request.user.is_authenticated:
-            return JsonResponse({'error': 'Authentication required'}, status=401)
         product = Product.objects.get(id=product_id)
         if not product:
             return JsonResponse({'error': 'Product not found'}, status=404)
