@@ -51,4 +51,4 @@ def build_user_profile(user):
         staff = user.staff
         profile.update({'email': getattr(staff, 'email', None)})
 
-    return profile
+    return profile    

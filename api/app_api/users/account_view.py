@@ -2,6 +2,7 @@ from django.http import JsonResponse
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from .models import Staff, User, Customer
 from django.utils.dateparse import parse_date
@@ -169,10 +170,8 @@ def logout_view(request):
 # Delete User
 @csrf_exempt
 @require_http_methods(["DELETE"])
+@login_required
 def delete_user(request):
-    if not hasattr(request, 'user') or not request.user.is_authenticated:
-        return JsonResponse({'error': 'Authentication required'}, status=401)
-
     user = request.user
     try:
         if hasattr(user, 'staff'):
@@ -192,19 +191,15 @@ def delete_user(request):
 
 # Get User Profile
 @require_http_methods(["GET"])
+@login_required
 def get_users_profile(request):
-    if not hasattr(request, 'user') or not request.user.is_authenticated:
-        return JsonResponse({'error': 'Authentication required'}, status=401)
-
     return JsonResponse({'user_profile': build_user_profile(request.user)}, status=200)
 
 # Update User Profile
 @csrf_exempt
 @require_http_methods(["PUT"])
+@login_required
 def update_user_profile(request):
-    if not hasattr(request, 'user') or not request.user.is_authenticated:
-        return JsonResponse({'error': 'Authentication required'}, status=401)
-
     put_data = parse_request_body(request)
 
     user = request.user
@@ -253,10 +248,8 @@ def update_user_profile(request):
 # Upload Profile Picture
 @csrf_exempt
 @require_http_methods(["POST"])
+@login_required
 def upload_profile_picture(request):
-    if not hasattr(request, 'user') or not request.user.is_authenticated:
-        return JsonResponse({'error': 'Authentication required'}, status=401)
-
     if 'profile_picture' not in request.FILES:
         return JsonResponse({'error': 'No profile picture provided'}, status=400)
 
@@ -287,10 +280,8 @@ def upload_profile_picture(request):
 # Change Password
 @csrf_exempt
 @require_http_methods(["PUT"])
+@login_required
 def change_password(request):
-    if not hasattr(request, 'user') or not request.user.is_authenticated:
-        return JsonResponse({'error': 'Authentication required'}, status=401)
-
     put_data = parse_request_body(request)
     current_password = put_data.get('current_password')
     new_password = put_data.get('new_password')
