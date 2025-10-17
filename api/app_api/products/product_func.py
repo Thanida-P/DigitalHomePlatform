@@ -3,7 +3,7 @@ from .objectModels import *
 from zodb.zodb_management import *
 import base64
 
-def create_product(name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, texture_files=None):
+def create_product(name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, is_container, texture_files=None):
     image_base64 = base64.b64encode(image.read()).decode('utf-8')
     model_id = create_3d_model(model_files, texture_files)
     display_scenes = []
@@ -24,11 +24,12 @@ def create_product(name, description, digital_price, physical_price, category, i
         display_scenes=display_scenes if display_scenes else [],
         digital_available=digital_available,
         physical_available=physical_available,
+        is_container=is_container
     )
     product.save()
     return product
 
-def update_existing_product(product_id, name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, texture_files):
+def update_existing_product(product_id, name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, is_container, texture_files):
     try:
         product = Product.objects.get(id=product_id)
     except Product.DoesNotExist:
@@ -57,6 +58,8 @@ def update_existing_product(product_id, name, description, digital_price, physic
         product.physical_available = physical_available
     if model_files:
         update_3d_model(product.model_id, model_files, texture_files)
+    if is_container is not None:
+        product.is_container = is_container
 
     if scene_files:
         display_scene_ids = update_display_scene(product.display_scenes, scene_files)

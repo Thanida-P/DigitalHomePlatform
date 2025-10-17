@@ -26,6 +26,7 @@ def add_product(request):
         digital_available = digital_available_str.lower() == 'true'
         physical_available_str = request.POST.get('physical_available', 'false')
         physical_available = physical_available_str.lower() == 'true'
+        is_container = request.POST.get('is_container', 'false').lower() == 'true'
         
         if not all([name, description, category, product_type, image]) or stock < 0 or not model_files:
             return JsonResponse({'error': 'Invalid input data'}, status=400)
@@ -36,7 +37,7 @@ def add_product(request):
         if not digital_available and not physical_available:
             return JsonResponse({'error': 'At least one of digital or physical availability must be true'}, status=400)
 
-        product = create_product(name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, texture_files)
+        product = create_product(name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, is_container, texture_files)
 
         return JsonResponse({'message': 'Product created successfully', 'product_id': product.id}, status=201)
     except Exception as e:
@@ -63,6 +64,7 @@ def update_product(request):
         digital_available = digital_available_str.lower() == 'true'
         physical_available_str = request.POST.get('physical_available', 'false')
         physical_available = physical_available_str.lower() == 'true'
+        is_container = request.POST.get('is_container', 'false').lower() == 'true'
         
         if not product_id:
             return JsonResponse({'error': 'Product ID is required'}, status=400)
@@ -75,7 +77,7 @@ def update_product(request):
         if not digital_available and not physical_available:
             return JsonResponse({'error': 'At least one of digital or physical availability must be true'}, status=400)
         
-        product = update_existing_product(product_id, name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, texture_files)
+        product = update_existing_product(product_id, name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, is_container, texture_files)
         return JsonResponse({'message': 'Product updated successfully', 'product_id': product.id}, status=200)
     except Product.DoesNotExist:
         return JsonResponse({'error': 'Product not found'}, status=404)

@@ -19,6 +19,7 @@ class Product(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     model_id = models.IntegerField(null=True, blank=True)  # Link to 3D model
     display_scenes = models.JSONField(default=list)  # List of room scene IDs
+    is_container = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
