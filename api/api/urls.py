@@ -21,6 +21,7 @@ import app_api.users.address_view as address_views
 import app_api.users.payment_view as payment_views
 import app_api.carts.view as cart_views
 import app_api.products.view as product_views
+import app_api.orders.view as order_views
 
 urlpatterns = [
     path('users/admin/register/', account_views.register_admin),
@@ -60,6 +61,11 @@ urlpatterns = [
     path('carts/view/', cart_views.view_cart),
     path('carts/clear_cart/', cart_views.clear_cart),
     path('carts/summary/', cart_views.get_cart_summary),
+    path('orders/checkout/', order_views.checkout),
+    path('orders/list/', order_views.list_orders),
+    path('orders/payment_completed/<int:order_id>/', order_views.payment_completed),
+    path('orders/cancel/<int:order_id>/', order_views.cancel_order),
+    path("orders/complete/<int:order_id>/", order_views.complete_order),
     
     # For debugging purposes
     path('test/add_3d_model/', product_views.add_3d_model),

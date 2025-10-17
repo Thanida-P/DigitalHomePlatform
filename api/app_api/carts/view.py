@@ -127,7 +127,7 @@ def clear_cart(request):
     cart.save()
 
     return JsonResponse({'message': 'Cart cleared successfully'}, status=200)
-@csrf_exempt
+
 @login_required
 @require_http_methods(["GET"])
 def get_cart_summary(request):
