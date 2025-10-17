@@ -1,4 +1,3 @@
-import json
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
@@ -75,19 +74,6 @@ def remove_credit_card(request, pm_id):
 @require_http_methods(["POST"])
 @login_required
 def add_bank_account(request):
-    """
-    Expected JSON body:
-    {
-        "provider": "scb",
-        "bank_name": "Siam Commercial Bank",
-        "account_holder": "John Doe",
-        "last4": "1234",
-        "provider_token": "ba_tok_001",   # token from your payment gateway / bank
-        "full_account_number": "optional - only if you must store (will be encrypted)"
-    }
-    """
-
-
     provider = request.POST.get("provider") or "bank"
     provider_token = request.POST.get("provider_token")
     bank_name = request.POST.get("bank_name")

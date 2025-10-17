@@ -5,6 +5,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from .models import Staff, User, Customer
+from app_api.carts.models import Cart
 from django.utils.dateparse import parse_date
 from .funcHelper import *
 import base64
@@ -41,6 +42,14 @@ def register(request):
             bank_accounts=[],
             cart_id=None
         )
+        
+        cart = Cart.objects.create(
+            customer=user.customer,
+            items=[]
+        )
+
+        user.customer.cart_id = cart.id
+        user.customer.save()
 
     response = JsonResponse({'message': 'User registered successfully'}, status=201)
     response.set_cookie(

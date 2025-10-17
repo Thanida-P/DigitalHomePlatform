@@ -19,6 +19,7 @@ from django.urls import path
 import app_api.users.account_view as account_views
 import app_api.users.address_view as address_views
 import app_api.users.payment_view as payment_views
+import app_api.carts.view as cart_views
 import app_api.products.view as product_views
 
 urlpatterns = [
@@ -54,6 +55,11 @@ urlpatterns = [
     path('products/list/', product_views.get_products),
     path('products/categories/', product_views.get_all_categories),
     path('products/types/', product_views.get_all_product_types),
+    path('carts/add_item/', cart_views.add_to_cart),
+    path('carts/remove_item/<int:cart_item_id>/', cart_views.remove_from_cart),
+    path('carts/view/', cart_views.view_cart),
+    path('carts/clear_cart/', cart_views.clear_cart),
+    path('carts/summary/', cart_views.get_cart_summary),
     
     # For debugging purposes
     path('test/add_3d_model/', product_views.add_3d_model),
