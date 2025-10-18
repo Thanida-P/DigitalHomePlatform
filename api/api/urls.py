@@ -19,8 +19,11 @@ from django.urls import path
 import app_api.users.account_view as account_views
 import app_api.users.address_view as address_views
 import app_api.users.payment_view as payment_views
+import app_api.users.wishlist_view as wishlist_views
 import app_api.carts.view as cart_views
 import app_api.products.view as product_views
+import app_api.orders.view as order_views
+import app_api.reviews.view as review_views
 
 urlpatterns = [
     path('users/admin/register/', account_views.register_admin),
@@ -45,6 +48,9 @@ urlpatterns = [
     path('users/payment_methods/add_bank_account/', payment_views.add_bank_account),
     path('users/payment_methods/list_bank_accounts/', payment_views.list_bank_accounts),
     path('users/payment_methods/remove_bank_account/<int:ba_id>/', payment_views.remove_bank_account),
+    path('users/wishlist/add/', wishlist_views.add_to_wishlist),
+    path('users/wishlist/remove/<int:product_id>/', wishlist_views.remove_from_wishlist),
+    path('users/wishlist/', wishlist_views.get_wishlist),
     path('products/add/', product_views.add_product),
     path('products/get_product_detail/<int:product_id>/', product_views.get_product_detail),
     path('products/get_3d_model/<int:model_id>/', product_views.get_3d_model),
@@ -60,7 +66,17 @@ urlpatterns = [
     path('carts/view/', cart_views.view_cart),
     path('carts/clear_cart/', cart_views.clear_cart),
     path('carts/summary/', cart_views.get_cart_summary),
-    
+    path('orders/checkout/', order_views.checkout),
+    path('orders/list/', order_views.list_orders),
+    path('orders/payment_completed/<int:order_id>/', order_views.payment_completed),
+    path('orders/cancel/<int:order_id>/', order_views.cancel_order),
+    path("orders/complete/<int:order_id>/", order_views.complete_order),
+    path('reviews/add/', review_views.add_review),
+    path('reviews/edit/', review_views.edit_review),
+    path('reviews/delete/<int:review_id>/', review_views.delete_review),
+    path('reviews/get_product_reviews/<int:product_id>/', review_views.get_reviews_for_product),
+    path('reviews/get_customer_reviews/', review_views.get_reviews_by_customer),
+
     # For debugging purposes
     path('test/add_3d_model/', product_views.add_3d_model),
     path('test/add_texture/', product_views.add_texture),

@@ -40,6 +40,7 @@ def register(request):
             purchased_history=[],
             credit_cards=[],
             bank_accounts=[],
+            wishlist=[],
             cart_id=None
         )
         
