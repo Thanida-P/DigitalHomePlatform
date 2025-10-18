@@ -60,7 +60,6 @@ def list_orders(request):
     orders_data = []
     for order in customer.orders.all().order_by('-created_at'):
         order_items = []
-        # iterate over the RelatedManager queryset instead of treating it as iterable
         for item in order.order_items_rel.all():
             order_items.append({
                 'id': item.id,
