@@ -133,7 +133,8 @@ def complete_order(request, order_id):
                 positions={'x': 0.0, 'y': 0.0, 'z': 0.0, 't': 0.0},
                 rotation={'x': 0.0, 'y': 0.0, 'z': 0.0},
                 scale={'x': 1.0, 'y': 1.0, 'z': 1.0},
-                position_history=[]
+                position_history=[],
+                amount=item.quantity
             )
             if item.product.is_container:
                 ContainerOwnedProducts.objects.create(product=ownedProduct)

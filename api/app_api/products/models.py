@@ -30,6 +30,7 @@ class OwnedProducts(models.Model):
     rotation = models.JSONField(default=dict)  # {'x': float, 'y': float, 'z': float}
     scale = models.JSONField(default=dict)     # {'x': float, 'y': float, 'z': float}
     texture_id = models.IntegerField(null=True, blank=True)
+    amount = models.IntegerField(default=1)
     position_history = models.JSONField(default=list)
     
 class ContainerOwnedProducts(models.Model):
