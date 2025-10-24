@@ -1,10 +1,7 @@
 import reflex as rx
-from ..template import template 
 from typing import Any, Dict
 
 class ThreepipeViewer(rx.Component):
-    """Threepipe viewer with drag and drop support for multiple models"""
-    
     tag = "ThreepipeViewerComponent"
     
     # Props
@@ -15,7 +12,6 @@ class ThreepipeViewer(rx.Component):
     show_ui: rx.Var[bool] = True
     enable_dropzone: rx.Var[bool] = True
     
-    # 🆕 Separate props for initial model only
     initial_model_position: rx.Var[list] = [0, 25, 0]
     initial_model_scale: rx.Var[float] = 1.0
     
@@ -57,6 +53,13 @@ class ThreepipeViewer(rx.Component):
                 const [initialized, setInitialized] = useState(false);
                 const [showDropPrompt, setShowDropPrompt] = useState(!modelUrl);
                 const [loadedModels, setLoadedModels] = useState([]);
+                
+                // Sidebar state
+                const [sidebarOpen, setSidebarOpen] = useState(true);
+                const [decorationsExpanded, setDecorationsExpanded] = useState(false);
+                const [modelsExpanded, setModelsExpanded] = useState(false);
+                const [searchQuery, setSearchQuery] = useState('');
+                const [selectedCategory, setSelectedCategory] = useState('All');
 
                 useEffect(() => {
                     let viewer = null;
@@ -73,8 +76,6 @@ class ThreepipeViewer(rx.Component):
                             console.log('🚀 Starting Threepipe initialization...');
                             
                             if (cleanup) return;
-                            
-                            console.log('🎨 Creating viewer...');
                             
                             viewer = new ThreeViewer({
                                 canvas: canvasRef.current,
@@ -99,7 +100,6 @@ class ThreepipeViewer(rx.Component):
                             });
                             
                             viewerRef.current = viewer;
-                            console.log('✅ Viewer created');
                             
                             const camera = viewer.scene.mainCamera;
                             
@@ -108,11 +108,8 @@ class ThreepipeViewer(rx.Component):
                                 camera.controls.maxDistance = 1000;
                                 camera.controls.enableDamping = true;
                                 camera.controls.dampingFactor = 0.05;
-                                
-                                console.log('✅ Camera controls configured');
                             }
                             
-                            // Dynamic clipping plane updater
                             function updateCameraClipping() {
                                 if (!viewer || cleanup) return;
                                 
@@ -130,10 +127,7 @@ class ThreepipeViewer(rx.Component):
                             }
                             
                             updateCameraClipping();
-                            console.log('✅ Dynamic camera clipping started');
                             
-                            
-                            console.log('🔌 Adding plugins...');
                             const picking = viewer.addPluginSync(PickingPlugin);
                             const transformControlsPlugin = viewer.addPluginSync(TransformControlsPlugin);
                             const editorView = viewer.addPluginSync(
@@ -146,9 +140,6 @@ class ThreepipeViewer(rx.Component):
                                 editorView
                             };
                             
-                            console.log('✅ Core plugins added');
-                            
-                            // 🆕 Dropzone: all dropped models stay at [0, 0, 0]
                             if (enableDropzone) {
                                 const dropzone = viewer.getPlugin(DropzonePlugin);
                                 if (dropzone) {
@@ -164,11 +155,9 @@ class ThreepipeViewer(rx.Component):
                                     });
                                     
                                     dropzone.addEventListener('drop', (e) => {
-                                        console.log('📦 Files dropped:', e);
                                         if (e.assets && e.assets.length > 0) {
                                             setShowDropPrompt(false);
                                             
-                                            // 🆕 All dropped models stay at [0, 0, 0] with scale 1.0
                                             const newModels = e.assets.map((asset, index) => {
                                                 const fileName = droppedFileNames[index] || 
                                                                asset.name || 
@@ -176,12 +165,9 @@ class ThreepipeViewer(rx.Component):
                                                                asset.modelObject?.name || 
                                                                `Model ${index + 1}`;
                                                 
-                                                // 🎯 Set position to [0, 0, 0] and scale to 1.0
                                                 if (asset.modelObject) {
                                                     asset.modelObject.position.set(0, 0, 0);
                                                     asset.modelObject.scale.set(1, 1, 1);
-                                                    
-                                                    console.log(`✅ Dropped model "${fileName}" placed at [0, 0, 0] with scale 1.0`);
                                                 }
                                                 
                                                 return {
@@ -198,52 +184,37 @@ class ThreepipeViewer(rx.Component):
                                                     picking.setSelectedObject(e.assets[0]);
                                                 }, 100);
                                             }
-                                            
-                                            console.log(`✅ Loaded ${e.assets.length} model(s) at origin`);
                                         }
                                     });
-                                    console.log('✅ Dropzone configured');
                                 }
                             }
                             
                             if (showUi) {
                                 try {
-                                    console.log('🎛️ Adding Tweakpane UI plugin...');
                                     const ui = viewer.addPluginSync(new TweakpaneUiPlugin(true));
-                                    
                                     ui.setupPluginUi(TransformControlsPlugin, { expanded: true });
                                     ui.setupPluginUi(PickingPlugin);
                                     ui.setupPluginUi(EditorViewWidgetPlugin);
-                                    
                                     if (enableDropzone) {
                                         ui.setupPluginUi(DropzonePlugin);
                                     }
-                                    
                                     pluginsRef.current.ui = ui;
-                                    console.log('✅ Tweakpane UI configured');
                                 } catch (uiError) {
                                     console.error('❌ Tweakpane UI error:', uiError);
                                 }
                             }
                             
                             if (environmentUrl) {
-                                console.log('🌍 Loading environment map...');
                                 await viewer.setEnvironmentMap(environmentUrl);
-                                console.log('✅ Environment loaded');
                             }
                             
-                            // 🆕 Load initial model with CUSTOM position and scale
                             if (modelUrl) {
-                                console.log('📦 Loading initial model:', modelUrl);
                                 const model = await viewer.load(modelUrl, {
                                     autoCenter: false,
                                     autoScale: false,
                                 });
                                 
-                                console.log('✅ Initial model loaded');
-                                
                                 if (model) {
-                                    // 🎯 Apply CUSTOM position and scale to initial model ONLY
                                     if (model.modelObject) {
                                         model.modelObject.position.set(
                                             initialModelPosition[0],
@@ -255,7 +226,6 @@ class ThreepipeViewer(rx.Component):
                                             initialModelScale,
                                             initialModelScale
                                         );
-                                        console.log(`✅ Initial model positioned at [${initialModelPosition}] with scale ${initialModelScale}`);
                                     }
                                     
                                     setShowDropPrompt(false);
@@ -276,55 +246,41 @@ class ThreepipeViewer(rx.Component):
                             
                             window.threepipeViewer = viewer;
                             window.threepipePicking = picking;
-                            window.threepipeTransformControlsPlugin = transformControlsPlugin;
-                            window.threepipeTransformControls = transformControlsPlugin.transformControls;
-                            window.threepipeEditorView = editorView;
-                            if (pluginsRef.current.ui) {
-                                window.threepipeUI = pluginsRef.current.ui;
-                            }
                             
-                            window.setModelTransform = (modelId, position = null, scale = null) => {
-                                const model = loadedModels.find(m => m.id === modelId);
-                                if (model && model.object.modelObject) {
-                                    if (position) {
-                                        model.object.modelObject.position.set(position[0], position[1], position[2]);
+                            window.loadFurnitureFromUrl = async (url, name) => {
+                                try {
+                                    const model = await viewer.load(url, {
+                                        autoCenter: false,
+                                        autoScale: false,
+                                    });
+                                    
+                                    if (model && model.modelObject) {
+                                        model.modelObject.position.set(0, 0, 0);
+                                        model.modelObject.scale.set(1, 1, 1);
+                                        
+                                        const newModel = {
+                                            name: name,
+                                            object: model,
+                                            id: Math.random().toString(36).substr(2, 9)
+                                        };
+                                        
+                                        setLoadedModels(prev => [...prev, newModel]);
+                                        setShowDropPrompt(false);
+                                        
+                                        if (picking) {
+                                            picking.setSelectedObject(model);
+                                        }
+                                        
+                                        return true;
                                     }
-                                    if (scale) {
-                                        model.object.modelObject.scale.set(scale, scale, scale);
-                                    }
-                                    console.log('✅ Transform updated for:', model.name);
+                                } catch (err) {
+                                    console.error('❌ Failed to load furniture:', err);
+                                    return false;
                                 }
-                            };
-                            
-                            window.getCameraInfo = () => {
-                                const cam = viewer.scene.mainCamera;
-                                const distance = cam.controls ? cam.controls.target.distanceTo(cam.position) : 0;
-                                return {
-                                    distance: distance.toFixed(4),
-                                    near: cam.near.toFixed(6),
-                                    far: cam.far.toFixed(2),
-                                    minDistance: cam.controls?.minDistance,
-                                    maxDistance: cam.controls?.maxDistance
-                                };
-                            };
-                            
-                            window.clearAllModels = () => {
-                                const scene = viewer.scene;
-                                const objectsToRemove = scene.modelRoot.children.filter(obj => 
-                                    obj.userData && obj.userData.importedObject
-                                );
-                                objectsToRemove.forEach(obj => {
-                                    scene.remove(obj);
-                                    obj.dispose?.();
-                                });
-                                setLoadedModels([]);
-                                setShowDropPrompt(true);
-                                console.log('🗑️ All models cleared');
                             };
                             
                             setLoading(false);
                             setInitialized(true);
-                            console.log('🎉 Initialization complete!');
                             
                         } catch (err) {
                             console.error('💥 Error:', err);
@@ -352,66 +308,9 @@ class ThreepipeViewer(rx.Component):
                     };
                 }, [showUi, enableDropzone, initialModelPosition, initialModelScale]);
                 
-                // Update model when URL changes
-                useEffect(() => {
-                    if (modelUrl === initialModelUrlRef.current) {
-                        console.log('⏭️ Skipping initial model URL in update effect');
-                        return;
-                    }
-                    
-                    if (viewerRef.current && modelUrl && initialized) {
-                        console.log('🔄 Loading new model:', modelUrl);
-                        setLoading(true);
-                        viewerRef.current.load(modelUrl, {
-                            autoCenter: false,
-                            autoScale: false,
-                            disposeSceneObjects: false,
-                        })
-                        .then((model) => {
-                            console.log('✅ New model loaded');
-                            if (model) {
-                                // 🎯 New models from state also get custom position
-                                if (model.modelObject) {
-                                    model.modelObject.position.set(
-                                        initialModelPosition[0],
-                                        initialModelPosition[1],
-                                        initialModelPosition[2]
-                                    );
-                                    model.modelObject.scale.set(
-                                        initialModelScale,
-                                        initialModelScale,
-                                        initialModelScale
-                                    );
-                                }
-                                
-                                setShowDropPrompt(false);
-                                
-                                const modelName = modelUrl.split('/').pop() || 'Model';
-                                const newModel = {
-                                    name: modelName,
-                                    object: model,
-                                    id: Math.random().toString(36).substr(2, 9)
-                                };
-                                setLoadedModels(prev => [...prev, newModel]);
-                                
-                                if (pluginsRef.current.picking) {
-                                    pluginsRef.current.picking.setSelectedObject(model);
-                                }
-                            }
-                            setLoading(false);
-                        })
-                        .catch(err => {
-                            console.error('❌ Model load error:', err);
-                            setError(err.message);
-                            setLoading(false);
-                        });
-                    }
-                }, [modelUrl, initialized]);
-                
                 const selectModel = (model) => {
                     if (pluginsRef.current.picking && model.object) {
                         pluginsRef.current.picking.setSelectedObject(model.object);
-                        console.log('Selected model:', model.name);
                     }
                 };
                 
@@ -421,12 +320,107 @@ class ThreepipeViewer(rx.Component):
                         viewerRef.current.scene.remove(modelToRemove.object);
                         modelToRemove.object.dispose?.();
                         setLoadedModels(prev => prev.filter(m => m.id !== modelId));
-                        console.log('Removed model:', modelToRemove.name);
                         
                         if (loadedModels.length === 1) {
                             setShowDropPrompt(true);
                         }
                     }
+                };
+                
+                // Enhanced furniture catalog with more items
+                const furnitureCatalog = [
+                    {
+                        id: 'chair1',
+                        name: 'Rocking Chair',
+                        url: '/models/Rocking_Chair.glb',
+                        thumbnail: '🪑',
+                        category: 'Seating',
+                        tags: ['chair', 'rocking', 'furniture', 'seating']
+                    },
+                    {
+                        id: 'helmet1',
+                        name: 'Damaged Helmet',
+                        url: 'https://samples.threepipe.org/minimal/DamagedHelmet/glTF/DamagedHelmet.gltf',
+                        thumbnail: '🪖',
+                        category: 'Decoration',
+                        tags: ['helmet', 'decoration', 'metal']
+                    },
+                    {
+                        id: 'cabin1',
+                        name: 'Forest Cabin',
+                        url: '/models/forest_cabin.glb',
+                        thumbnail: '🏠',
+                        category: 'Building',
+                        tags: ['cabin', 'house', 'building', 'forest']
+                    },
+                    {
+                        id: 'sofa1',
+                        name: 'Modern Sofa',
+                        url: '/models/sofa.glb',
+                        thumbnail: '🛋️',
+                        category: 'Seating',
+                        tags: ['sofa', 'couch', 'furniture', 'seating', 'modern']
+                    },
+                    {
+                        id: 'table1',
+                        name: 'Dining Table',
+                        url: '/models/table.glb',
+                        thumbnail: '🪑',
+                        category: 'Tables',
+                        tags: ['table', 'dining', 'furniture', 'wood']
+                    },
+                    {
+                        id: 'lamp1',
+                        name: 'Floor Lamp',
+                        url: '/models/lamp.glb',
+                        thumbnail: '💡',
+                        category: 'Lighting',
+                        tags: ['lamp', 'light', 'floor', 'lighting']
+                    },
+                    {
+                        id: 'bed1',
+                        name: 'King Bed',
+                        url: '/models/bed.glb',
+                        thumbnail: '🛏️',
+                        category: 'Bedroom',
+                        tags: ['bed', 'bedroom', 'sleep', 'furniture']
+                    },
+                    {
+                        id: 'desk1',
+                        name: 'Office Desk',
+                        url: '/models/desk.glb',
+                        thumbnail: '🖥️',
+                        category: 'Tables',
+                        tags: ['desk', 'office', 'work', 'table']
+                    },
+                ];
+                
+                // Get unique categories
+                const categories = ['All', ...new Set(furnitureCatalog.map(item => item.category))];
+                
+                // Filter furniture by category and search query
+                const filteredFurniture = furnitureCatalog.filter(item => {
+                    const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
+                    const search = searchQuery.toLowerCase();
+                    const matchesSearch = !search || (
+                        item.name.toLowerCase().includes(search) ||
+                        item.category.toLowerCase().includes(search) ||
+                        item.tags.some(tag => tag.toLowerCase().includes(search))
+                    );
+                    return matchesCategory && matchesSearch;
+                });
+                
+                // Group furniture by category
+                const groupedFurniture = {};
+                filteredFurniture.forEach(item => {
+                    if (!groupedFurniture[item.category]) {
+                        groupedFurniture[item.category] = [];
+                    }
+                    groupedFurniture[item.category].push(item);
+                });
+                
+                const loadFurniture = (item) => {
+                    window.loadFurnitureFromUrl(item.url, item.name);
                 };
                 
                 return (
@@ -446,133 +440,545 @@ class ThreepipeViewer(rx.Component):
                                 display: 'block'
                             }}
                         />
-                        {enableDropzone && showDropPrompt && !loading && (
-                            <div style={{
-                                position: 'absolute',
-                                top: '50%',
-                                left: '50%',
-                                transform: 'translate(-50%, -50%)',
-                                color: 'rgba(255, 255, 255, 0.7)',
-                                fontSize: '24px',
-                                fontFamily: 'sans-serif',
-                                textAlign: 'center',
-                                pointerEvents: 'none',
-                                zIndex: 50,
-                                background: 'rgba(0, 0, 0, 0.6)',
-                                padding: '40px 60px',
-                                borderRadius: '16px',
-                                border: '2px dashed rgba(255, 255, 255, 0.3)',
-                                backdropFilter: 'blur(10px)'
-                            }}>
-                                <div style={{ fontSize: '48px', marginBottom: '20px' }}>📦</div>
-                                <div style={{ marginBottom: '12px', fontWeight: '600' }}>
-                                    Drop 3D Models Here
-                                </div>
-                                <div style={{ 
-                                    fontSize: '16px', 
-                                    opacity: 0.9,
-                                    marginTop: '8px',
-                                    color: '#22c55e'
-                                }}>
-                                    Will be placed at origin [0, 0, 0]
-                                </div>
-                                <div style={{ 
-                                    fontSize: '14px', 
-                                    opacity: 0.8,
-                                    fontFamily: 'monospace',
-                                    marginTop: '16px'
-                                }}>
-                                    GLB • GLTF • FBX • OBJ • STL • PLY • USDZ
-                                </div>
-                            </div>
-                        )}
                         
-                        {loadedModels.length > 0 && (
+                        {/* SIDEBAR */}
+                        <div style={{
+                            position: 'absolute',
+                            left: sidebarOpen ? '0' : '-400px',
+                            top: '0',
+                            width: '400px',
+                            height: '100%',
+                            background: 'linear-gradient(180deg, #ffffff 0%, #f8f9fa 100%)',
+                            borderRight: '1px solid rgba(0, 0, 0, 0.1)',
+                            boxShadow: sidebarOpen ? '4px 0 32px rgba(0, 0, 0, 0.15)' : 'none',
+                            transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                            zIndex: 1500,
+                            display: 'flex',
+                            flexDirection: 'column',
+                        }}>
+                            {/* Sidebar Header */}
                             <div style={{
-                                position: 'absolute',
-                                top: '60px',
-                                left: '20px',
-                                background: 'rgba(0, 0, 0, 0.9)',
-                                padding: '16px',
-                                borderRadius: '12px',
-                                zIndex: 1000,
-                                maxWidth: '300px',
-                                maxHeight: '400px',
-                                overflow: 'auto',
-                                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)',
-                                backdropFilter: 'blur(10px)'
+                                padding: '24px 20px',
+                                borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
+                                background: 'white',
                             }}>
                                 <div style={{
-                                    color: 'white',
-                                    fontSize: '14px',
-                                    fontWeight: 'bold',
-                                    marginBottom: '12px',
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    borderBottom: '1px solid #4a5568',
-                                    paddingBottom: '8px'
+                                    color: '#1a1a2e',
+                                    fontSize: '24px',
+                                    fontWeight: '700',
+                                    marginBottom: '8px',
                                 }}>
-                                    <span>📦 Loaded Models ({loadedModels.length})</span>
+                                    Digital Home
                                 </div>
-                                {loadedModels.map((model) => (
-                                    <div 
-                                        key={model.id}
+                                <div style={{
+                                    color: '#64748b',
+                                    fontSize: '14px',
+                                }}>
+                                    Back to Shop
+                                </div>
+                            </div>
+                            
+                            {/* Main Content */}
+                            <div style={{
+                                flex: 1,
+                                overflowY: 'auto',
+                                padding: '16px',
+                                background: '#f8f9fa',
+                            }}>
+                                {/* Decorations Section */}
+                                <div style={{ marginBottom: '12px' }}>
+                                    <button
+                                        onClick={() => {
+                                            setDecorationsExpanded(!decorationsExpanded);
+                                            if (!decorationsExpanded) {
+                                                setModelsExpanded(false);
+                                            }
+                                        }}
                                         style={{
-                                            background: 'rgba(255, 255, 255, 0.1)',
-                                            padding: '10px',
-                                            borderRadius: '6px',
-                                            marginBottom: '8px',
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center',
+                                            width: '100%',
+                                            padding: '18px 20px',
+                                            background: decorationsExpanded 
+                                                ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                                                : 'white',
+                                            border: '1px solid rgba(0, 0, 0, 0.08)',
+                                            borderRadius: '12px',
+                                            color: decorationsExpanded ? 'white' : '#1a1a2e',
+                                            fontSize: '16px',
+                                            fontWeight: '600',
                                             cursor: 'pointer',
-                                            transition: 'all 0.2s'
+                                            transition: 'all 0.2s',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            textAlign: 'left',
+                                            boxShadow: decorationsExpanded ? '0 4px 12px rgba(59, 130, 246, 0.25)' : 'none',
                                         }}
                                         onMouseEnter={(e) => {
-                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                                            if (!decorationsExpanded) {
+                                                e.currentTarget.style.background = '#f1f5f9';
+                                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                                e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
+                                            }
                                         }}
                                         onMouseLeave={(e) => {
-                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                                            if (!decorationsExpanded) {
+                                                e.currentTarget.style.background = 'white';
+                                                e.currentTarget.style.transform = 'translateY(0)';
+                                                e.currentTarget.style.boxShadow = 'none';
+                                            }
                                         }}
-                                        onClick={() => selectModel(model)}
                                     >
-                                        <span style={{
-                                            color: 'white',
-                                            fontSize: '13px',
-                                            flex: 1,
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                            whiteSpace: 'nowrap'
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <span style={{ fontSize: '24px' }}>🛋️</span>
+                                            <span>Furniture Catalog</span>
+                                        </div>
+                                        <span style={{ 
+                                            fontSize: '18px',
+                                            transform: decorationsExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                                            transition: 'transform 0.3s'
                                         }}>
-                                            {model.name}
+                                            ▼
                                         </span>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                removeModel(model.id);
-                                            }}
-                                            style={{
-                                                background: '#dc2626',
-                                                border: 'none',
-                                                borderRadius: '4px',
-                                                color: 'white',
-                                                padding: '4px 8px',
-                                                fontSize: '11px',
-                                                cursor: 'pointer',
-                                                marginLeft: '8px',
-                                                transition: 'background 0.2s'
-                                            }}
-                                            onMouseEnter={(e) => e.target.style.background = '#b91c1c'}
-                                            onMouseLeave={(e) => e.target.style.background = '#dc2626'}
-                                        >
-                                            ✕
-                                        </button>
-                                    </div>
-                                ))}
+                                    </button>
+                                    
+                                    {/* Decorations Expanded Content */}
+                                    {decorationsExpanded && (
+                                        <div style={{
+                                            marginTop: '12px',
+                                            padding: '20px',
+                                            background: 'white',
+                                            borderRadius: '12px',
+                                            border: '1px solid rgba(0, 0, 0, 0.08)',
+                                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                                        }}>
+                                            {/* Search Bar */}
+                                            <div style={{ marginBottom: '16px' }}>
+                                                <div style={{ position: 'relative' }}>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search furniture..."
+                                                        value={searchQuery}
+                                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                                        style={{
+                                                            width: '100%',
+                                                            padding: '12px 16px 12px 44px',
+                                                            background: '#f8f9fa',
+                                                            border: '1px solid rgba(0, 0, 0, 0.1)',
+                                                            borderRadius: '10px',
+                                                            color: '#1a1a2e',
+                                                            fontSize: '14px',
+                                                            outline: 'none',
+                                                            transition: 'all 0.2s',
+                                                        }}
+                                                        onFocus={(e) => {
+                                                            e.target.style.background = 'white';
+                                                            e.target.style.borderColor = '#3b82f6';
+                                                            e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                                                        }}
+                                                        onBlur={(e) => {
+                                                            e.target.style.background = '#f8f9fa';
+                                                            e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                                                            e.target.style.boxShadow = 'none';
+                                                        }}
+                                                    />
+                                                    <span style={{
+                                                        position: 'absolute',
+                                                        left: '16px',
+                                                        top: '50%',
+                                                        transform: 'translateY(-50%)',
+                                                        fontSize: '18px',
+                                                        pointerEvents: 'none',
+                                                    }}>
+                                                        🔍
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Category Filter Buttons */}
+                                            <div style={{ marginBottom: '20px' }}>
+                                                <div style={{
+                                                    color: '#64748b',
+                                                    fontSize: '12px',
+                                                    fontWeight: '600',
+                                                    textTransform: 'uppercase',
+                                                    letterSpacing: '0.5px',
+                                                    marginBottom: '12px',
+                                                }}>
+                                                    Categories
+                                                </div>
+                                                <div style={{ 
+                                                    display: 'flex',
+                                                    flexWrap: 'wrap',
+                                                    gap: '8px',
+                                                }}>
+                                                    {categories.map((category) => (
+                                                        <button
+                                                            key={category}
+                                                            onClick={() => setSelectedCategory(category)}
+                                                            style={{
+                                                                padding: '8px 16px',
+                                                                background: selectedCategory === category 
+                                                                    ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                                                                    : '#f1f5f9',
+                                                                border: 'none',
+                                                                borderRadius: '20px',
+                                                                color: selectedCategory === category ? 'white' : '#475569',
+                                                                fontSize: '13px',
+                                                                fontWeight: '600',
+                                                                cursor: 'pointer',
+                                                                transition: 'all 0.2s',
+                                                                boxShadow: selectedCategory === category 
+                                                                    ? '0 2px 8px rgba(59, 130, 246, 0.3)' 
+                                                                    : 'none',
+                                                            }}
+                                                            onMouseEnter={(e) => {
+                                                                if (selectedCategory !== category) {
+                                                                    e.target.style.background = '#e2e8f0';
+                                                                }
+                                                            }}
+                                                            onMouseLeave={(e) => {
+                                                                if (selectedCategory !== category) {
+                                                                    e.target.style.background = '#f1f5f9';
+                                                                }
+                                                            }}
+                                                        >
+                                                            {category}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Furniture Display by Category */}
+                                            <div style={{ 
+                                                maxHeight: '500px',
+                                                overflowY: 'auto',
+                                                paddingRight: '4px',
+                                            }}>
+                                                {Object.keys(groupedFurniture).length > 0 ? (
+                                                    Object.entries(groupedFurniture).map(([category, items]) => (
+                                                        <div key={category} style={{ marginBottom: '24px' }}>
+                                                            <div style={{
+                                                                color: '#1a1a2e',
+                                                                fontSize: '15px',
+                                                                fontWeight: '700',
+                                                                marginBottom: '12px',
+                                                                paddingBottom: '8px',
+                                                                borderBottom: '2px solid #e2e8f0',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '8px',
+                                                            }}>
+                                                                <span>{category}</span>
+                                                                <span style={{
+                                                                    background: '#e2e8f0',
+                                                                    padding: '2px 8px',
+                                                                    borderRadius: '12px',
+                                                                    fontSize: '11px',
+                                                                    fontWeight: '600',
+                                                                    color: '#64748b',
+                                                                }}>
+                                                                    {items.length}
+                                                                </span>
+                                                            </div>
+                                                            
+                                                            <div style={{ 
+                                                                display: 'grid',
+                                                                gridTemplateColumns: 'repeat(2, 1fr)',
+                                                                gap: '12px',
+                                                            }}>
+                                                                {items.map((item) => (
+                                                                    <div 
+                                                                        key={item.id}
+                                                                        style={{
+                                                                            background: 'white',
+                                                                            border: '1px solid rgba(0, 0, 0, 0.08)',
+                                                                            borderRadius: '12px',
+                                                                            overflow: 'hidden',
+                                                                            cursor: 'pointer',
+                                                                            transition: 'all 0.2s',
+                                                                        }}
+                                                                        onClick={() => loadFurniture(item)}
+                                                                        onMouseEnter={(e) => {
+                                                                            e.currentTarget.style.transform = 'translateY(-4px)';
+                                                                            e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.2)';
+                                                                            e.currentTarget.style.borderColor = '#3b82f6';
+                                                                        }}
+                                                                        onMouseLeave={(e) => {
+                                                                            e.currentTarget.style.transform = 'translateY(0)';
+                                                                            e.currentTarget.style.boxShadow = 'none';
+                                                                            e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)';
+                                                                        }}
+                                                                    >
+                                                                        {/* Thumbnail */}
+                                                                        <div style={{
+                                                                            width: '100%',
+                                                                            height: '100px',
+                                                                            background: 'linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%)',
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'center',
+                                                                            fontSize: '40px',
+                                                                            borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+                                                                        }}>
+                                                                            {item.thumbnail}
+                                                                        </div>
+                                                                        
+                                                                        {/* Info */}
+                                                                        <div style={{ padding: '12px' }}>
+                                                                            <div style={{
+                                                                                color: '#1a1a2e',
+                                                                                fontSize: '13px',
+                                                                                fontWeight: '600',
+                                                                                marginBottom: '4px',
+                                                                                overflow: 'hidden',
+                                                                                textOverflow: 'ellipsis',
+                                                                                whiteSpace: 'nowrap',
+                                                                            }}>
+                                                                                {item.name}
+                                                                            </div>
+                                                                            <div style={{
+                                                                                color: '#64748b',
+                                                                                fontSize: '11px',
+                                                                            }}>
+                                                                                Click to add
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div style={{
+                                                        textAlign: 'center',
+                                                        padding: '40px 20px',
+                                                        color: '#64748b',
+                                                        fontSize: '14px',
+                                                    }}>
+                                                        <div style={{ fontSize: '36px', marginBottom: '12px' }}>🔍</div>
+                                                        <div>No furniture found</div>
+                                                        <div style={{ fontSize: '12px', marginTop: '8px', opacity: 0.7 }}>
+                                                            Try a different search or category
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                {/* Loaded Models Section */}
+                                <div style={{ marginBottom: '12px' }}>
+                                    <button
+                                        onClick={() => {
+                                            setModelsExpanded(!modelsExpanded);
+                                            if (!modelsExpanded) {
+                                                setDecorationsExpanded(false);
+                                            }
+                                        }}
+                                        style={{
+                                            width: '100%',
+                                            padding: '18px 20px',
+                                            background: modelsExpanded 
+                                                ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
+                                                : 'white',
+                                            border: '1px solid rgba(0, 0, 0, 0.08)',
+                                            borderRadius: '12px',
+                                            color: modelsExpanded ? 'white' : '#1a1a2e',
+                                            fontSize: '16px',
+                                            fontWeight: '600',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            textAlign: 'left',
+                                            boxShadow: modelsExpanded ? '0 4px 12px rgba(34, 197, 94, 0.25)' : 'none',
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            if (!modelsExpanded) {
+                                                e.currentTarget.style.background = '#f1f5f9';
+                                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                                e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
+                                            }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (!modelsExpanded) {
+                                                e.currentTarget.style.background = 'white';
+                                                e.currentTarget.style.transform = 'translateY(0)';
+                                                e.currentTarget.style.boxShadow = 'none';
+                                            }
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <span style={{ fontSize: '24px' }}>📥</span>
+                                            <span>Loaded Models</span>
+                                            <span style={{
+                                                background: modelsExpanded ? 'rgba(255, 255, 255, 0.2)' : '#e2e8f0',
+                                                padding: '4px 10px',
+                                                borderRadius: '12px',
+                                                fontSize: '12px',
+                                                fontWeight: '700',
+                                            }}>
+                                                {loadedModels.length}
+                                            </span>
+                                        </div>
+                                        <span style={{ 
+                                            fontSize: '18px',
+                                            transform: modelsExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                                            transition: 'transform 0.3s'
+                                        }}>
+                                            ▼
+                                        </span>
+                                    </button>
+                                    
+                                    {/* Loaded Models Content */}
+                                    {modelsExpanded && (
+                                        <div style={{
+                                            marginTop: '12px',
+                                            padding: '20px',
+                                            background: 'white',
+                                            borderRadius: '12px',
+                                            border: '1px solid rgba(0, 0, 0, 0.08)',
+                                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                                            maxHeight: '500px',
+                                            overflowY: 'auto',
+                                        }}>
+                                            {loadedModels.length === 0 ? (
+                                                <div style={{
+                                                    textAlign: 'center',
+                                                    color: '#64748b',
+                                                    padding: '40px 20px',
+                                                }}>
+                                                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>📭</div>
+                                                    <div style={{ fontSize: '14px', fontWeight: '600' }}>No models loaded</div>
+                                                    <div style={{ fontSize: '12px', marginTop: '8px' }}>
+                                                        Drop files or add furniture
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                    {loadedModels.map((model) => (
+                                                        <div 
+                                                            key={model.id}
+                                                            style={{
+                                                                background: '#f8f9fa',
+                                                                border: '1px solid rgba(0, 0, 0, 0.08)',
+                                                                borderRadius: '10px',
+                                                                padding: '14px',
+                                                                cursor: 'pointer',
+                                                                transition: 'all 0.2s',
+                                                            }}
+                                                            onClick={() => selectModel(model)}
+                                                            onMouseEnter={(e) => {
+                                                                e.currentTarget.style.background = '#e0f2fe';
+                                                                e.currentTarget.style.borderColor = '#3b82f6';
+                                                            }}
+                                                            onMouseLeave={(e) => {
+                                                                e.currentTarget.style.background = '#f8f9fa';
+                                                                e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)';
+                                                            }}
+                                                        >
+                                                            <div style={{
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'space-between',
+                                                                gap: '12px',
+                                                            }}>
+                                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                                    <div style={{
+                                                                        color: '#1a1a2e',
+                                                                        fontSize: '14px',
+                                                                        fontWeight: '600',
+                                                                        marginBottom: '4px',
+                                                                        overflow: 'hidden',
+                                                                        textOverflow: 'ellipsis',
+                                                                        whiteSpace: 'nowrap',
+                                                                    }}>
+                                                                        {model.name}
+                                                                    </div>
+                                                                    <div style={{
+                                                                        color: '#64748b',
+                                                                        fontSize: '11px',
+                                                                    }}>
+                                                                        Click to select
+                                                                    </div>
+                                                                </div>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        removeModel(model.id);
+                                                                    }}
+                                                                    style={{
+                                                                        background: '#fee2e2',
+                                                                        border: '1px solid #fecaca',
+                                                                        borderRadius: '8px',
+                                                                        color: '#dc2626',
+                                                                        padding: '8px 14px',
+                                                                        fontSize: '12px',
+                                                                        fontWeight: '600',
+                                                                        cursor: 'pointer',
+                                                                        transition: 'all 0.2s',
+                                                                    }}
+                                                                    onMouseEnter={(e) => {
+                                                                        e.target.style.background = '#fecaca';
+                                                                    }}
+                                                                    onMouseLeave={(e) => {
+                                                                        e.target.style.background = '#fee2e2';
+                                                                    }}
+                                                                >
+                                                                    Remove
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        )}
+                        </div>
                         
+                        {/* SIDEBAR TOGGLE BUTTON */}
+                        <button
+                            onClick={() => setSidebarOpen(!sidebarOpen)}
+                            style={{
+                                position: 'absolute',
+                                left: sidebarOpen ? '400px' : '0',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                width: '20px',
+                                height: '80px',
+                                background: 'white',
+                                border: '1px solid rgba(0, 0, 0, 0.1)',
+                                borderLeft: sidebarOpen ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
+                                borderRadius: sidebarOpen ? '0 12px 12px 0' : '0 12px 12px 0',
+                                color: '#1a1a2e',
+                                fontSize: '20px',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                zIndex: 1600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '2px 0 12px rgba(0, 0, 0, 0.1)',
+                            }}
+                            onMouseEnter={(e) => {
+                                e.target.style.background = '#3b82f6';
+                                e.target.style.color = 'white';
+                                e.target.style.width = '28px';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.target.style.background = 'white';
+                                e.target.style.color = '#1a1a2e';
+                                e.target.style.width = '20px';
+                            }}
+                        >
+                            {sidebarOpen ? '<' : '>'}
+                        </button>
+                        
+                        {/* Loading, Error, etc. - same as before */}
                         {loading && (
                             <div style={{
                                 position: 'absolute',
@@ -585,53 +991,10 @@ class ThreepipeViewer(rx.Component):
                                 backgroundColor: 'rgba(0, 0, 0, 0.9)',
                                 padding: '24px 32px',
                                 borderRadius: '12px',
-                                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)',
                                 zIndex: 999
                             }}>
-                                <div style={{ marginBottom: '12px', fontSize: '32px', animation: 'spin 2s linear infinite' }}>
-                                    🔄
-                                </div>
-                                <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
-                                    Loading 3D Model
-                                </div>
-                                <div style={{ fontSize: '14px', opacity: 0.7 }}>
-                                    Please wait...
-                                </div>
-                            </div>
-                        )}
-                        
-                        {error && (
-                            <div style={{
-                                position: 'absolute',
-                                top: '20px',
-                                right: '20px',
-                                background: 'rgba(220, 38, 38, 0.95)',
-                                color: 'white',
-                                padding: '16px 24px',
-                                borderRadius: '8px',
-                                zIndex: 1000,
-                                maxWidth: '400px',
-                                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)'
-                            }}>
-                                <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>❌ Error</div>
-                                <div style={{ fontSize: '14px' }}>{error}</div>
-                            </div>
-                        )}
-                        
-                        {showUi && !loading && !error && (
-                            <div style={{
-                                position: 'absolute',
-                                bottom: '20px',
-                                left: '20px',
-                                background: 'rgba(59, 130, 246, 0.9)',
-                                color: 'white',
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                fontSize: '11px',
-                                zIndex: 1000,
-                                boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                            }}>
-                                🎛️ Tweakpane UI Active
+                                <div style={{ marginBottom: '12px', fontSize: '32px' }}>🔄</div>
+                                <div style={{ fontWeight: 'bold' }}>Loading...</div>
                             </div>
                         )}
                         
@@ -652,17 +1015,13 @@ threepipe_advanced_viewer = ThreepipeViewer.create
 class ViewerState(rx.State):
     """State for the 3D viewer."""
     
-    # Initial model from code (this one gets custom position/scale)
     initial_model: str = "/models/forest_cabin.glb"
     current_model: str = initial_model
     show_ui: bool = True
     enable_dropzone: bool = True
     
-    # 🆕 Position and scale for INITIAL MODEL ONLY
-    initial_model_position: list = [-20, -8, 10]  # Custom position for initial model
-    initial_model_scale: float = 1.5  # Custom scale for initial model
-    
-    background_color: str = "0xF5F5F5" 
+    initial_model_position: list = [-20, -8, 10]
+    initial_model_scale: float = 1.5
     
     def load_helmet(self):
         self.current_model = "https://samples.threepipe.org/minimal/DamagedHelmet/glTF/DamagedHelmet.gltf"
@@ -671,10 +1030,10 @@ class ViewerState(rx.State):
         self.current_model = "/models/Rocking_Chair.glb"
     
     def toggle_ui(self):
-        self.show_ui = not self.show_ui
+        self.show_ui = not self.show_ui 
 
 def room_content() -> rx.Component:
-    return rx.fragment(
+     return rx.fragment(
         rx.box(
             threepipe_advanced_viewer(
                 model_url=ViewerState.current_model,
@@ -688,36 +1047,6 @@ def room_content() -> rx.Component:
             position="relative",
         ),
         
-        # Back button
-        rx.link(
-            rx.button(
-                rx.icon("arrow-left", size=20),
-                rx.text("Back", margin_left="8px"),
-                display="flex",
-                align_items="center",
-                padding="12px 20px",
-                background="rgba(0, 0, 0, 0.8)",
-                color="white",
-                border="1px solid rgba(255, 255, 255, 0.2)",
-                border_radius="8px",
-                cursor="pointer",
-                font_size="14px",
-                font_weight="500",
-                transition="all 0.2s",
-                _hover={
-                    "background": "rgba(59, 130, 246, 0.9)",
-                    "border_color": "rgba(59, 130, 246, 1)",
-                    "transform": "translateY(-2px)",
-                    "box_shadow": "0 4px 12px rgba(59, 130, 246, 0.4)",
-                },
-            ),
-            href="/",
-            position="absolute",
-            top="20px",
-            left="20px",
-            z_index="2000",
-        ),
-        
         width="100%",
         height="100vh",
         bg="gray.900",
@@ -726,4 +1055,3 @@ def room_content() -> rx.Component:
 
 def my_digital_home_page() -> rx.Component:
     return room_content()
-    # return template(room_content)

@@ -40,7 +40,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.gis',
     'app_api',
-    'app_api.users'
+    'app_api.users',
+    'app_api.products',
+    'app_api.carts',
+    'app_api.orders',
+    'app_api.reviews',
 ]
 
 MIDDLEWARE = [

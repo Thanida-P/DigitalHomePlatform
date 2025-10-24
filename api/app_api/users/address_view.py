@@ -1,5 +1,6 @@
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from .models import Address
 from django.http import JsonResponse
@@ -9,10 +10,8 @@ from .funcHelper import *
 # Add Address
 @csrf_exempt
 @require_http_methods(["POST"])
+@login_required
 def add_address(request):
-    if not request.user.is_authenticated:
-        return JsonResponse({'error': 'Authentication required'}, status=401)
-    
     user = request.user
     
     if not hasattr(user, 'customer'):
@@ -31,10 +30,8 @@ def add_address(request):
 # Edit Address
 @csrf_exempt
 @require_http_methods(["PUT"])
+@login_required
 def edit_address(request):
-    if not request.user.is_authenticated:
-        return JsonResponse({'error': 'Authentication required'}, status=401)
-    
     user = request.user
     
     if not hasattr(user, 'customer'):
@@ -61,10 +58,8 @@ def edit_address(request):
 # Set Default Address
 @csrf_exempt
 @require_http_methods(["PUT"])
+@login_required
 def set_default_address(request):
-    if not request.user.is_authenticated:
-        return JsonResponse({'error': 'Authentication required'}, status=401)
-    
     user = request.user
     
     if not hasattr(user, 'customer'):
@@ -91,10 +86,8 @@ def set_default_address(request):
 # Remove Address
 @csrf_exempt
 @require_http_methods(["DELETE"])
+@login_required
 def remove_address(request):
-    if not request.user.is_authenticated:
-        return JsonResponse({'error': 'Authentication required'}, status=401)
-    
     user = request.user
     
     if not hasattr(user, 'customer'):
@@ -119,10 +112,8 @@ def remove_address(request):
 # Get Addresses
 @csrf_exempt
 @require_http_methods(["GET"])
+@login_required
 def get_addresses(request):
-    if not request.user.is_authenticated:
-        return JsonResponse({'error': 'Authentication required'}, status=401)
-    
     user = request.user
     
     if not hasattr(user, 'customer'):
