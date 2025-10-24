@@ -79,17 +79,21 @@ WSGI_APPLICATION = 'api.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME': 'digitalhome_db',
-        'USER': 'postgres',
-        'PASSWORD': '12345678',
+        'NAME': 'testdigitalhome_db',
+        'USER': 'myopapakyaw',
+        'PASSWORD': '',
         'HOST': 'localhost',
         'PORT': '5432',
     }
 }
 
 # ZODB settings and GDAL library path
-GEOS_LIBRARY_PATH = r"C:/Program Files/GDAL/bin/geos_c.dll"
-GDAL_LIBRARY_PATH = r"C:/Program Files/GDAL/bin/gdal.dll"
+#GEOS_LIBRARY_PATH = r"C:/Program Files/GDAL/bin/geos_c.dll"
+#GDAL_LIBRARY_PATH = r"C:/Program Files/GDAL/bin/gdal.dll"
+
+GEOS_LIBRARY_PATH = "/opt/homebrew/opt/geos/lib/libgeos_c.dylib"
+GDAL_LIBRARY_PATH = "/opt/homebrew/opt/gdal/lib/libgdal.dylib"
+
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ZODB_FILE = os.path.join(BASE_DIR, 'data', 'zodb.fs')
