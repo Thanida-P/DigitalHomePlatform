@@ -100,8 +100,9 @@ def get_products(request):
         
         product_list = []
         for product in products:
+            item = product.item
             if search_query is not None:
-                if search_query and search_query.lower() not in product.name.lower():
+                if search_query and search_query.lower() not in item.name.lower():
                     continue
             if category is not None and category.lower() != product.category.lower():
                 continue
@@ -130,15 +131,15 @@ def get_products(request):
 
             product_data = {
                 'id': product.id,
-                'name': product.name,
-                'description': product.description,        #add this
-                'category': product.category,                   #add this
+                'name': item.name,
+                'description': item.description,
+                'category': item.category,
                 'digital_price': str(product.digital_price),
                 'physical_price': str(product.physical_price),
                 'image': product.image,
                 'rating': product.rating,
-                'product_type': product.type,
-                'created_at': product.created_at,
+                'product_type': item.type,
+                'created_at': item.created_at,
             }
             product_list.append(product_data)
         if sort_by is not None:
@@ -166,24 +167,24 @@ def get_product_detail(request, product_id):
         if not product_id:
             return JsonResponse({'error': 'Product ID is required'}, status=400)
         product = Product.objects.get(id=product_id)
+        item = product.item
         
         product_data = {
             'id': product.id,
-            'name': product.name,
-            'description': product.description,
+            'name': item.name,
+            'description': item.description,
             'digital_price': str(product.digital_price),
             'physical_price': str(product.physical_price),
-            'category': product.category,
-            'type': product.type,
+            'category': item.category,
+            'type': item.type,
             'image': product.image,
             'stock': product.stock,
             'reviews': product.reviews,
             'rating': product.rating,
-            'created_at': product.created_at,
-            'updated_at': product.updated_at,
-            'model_id': product.model_id,
-            'display_scenes_ids': product.display_scenes,
-            'texture_id': product.texture_id if hasattr(product, 'texture_id') else None
+            'created_at': item.created_at,
+            'updated_at': item.updated_at,
+            'model_id': item.model_id,
+            'display_scenes_ids': product.display_scenes
         }
         return JsonResponse({'product': product_data}, status=200)
     except Product.DoesNotExist:
@@ -263,7 +264,7 @@ def get_textures(request, model_id):
 @login_required
 def get_all_categories(request):
     try:
-        categories = Product.objects.values_list('category', flat=True).distinct()
+        categories = Item.objects.values_list('category', flat=True).distinct()
         return JsonResponse({'categories': list(categories)}, status=200)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
@@ -272,7 +273,7 @@ def get_all_categories(request):
 @login_required
 def get_all_product_types(request):
     try:
-        product_types = Product.objects.values_list('type', flat=True).distinct()
+        product_types = Item.objects.values_list('type', flat=True).distinct()
         return JsonResponse({'product_types': list(product_types)}, status=200)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)

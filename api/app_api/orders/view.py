@@ -3,7 +3,7 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from .models import Order, OrderItem
-from app_api.products.models import OwnedProducts, ContainerOwnedProducts, NonContainerOwnedProducts
+from app_api.products.models import Item, OwnedItem, ContainerOwnedItem, NonContainerOwnedItem
 
 @csrf_exempt
 @login_required
@@ -60,14 +60,15 @@ def list_orders(request):
     orders_data = []
     for order in customer.orders.all().order_by('-created_at'):
         order_items = []
-        for item in order.order_items_rel.all():
+        for order_item in order.order_items_rel.all():
+            item = order_item.product.item
             order_items.append({
-                'id': item.id,
-                'product_id': item.product.id,
-                'product_name': item.product.name,
-                'quantity': item.quantity,
-                'type': item.type,
-                'added_at': item.added_at.isoformat(),
+                'id': order_item.id,
+                'product_id': order_item.product.id,
+                'product_name': item.name,
+                'quantity': order_item.quantity,
+                'type': order_item.type,
+                'added_at': order_item.added_at.isoformat(),
             })
         orders_data.append({
             'order_id': order.id,
@@ -126,19 +127,22 @@ def complete_order(request, order_id):
     order.status = 'complete'
     order.save()
 
-    for item in order.order_items_rel.all():
-        if item.type == 'digital':
-            ownedProduct = OwnedProducts.objects.create(
-                product=item.product,
-                positions={'x': 0.0, 'y': 0.0, 'z': 0.0, 't': 0.0},
-                rotation={'x': 0.0, 'y': 0.0, 'z': 0.0},
-                scale={'x': 1.0, 'y': 1.0, 'z': 1.0},
-                position_history=[],
-                amount=item.quantity
-            )
-            if item.product.is_container:
-                ContainerOwnedProducts.objects.create(product=ownedProduct)
-            else:
-                NonContainerOwnedProducts.objects.create(product=ownedProduct)
+    for order_item in order.order_items_rel.all():
+        if order_item.type == 'digital':
+            for _ in range(order_item.quantity):
+                item = order_item.product.item
+                ownedItem = OwnedItem.objects.create(
+                    item=item,
+                    positions={'x': 0.0, 'y': 0.0, 'z': 0.0, 't': 0.0},
+                    rotation={'x': 0.0, 'y': 0.0, 'z': 0.0},
+                    scale={'x': 1.0, 'y': 1.0, 'z': 1.0},
+                    position_history=[]
+                )
+                if item.is_container:
+                    categorizedItem = ContainerOwnedItem.objects.create(product=ownedItem)
+                else:
+                    categorizedItem = NonContainerOwnedItem.objects.create(product=ownedItem)
+                customer.owned_digital_products.append(categorizedItem.id)
+    customer.save()
 
     return JsonResponse({'message': 'Order status updated to complete and products granted'}, status=200)

@@ -49,7 +49,6 @@ def direct_create_Texture(texture_file):
         transaction.commit()
         return texture_id
     except Exception:
-        # Ensure any joined transaction is aborted so the connection can be closed
         try:
             transaction.abort()
         except Exception:
