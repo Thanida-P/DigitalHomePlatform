@@ -131,6 +131,8 @@ def get_products(request):
             product_data = {
                 'id': product.id,
                 'name': product.name,
+                'description': product.description,        #add this
+                'category': product.category,                   #add this
                 'digital_price': str(product.digital_price),
                 'physical_price': str(product.physical_price),
                 'image': product.image,
@@ -191,7 +193,7 @@ def get_product_detail(request, product_id):
 
 @csrf_exempt
 @require_http_methods(["DELETE"])
-@login_required
+#@login_required
 def delete_product(request, product_id):
     try:
         if not product_id:
