@@ -3,6 +3,8 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 
+from app_api.products.models import Item
+
 from .models import CartItem
 from .funcHelper import *
 
@@ -91,10 +93,11 @@ def view_cart(request):
 
     items = []
     for cart_item in cart.cart_items.all():
+        item = cart_item.product.item
         items.append({
             'id': cart_item.id,
             'product_id': cart_item.product.id,
-            'product_name': cart_item.product.name,
+            'product_name': item.name,
             'quantity': cart_item.quantity,
             'type': cart_item.type,
             'added_at': cart_item.added_at.isoformat(),

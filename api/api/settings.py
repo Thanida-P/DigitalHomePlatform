@@ -83,9 +83,9 @@ WSGI_APPLICATION = 'api.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME': 'testdigitalhome_db',
-        'USER': 'myopapakyaw',
-        'PASSWORD': '',
+        'NAME': 'digitalhome_db',
+        'USER': 'postgres',
+        'PASSWORD': 'Password123',
         'HOST': 'localhost',
         'PORT': '5432',
     }
@@ -95,8 +95,11 @@ DATABASES = {
 #GEOS_LIBRARY_PATH = r"C:/Program Files/GDAL/bin/geos_c.dll"
 #GDAL_LIBRARY_PATH = r"C:/Program Files/GDAL/bin/gdal.dll"
 
-GEOS_LIBRARY_PATH = "/opt/homebrew/opt/geos/lib/libgeos_c.dylib"
-GDAL_LIBRARY_PATH = "/opt/homebrew/opt/gdal/lib/libgdal.dylib"
+# GEOS_LIBRARY_PATH = "/opt/homebrew/opt/geos/lib/libgeos_c.dylib"
+# GDAL_LIBRARY_PATH = "/opt/homebrew/opt/gdal/lib/libgdal.dylib"
+
+GEOS_LIBRARY_PATH = r"C:/OSGeo4W/bin/geos_c.dll"
+GDAL_LIBRARY_PATH = r"C:/OSGeo4W/bin/gdal311.dll"
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
