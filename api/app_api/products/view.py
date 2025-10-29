@@ -193,7 +193,7 @@ def get_product_detail(request, product_id):
 
 @csrf_exempt
 @require_http_methods(["DELETE"])
-#@login_required
+@login_required
 def delete_product(request, product_id):
     try:
         if not product_id:
