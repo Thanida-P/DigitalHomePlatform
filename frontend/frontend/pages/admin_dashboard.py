@@ -23,8 +23,8 @@ class AdminDashboardState(rx.State):
     physical_price: str = ""
     digital_price: str = ""
     category: str = ""
-    room_type: str = "livingroom"
-    rating: str = "5.0"
+    product_type: str = ""
+    stock: str = ""
     preview_image: str = ""
     hover_image: str = ""
     model_file: str = ""
@@ -34,6 +34,20 @@ class AdminDashboardState(rx.State):
     total_products: int = 0
     total_sold: int = 0
     total_revenue: float = 0.0
+
+
+    preview_image_file: str = ""
+    model_file_file: str = ""
+    material_file_file: str = ""
+
+    def set_preview_image_file(self, file_name: str):
+        self.preview_image_file = file_name
+
+    def set_model_file_file(self, file_name: str):
+        self.model_file_file = file_name
+
+    def set_material_file_file(self, file_name: str):
+        self.material_file_file = file_name
     
     def load_products(self):
         """Load all products from data"""
@@ -119,8 +133,8 @@ class AdminDashboardState(rx.State):
         self.physical_price = ""
         self.digital_price = ""
         self.category = ""
-        self.room_type = "livingroom"
-        self.rating = "5.0"
+        self.product_type = ""
+        self.stock = ""
         self.preview_image = ""
         self.hover_image = ""
         self.model_file = ""
@@ -142,13 +156,13 @@ class AdminDashboardState(rx.State):
     
     def set_category(self, value: str):
         self.category = value
-    
-    def set_room_type(self, value: str):
-        self.room_type = value
-    
-    def set_rating(self, value: str):
-        self.rating = value
-    
+
+    def set_product_type(self, value: str):
+        self.product_type = value
+
+    def set_stock(self, value: str):
+        self.stock = value
+
     def set_preview_image(self, value: str):
         self.preview_image = value
     
@@ -361,11 +375,11 @@ def product_form_modal(is_edit: bool = False) -> rx.Component:
                 # Room and Category
                 rx.hstack(
                     rx.vstack(
-                        rx.text("Room *", size="2", weight="medium"),
-                        rx.select(
-                            ["livingroom", "bedroom", "kitchen", "officeroom"],
-                            value=AdminDashboardState.room_type,
-                            on_change=AdminDashboardState.set_room_type,
+                        rx.text("Product Type", size="2", weight="medium"),
+                         rx.input(
+                            placeholder="Sofa",
+                            value=AdminDashboardState.product_type,
+                            on_change=AdminDashboardState.set_product_type,
                         ),
                         spacing="1",
                         width="100%",
@@ -373,7 +387,7 @@ def product_form_modal(is_edit: bool = False) -> rx.Component:
                     rx.vstack(
                         rx.text("Category *", size="2", weight="medium"),
                         rx.input(
-                            placeholder="Sofa",
+                            placeholder="Bedroom, Living Room, Kitchen, Office Room",
                             value=AdminDashboardState.category,
                             on_change=AdminDashboardState.set_category,
                         ),
@@ -384,58 +398,92 @@ def product_form_modal(is_edit: bool = False) -> rx.Component:
                     width="100%",
                 ),
                 
-                # Rating
+                # Stock
                 rx.vstack(
-                    rx.text("Rating (1-5)", size="2", weight="medium"),
+                    rx.text("Product Stock", size="2", weight="medium"),
                     rx.input(
-                        placeholder="4.5",
+                        placeholder="20",
                         type="number",
-                        min="0",
-                        max="5",
-                        step="0.1",
-                        value=AdminDashboardState.rating,
-                        on_change=AdminDashboardState.set_rating,
+                        value=AdminDashboardState.stock,
+                        on_change=AdminDashboardState.set_stock,
                     ),
                     spacing="1",
                     width="100%",
                 ),
                 
-                # File Uploads
+                # Preview Image Upload
                 rx.vstack(
-                    rx.text("Preview Image *", size="2", weight="medium"),
-                    rx.input(
-                        placeholder="/images/product.jpg or upload",
-                        value=AdminDashboardState.preview_image,
-                        on_change=AdminDashboardState.set_preview_image,
-                    ),
-                    rx.text("Upload image file", size="1", color="#64748B"),
-                    spacing="1",
-                    width="100%",
-                ),
+                    rx.upload(
+                        rx.button(
+                            rx.icon("camera", size=16),
+                            "Change Photo",
+                            size="1",
+                            variant="soft",
+                            cursor="pointer",
+                        ),
+                        id="preview_image_upload",
+                        accept={
+                            "image/png": [".png"],
+                            "image/jpeg": [".jpg", ".jpeg"],
+                        },
+                        max_files=1,
                 
+                    ),
+                   rx.cond(
+                        AdminDashboardState.material_file_file != "",
+                        AdminDashboardState.material_file_file,
+                        "No file selected",
+                    )
+                ),
+
+                # 3D Model File Upload
                 rx.vstack(
-                    rx.text("3D Model File *", size="2", weight="medium"),
-                    rx.input(
-                        placeholder="/models/product.glb or upload",
-                        value=AdminDashboardState.model_file,
-                        on_change=AdminDashboardState.set_model_file,
+                    rx.upload(
+                        rx.button(
+                            rx.icon("cube", size=16),
+                            "Upload 3D Model",
+                            size="1",
+                            variant="soft",
+                            cursor="pointer",
+                        ),
+                        id="model_file_upload",
+                        accept={"model/gltf-binary": [".glb"]},
+                        max_files=1,
+                        
                     ),
-                    rx.text("Upload .glb file", size="1", color="#64748B"),
-                    spacing="1",
-                    width="100%",
+                   rx.cond(
+                        AdminDashboardState.material_file_file != "",
+                        AdminDashboardState.material_file_file,
+                        "No file selected",
+                    )
                 ),
-                
+
+                # Material File Upload
                 rx.vstack(
-                    rx.text("Material File (Optional)", size="2", weight="medium"),
-                    rx.input(
-                        placeholder="Upload material file",
-                        value=AdminDashboardState.material_file,
-                        on_change=AdminDashboardState.set_material_file,
+                    rx.upload(
+                        rx.button(
+                            rx.icon("file", size=16),
+                            "Upload Material",
+                            size="1",
+                            variant="soft",
+                            cursor="pointer",
+                        ),
+                        id="material_file_upload",
+                        accept={
+                            "application/pdf": [".pdf"],
+                            "application/vnd.ms-excel": [".xls", ".xlsx"],
+                        },
+                        max_files=1,
+                        
                     ),
-                    spacing="1",
-                    width="100%",
+                    rx.cond(
+                        AdminDashboardState.material_file_file != "",
+                        AdminDashboardState.material_file_file,
+                        "No file selected",
+                    )
                 ),
-                
+
+
                 spacing="4",
                 width="100%",
             ),

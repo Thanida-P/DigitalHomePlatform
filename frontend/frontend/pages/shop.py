@@ -38,19 +38,20 @@ def search_and_filters():
             height="40px",
             
         ),
+       
         rx.select(
-            ["All Popular", "Most Popular", "Newest"],
-            default_value="All Popular",
-            width="160px",
-            height="40px",
-         
-        ),
-        rx.select(
-            ["All VR/AR products", "AR Ready", "VR Ready"],
-            default_value="All VR/AR products",
+            ["All Products", "Physical", "Digital"],
+            default_value="All Products",
             width="160px",
             height="40px",
           
+        ),
+         rx.select(
+            [ "Most Popular", "Newest"],
+            default_value="Most Popular",
+            width="160px",
+            height="40px",
+         
         ),
         spacing="2",
         justify="center",
