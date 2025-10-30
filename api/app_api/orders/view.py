@@ -85,6 +85,7 @@ def list_orders(request):
                 'created_at': order.created_at.isoformat(),
                 'updated_at': order.updated_at.isoformat(),
             })
+        transaction.commit()
         return JsonResponse({'orders': orders_data}, status=200)
     finally:
         connection.close()
@@ -149,6 +150,7 @@ def complete_order(request, order_id):
                         container_id = get_container_owned_item_id(root)
                         categorizedItem = ContainerOwnedItem(
                             id=container_id,
+                            owner_id=customer.id,
                             name=item.get_name(),
                             description=item.get_description(),
                             model_id=item.get_model_id(),
@@ -165,6 +167,7 @@ def complete_order(request, order_id):
                         noncontainer_id = get_noncontainer_owned_item_id(root)
                         categorizedItem = NonContainerOwnedItem(
                             id=noncontainer_id,
+                            owner_id=customer.id,
                             name=item.get_name(),
                             description=item.get_description(),
                             model_id=item.get_model_id(),
@@ -178,7 +181,7 @@ def complete_order(request, order_id):
                         )
                         root.nonContainerOwnedItems[noncontainer_id] = categorizedItem
                     transaction.commit()
-                    customer.owned_digital_products.append(categorizedItem.get_id())
+                    customer.owned_digital_products.append({ 'id': categorizedItem.get_id(), 'is_container': categorizedItem.is_container})
         customer.save()
 
         return JsonResponse({'message': 'Order status updated to complete and products granted'}, status=200)
