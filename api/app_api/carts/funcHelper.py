@@ -3,16 +3,18 @@ from io import BytesIO
 from django.http.multipartparser import MultiPartParser
 from django.http import QueryDict
 from decimal import Decimal, InvalidOperation
+from zodb.zodb_management import *
 import json
 
-def calculate_total_price(cart_items):
+def calculate_total_price(root, cart_items):
     total = Decimal('0')
     for item in cart_items:
-        product = item.product
+        product = root.products[item.product_id]
         if item.type == 'digital':
-            item.unit_price = product.digital_price
+            item.unit_price = product.get_digital_price()
         elif item.type == 'physical':
-            item.unit_price = product.physical_price
+            item.unit_price = product.get_physical_price()
+        item.save()
         total += Decimal(item.quantity) * Decimal(item.unit_price)
     return total
 

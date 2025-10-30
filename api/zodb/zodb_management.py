@@ -15,8 +15,8 @@ file_storage = ZODB.FileStorage.FileStorage(ZODB_FILE)
 storage = BlobStorage(BLOB_DIR, file_storage)
 db = ZODB.DB(storage)
 
+#Get a fresh connection and ensure root is initialized
 def get_connection():
-    """Get a fresh connection and ensure root is initialized"""
     connection = db.open()
     root = connection.root()
     

@@ -62,6 +62,7 @@ urlpatterns = [
     path('products/categories/', product_views.get_all_categories),
     path('products/types/', product_views.get_all_product_types),
     path('carts/add_item/', cart_views.add_to_cart),
+    path('carts/decrease_item/<int:cart_item_id>/', cart_views.decrease_cart_item_quantity),
     path('carts/remove_item/<int:cart_item_id>/', cart_views.remove_from_cart),
     path('carts/view/', cart_views.view_cart),
     path('carts/clear_cart/', cart_views.clear_cart),

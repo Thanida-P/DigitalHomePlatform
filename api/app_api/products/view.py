@@ -273,13 +273,13 @@ def get_textures(request, model_id):
 def get_all_categories(request):
     connection, root = get_connection()
     try:
-        categories = []
+        categories = set()
         for obj in root.objectItems.values():
             try:
-                categories.append(obj.get_category())
+                categories.add(obj.get_category())
             except Exception:
                 continue
-        return JsonResponse({'categories': list(set(categories))}, status=200)
+        return JsonResponse({'categories': list(categories)}, status=200)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
     finally:
@@ -295,7 +295,6 @@ def get_all_product_types(request):
             try:
                 product_types.add(obj.get_type())
             except Exception:
-                # skip objects that don't expose get_type()
                 continue
         return JsonResponse({'product_types': list(product_types)}, status=200)
     except Exception as e:

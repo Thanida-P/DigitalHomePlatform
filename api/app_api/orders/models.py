@@ -13,10 +13,10 @@ class Order(models.Model):
     
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='order_items_rel')
-    product = models.ForeignKey('products.Product', on_delete=models.CASCADE)
+    product_id = models.IntegerField()
     quantity = models.PositiveIntegerField(default=1)
     type = models.CharField(max_length=20)  # 'digital' or 'physical'
     added_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.quantity} of {self.product.name} in Order {self.order.id}"
+        return f"{self.quantity} of {self.product_id} in Order {self.order.id}"
