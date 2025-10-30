@@ -1,35 +1,68 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { Canvas } from "@react-three/fiber";
+import { GlobalProvider } from "./context/global-context";
+import { Environment, Gltf, PerspectiveCamera } from "@react-three/drei";
+import { createXRStore, XR } from "@react-three/xr";
+import Gun from "./components/gun";
+import Bullets from "./components/bullets";
+import Target from "./components/target";
+import Score from "./components/score";
 
-function App() {
-  const [count, setCount] = useState(0)
+const xrStore = createXRStore({
+  controller: {
+    right: Gun,
+  },
+});
 
+export default function App() {
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <GlobalProvider>
+      <>
+        <Canvas
+          style={{
+            width: "100vw",
+            height: "100vh",
+            position: "fixed",
+          }}
+        >
+          <color args={[0x808080]} attach={"background"} />
+          <PerspectiveCamera makeDefault position={[0, 1.6, 2]} fov={75} />
+          <Environment preset="warehouse" />
+          <Gltf src="/spacestation.glb" />
+          <XR store={xrStore} />
+          <Bullets />
+          <Target targetIdx={0} />
+          <Target targetIdx={1} />
+          <Target targetIdx={2} />
+          <Score />
+        </Canvas>
+        <div
+          style={{
+            position: "fixed",
+            display: "flex",
+            width: "100vw",
+            height: "100vh",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            alignItems: "center",
+            color: "white",
+          }}
+        >
+          <button
+            style={{
+              position: "fixed",
+              bottom: "20px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              fontSize: "20px",
+            }}
+            onClick={() => {
+              xrStore.enterVR();
+            }}
+          >
+            Enter VR
+          </button>
+        </div>
+      </>
+    </GlobalProvider>
+  );
 }
-
-export default App
