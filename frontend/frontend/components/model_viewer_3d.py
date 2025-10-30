@@ -2,13 +2,17 @@ import reflex as rx
 from typing import Any, Dict, List
 from reflex.components.component import NoSSRComponent
 
+
 class ThreeFiberCanvas(NoSSRComponent):
     """Canvas for react-three-fiber (Three.js in React)."""
+
     library = "@react-three/fiber"
     tag = "Canvas"
 
+
 class ModelViewer3D(rx.Component):
     """Load and display a GLB model using GLTFLoader."""
+
     tag = "ModelViewer3DComponent"
 
     url: rx.Var[str] = ""
@@ -72,7 +76,8 @@ class ModelViewer3D(rx.Component):
             }
             """
         ]
-    
+
+
 class SceneWithLighting(rx.Component):
     tag = "SceneWithLightingComponent"
 
@@ -90,7 +95,8 @@ class SceneWithLighting(rx.Component):
             }
             """
         ]
-    
+
+
 class CameraControls(rx.Component):
     tag = "CameraControls3DComponent"
 

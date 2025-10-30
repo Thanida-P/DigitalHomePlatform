@@ -3,10 +3,9 @@ import reflex as rx
 from ..template import template
 from ..state import AuthState
 import httpx
-from typing import Optional,Callable,Any
+from typing import Optional, Callable, Any
+from ..config import API_BASE_URL
 
-
-API_BASE_URL = os.getenv("API_URL", "http://localhost:8001")
 
 class Address(rx.Base):
     id: int
@@ -14,13 +13,12 @@ class Address(rx.Base):
     is_default: bool
 
 
-
 class ProfileState(rx.State):
     # Menu / section
     active_section: str = "profile"
     show_password_form: bool = False
     has_addresses: bool = False
-    selected_menu: str = "personal_info"  
+    selected_menu: str = "personal_info"
 
     profile_picture: str = ""  # Base64 encoded image or URL
     is_uploading: bool = False
@@ -37,7 +35,6 @@ class ProfileState(rx.State):
     province: str = ""
     street_address: str = ""
 
-
     # Password fields
     current_password: str = ""
     new_password: str = ""
@@ -48,8 +45,7 @@ class ProfileState(rx.State):
     show_confirm_password: bool = False
     is_submitting: bool = False
     password_error: str = ""
-    password_success: str = ""  
-
+    password_success: str = ""
 
     # Address management
     addresses: list[Address] = []
@@ -61,16 +57,15 @@ class ProfileState(rx.State):
 
     def set_form_username(self, value: str):
         self.form_username = value
-    
+
     def set_form_province(self, value: str):
         self.form_province = value
-    
+
     def set_form_street_address(self, value: str):
         self.form_street_address = value
-    
+
     def set_form_phone_number(self, value: str):
         self.form_phone_number = value
-
 
     def set_first_name(self, value: str):
         self.first_name = value
@@ -98,7 +93,7 @@ class ProfileState(rx.State):
 
     def set_new_password(self, value: str):
         self.new_password = value
-    
+
     def set_confirm_password(self, value: str):
         self.confirm_password = value
 
@@ -121,13 +116,13 @@ class ProfileState(rx.State):
 
     def toggle_current_password(self):
         self.show_current_password = not self.show_current_password
-    
+
     def toggle_new_password(self):
         self.show_new_password = not self.show_new_password
-    
+
     def toggle_confirm_password(self):
         self.show_confirm_password = not self.show_confirm_password
-    
+
     # Your existing methods...
     def close_password_form(self):
         self.show_password_form = False
@@ -143,114 +138,119 @@ class ProfileState(rx.State):
         self.show_new_password = False
         self.show_confirm_password = False
 
-    
     async def submit_password_change(self):
         """Submit password change request to backend"""
         print("=== PASSWORD CHANGE STARTED ===")
-        
+
         # Set loading state
         self.is_submitting = True
-        
+
         # Clear previous messages
         self.password_error = ""
         self.password_success = ""
-        
+
         print(f"Current password length: {len(self.current_password)}")
         print(f"New password length: {len(self.new_password)}")
         print(f"Confirm password length: {len(self.confirm_password)}")
-        
+
         # Validate inputs
         if not self.current_password:
             self.password_error = "Please enter your current password"
             self.is_submitting = False
             print(f"Validation error: {self.password_error}")
             return
-        
+
         if not self.new_password:
             self.password_error = "Please enter a new password"
             self.is_submitting = False
             print(f"Validation error: {self.password_error}")
             return
-        
+
         if len(self.new_password) < 6:
             self.password_error = "New password must be at least 6 characters"
             self.is_submitting = False
             print(f"Validation error: {self.password_error}")
             return
-        
+
         if not self.confirm_password:
             self.password_error = "Please confirm your new password"
             self.is_submitting = False
             print(f"Validation error: {self.password_error}")
             return
-        
+
         if self.new_password != self.confirm_password:
             self.password_error = "New passwords do not match"
             self.is_submitting = False
             print(f"Validation error: {self.password_error}")
             return
-        
+
         if self.current_password == self.new_password:
             self.password_error = "New password must be different from current password"
             self.is_submitting = False
             print(f"Validation error: {self.password_error}")
             return
-        
+
         print("Validation passed, getting auth state...")
-        
+
         # Get auth state
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
-        
+
         print(f"Cookies available: {bool(cookies_dict)}")
         print(f"API URL: {API_BASE_URL}/users/change_password/")
-        
+
         # Make API request
         try:
             async with httpx.AsyncClient() as client:
                 print("Sending request to backend...")
                 response = await client.put(
-                    f"{API_BASE_URL}/users/change_password/", 
+                    f"{API_BASE_URL}/users/change_password/",
                     json={
                         "current_password": self.current_password,
-                        "new_password": self.new_password
+                        "new_password": self.new_password,
                     },
-                    cookies=cookies_dict,  
-                    timeout=10.0
+                    cookies=cookies_dict,
+                    timeout=10.0,
                 )
-                
+
                 print(f"Response status: {response.status_code}")
                 print(f"Response body: {response.text}")
-                
+
                 if response.status_code == 200:
-                    self.password_success = "Password changed successfully! Redirecting to login..."
+                    self.password_success = (
+                        "Password changed successfully! Redirecting to login..."
+                    )
                     print("Password changed successfully!")
                     self.clear_password_fields()
                     self.show_password_form = False
                     self.is_submitting = False
-                    
+
                     # Redirect to login page
                     return rx.redirect("/login")
-                    
+
                 elif response.status_code == 403:
                     self.password_error = "Current password is incorrect"
                     print(f"Error: {self.password_error}")
-                    
+
                 elif response.status_code == 400:
                     data = response.json()
-                    self.password_error = data.get('error', 'Invalid request')
+                    self.password_error = data.get("error", "Invalid request")
                     print(f"Error: {self.password_error}")
-                    
+
                 elif response.status_code == 401:
-                    self.password_error = "Authentication required. Please log in again."
+                    self.password_error = (
+                        "Authentication required. Please log in again."
+                    )
                     print(f"Error: {self.password_error}")
                     self.is_submitting = False
                     return rx.redirect("/login")
-                    
+
                 else:
-                    self.password_error = f"Server error (Status: {response.status_code})"
+                    self.password_error = (
+                        f"Server error (Status: {response.status_code})"
+                    )
                     print(f"Error: {self.password_error}")
-                    
+
         except httpx.TimeoutException as e:
             self.password_error = "Request timeout. Please check your connection."
             print(f"Timeout error: {e}")
@@ -260,15 +260,14 @@ class ProfileState(rx.State):
         except Exception as e:
             self.password_error = f"An unexpected error occurred: {str(e)}"
             print(f"Unexpected error: {e}")
-        
+
         self.is_submitting = False
         print("=== PASSWORD CHANGE ENDED ===")
         print(f"Final error message: {self.password_error}")
         print(f"Final success message: {self.password_success}")
 
-
     async def save_profile(self):
-    # Access AuthState instance to get the actual cookie value
+        # Access AuthState instance to get the actual cookie value
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
 
@@ -289,7 +288,7 @@ class ProfileState(rx.State):
                     f"{API_BASE_URL}/users/profile/update/",
                     json=payload,
                     cookies=cookies_dict,
-                    timeout=5.0
+                    timeout=5.0,
                 )
 
             if response.status_code == 200:
@@ -306,29 +305,27 @@ class ProfileState(rx.State):
     async def load_user_data(self):
         """Fetch user profile from backend"""
         auth_state = await self.get_state(AuthState)
-        
+
         if not auth_state.is_logged_in:
             return
 
         cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
-        
+
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{API_BASE_URL}/users/profile/",
-                    cookies=cookies_dict,
-                    timeout=5.0
+                    f"{API_BASE_URL}/users/profile/", cookies=cookies_dict, timeout=5.0
                 )
             if response.status_code == 200:
                 data = response.json()
                 user = data.get("user_profile", {})
-                
+
                 # DEBUG: Print the entire user object
                 print("=== USER DATA ===")
                 print(f"Full user object: {user}")
                 print(f"Profile pic raw: {user.get('profilePic', 'NOT FOUND')}")
                 print(f"All keys: {user.keys()}")
-                
+
                 self.first_name = user.get("first_name", "")
                 self.last_name = user.get("last_name", "")
                 self.username = user.get("username", "")
@@ -344,7 +341,9 @@ class ProfileState(rx.State):
                         self.profile_picture = profile_pic
                     else:
                         self.profile_picture = f"data:image/png;base64,{profile_pic}"
-                    print(f"Profile picture set to: {self.profile_picture[:100]}...")  # Print first 100 chars
+                    print(
+                        f"Profile picture set to: {self.profile_picture[:100]}..."
+                    )  # Print first 100 chars
                 else:
                     self.profile_picture = ""
                     print("Profile picture is empty")
@@ -357,7 +356,7 @@ class ProfileState(rx.State):
         print(f"=== UPLOAD DEBUG ===")
         print(f"Files received: {files}")
         print(f"Files type: {type(files)}")
-        
+
         if not files:
             self.upload_error = "No file selected"
             return
@@ -365,101 +364,105 @@ class ProfileState(rx.State):
         try:
             self.is_uploading = True
             self.upload_error = ""
-            
+
             # Get the first file
             upload_file = files[0] if isinstance(files, list) else files
-            
+
             print(f"Upload file: {upload_file}")
             print(f"Upload file type: {type(upload_file)}")
             print(f"Upload file dir: {dir(upload_file)}")
-            
+
             # Check various possible formats
-            if hasattr(upload_file, 'read'):
+            if hasattr(upload_file, "read"):
                 # It's an UploadFile object with read method
                 print("Has read method - treating as UploadFile")
                 file_content = await upload_file.read()
-                filename = getattr(upload_file, 'filename', 'profile.png')
-                content_type = getattr(upload_file, 'type', 'image/png')
+                filename = getattr(upload_file, "filename", "profile.png")
+                content_type = getattr(upload_file, "type", "image/png")
             elif isinstance(upload_file, str):
                 # It's a file path string
                 print(f"File path received: {upload_file}")
-                with open(upload_file, 'rb') as f:
+                with open(upload_file, "rb") as f:
                     file_content = f.read()
                 filename = os.path.basename(upload_file)
-                ext = filename.split('.')[-1].lower()
-                content_type = 'image/jpeg' if ext in ['jpg', 'jpeg'] else 'image/png'
+                ext = filename.split(".")[-1].lower()
+                content_type = "image/jpeg" if ext in ["jpg", "jpeg"] else "image/png"
             elif isinstance(upload_file, bytes):
                 # It's raw bytes
                 print("Raw bytes received")
                 file_content = upload_file
-                filename = 'profile.png'
-                content_type = 'image/png'
+                filename = "profile.png"
+                content_type = "image/png"
             else:
                 # Unknown format
                 print(f"Unknown format: {type(upload_file)}")
                 self.upload_error = f"Unexpected file format: {type(upload_file)}"
                 self.is_uploading = False
                 return
-            
+
             # Validate file type
             if content_type not in ["image/png", "image/jpeg", "image/jpg"]:
                 self.upload_error = "Invalid file type. Only PNG and JPEG are allowed."
                 self.is_uploading = False
                 return
-            
+
             # Validate file size (5MB limit)
             if len(file_content) > 5 * 1024 * 1024:
                 self.upload_error = "Profile picture exceeds size limit of 5MB"
                 self.is_uploading = False
                 return
-            
+
             # Upload to backend
-            await self.upload_profile_picture_with_content(file_content, filename, content_type)
-            
+            await self.upload_profile_picture_with_content(
+                file_content, filename, content_type
+            )
+
         except Exception as e:
             self.upload_error = f"Error handling upload: {str(e)}"
             print(f"Error in handle_upload: {str(e)}")
             import traceback
+
             traceback.print_exc()
             self.is_uploading = False
 
-
-    async def upload_profile_picture_with_content(self, file_content: bytes, filename: str, content_type: str):
+    async def upload_profile_picture_with_content(
+        self, file_content: bytes, filename: str, content_type: str
+    ):
         """Upload profile picture to backend with file content"""
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
-        
+
         try:
             # Create form data with the file content
-            files_data = {
-                'profile_picture': (filename, file_content, content_type)
-            }
-            
+            files_data = {"profile_picture": (filename, file_content, content_type)}
+
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     f"{API_BASE_URL}/users/profile/upload_profile_picture/",
                     files=files_data,
                     cookies=cookies_dict,
-                    timeout=10.0
+                    timeout=10.0,
                 )
-            
+
             if response.status_code == 200:
                 print("Profile picture uploaded successfully")
                 # Reload user data to get new profile picture
                 await self.load_user_data()
                 self.upload_error = ""
             else:
-                error_msg = response.json().get('error', 'Unknown error') if response.text else 'Unknown error'
+                error_msg = (
+                    response.json().get("error", "Unknown error")
+                    if response.text
+                    else "Unknown error"
+                )
                 self.upload_error = f"Failed to upload: {error_msg}"
                 print(f"Upload failed: {response.text}")
-                
+
         except Exception as e:
             self.upload_error = f"Error uploading profile picture: {str(e)}"
             print(f"Error uploading profile picture: {str(e)}")
         finally:
             self.is_uploading = False
-
-
 
 
 def profile_avatar_section() -> rx.Component:
@@ -480,7 +483,7 @@ def profile_avatar_section() -> rx.Component:
                     fallback=rx.cond(
                         ProfileState.username != "",
                         ProfileState.username[0:2].upper(),
-                        "U"
+                        "U",
                     ),
                     size="8",
                     radius="full",
@@ -490,7 +493,6 @@ def profile_avatar_section() -> rx.Component:
             width="100%",
             padding="20px 0px",
         ),
-        
         # Upload component with button
         rx.upload(
             rx.button(
@@ -508,22 +510,16 @@ def profile_avatar_section() -> rx.Component:
             max_files=1,
             on_drop=ProfileState.handle_upload,
         ),
-        
         # Username display
         rx.center(
             rx.text(
-                rx.cond(
-                    ProfileState.username != "",
-                    ProfileState.username,
-                    "User"
-                ),
+                rx.cond(ProfileState.username != "", ProfileState.username, "User"),
                 font_size="18px",
                 font_weight="bold",
-                color="#22282C"
+                color="#22282C",
             ),
             width="100%",
         ),
-        
         # Upload status messages
         rx.cond(
             ProfileState.is_uploading,
@@ -535,7 +531,6 @@ def profile_avatar_section() -> rx.Component:
             ),
             rx.fragment(),
         ),
-        
         rx.cond(
             ProfileState.upload_error != "",
             rx.center(
@@ -550,19 +545,16 @@ def profile_avatar_section() -> rx.Component:
             ),
             rx.fragment(),
         ),
-        
         spacing="3",
         width="100%",
     )
 
+
 def profile_content() -> rx.Component:
     return rx.hstack(
-  
         rx.box(
             rx.vstack(
                 profile_avatar_section(),
-        
-                
                 rx.vstack(
                     nav_button("Personal Information", "profile"),
                     nav_button("My Address", "address"),
@@ -578,8 +570,6 @@ def profile_content() -> rx.Component:
             height="100%",
             bg="#F9FAFB",
         ),
- 
-      
         rx.box(
             rx.match(
                 ProfileState.active_section,
@@ -589,19 +579,18 @@ def profile_content() -> rx.Component:
                 ("orders", orders_content()),
                 ("reviews", reviews_content()),
                 ("notification", notification_content()),
-                profile_info_content(),  
+                profile_info_content(),
             ),
             flex="1",
             padding="40px",
             bg="white",
         ),
-        
         # Password Change Modal
         password_change_modal(),
-    
         width="100%",
         height="100%",
     )
+
 
 def nav_button(text: str, section: str) -> rx.Component:
     return rx.button(
@@ -612,13 +601,11 @@ def nav_button(text: str, section: str) -> rx.Component:
             menu_item_style(True),
             menu_item_style(False),
         ),
-
         color="#22282c",
     )
 
+
 def profile_info_content() -> rx.Component:
-    
-   
     return rx.vstack(
         rx.center(
             rx.text(
@@ -626,29 +613,50 @@ def profile_info_content() -> rx.Component:
                 font_size="20px",
                 font_weight="bold",
                 margin_bottom="20px",
-                color="#22282c"
+                color="#22282c",
             ),
             width="100%",
         ),
-
         rx.hstack(
-            input_with_label("First Name", value = ProfileState.first_name,on_change=ProfileState.set_first_name),
-            input_with_label("Last Name", value = ProfileState.last_name,on_change=ProfileState.set_last_name),
+            input_with_label(
+                "First Name",
+                value=ProfileState.first_name,
+                on_change=ProfileState.set_first_name,
+            ),
+            input_with_label(
+                "Last Name",
+                value=ProfileState.last_name,
+                on_change=ProfileState.set_last_name,
+            ),
             spacing="4",
             width="100%",
         ),
-
-        input_with_label("Username", ProfileState.username,on_change=ProfileState.set_username),
-        input_with_label("E-mail", ProfileState.email,on_change=ProfileState.set_email),
-        input_with_label("Mobile No.", ProfileState.phone_number,on_change=ProfileState.set_phone_number),
-
+        input_with_label(
+            "Username", ProfileState.username, on_change=ProfileState.set_username
+        ),
+        input_with_label(
+            "E-mail", ProfileState.email, on_change=ProfileState.set_email
+        ),
+        input_with_label(
+            "Mobile No.",
+            ProfileState.phone_number,
+            on_change=ProfileState.set_phone_number,
+        ),
         rx.hstack(
-            select_with_label("Gender (Optional)", ["Male", "Female", "Other"],value=ProfileState.gender,on_change=ProfileState.set_gender),
-            input_with_label_date("Birthday (Optional)", ProfileState.birthday,on_change=ProfileState.set_birthday),
+            select_with_label(
+                "Gender (Optional)",
+                ["Male", "Female", "Other"],
+                value=ProfileState.gender,
+                on_change=ProfileState.set_gender,
+            ),
+            input_with_label_date(
+                "Birthday (Optional)",
+                ProfileState.birthday,
+                on_change=ProfileState.set_birthday,
+            ),
             spacing="4",
             width="100%",
         ),
-
         rx.button(
             "Save",
             width="100%",
@@ -657,9 +665,8 @@ def profile_info_content() -> rx.Component:
             border_radius="8px",
             padding="20px",
             cursor="pointer",
-            on_click=ProfileState.save_profile 
+            on_click=ProfileState.save_profile,
         ),
-
         rx.button(
             "Change Password",
             on_click=ProfileState.open_password_form,
@@ -671,10 +678,10 @@ def profile_info_content() -> rx.Component:
             color="#22282c",
             border="0.5px solid #929FA7",
         ),
-        
         spacing="5",
         width="100%",
     )
+
 
 def password_change_modal() -> rx.Component:
     return rx.cond(
@@ -709,13 +716,21 @@ def password_change_modal() -> rx.Component:
                         font_size="16px",
                         color="#22282C",
                     ),
-                    
                     # Current Password Field
                     rx.vstack(
-                        rx.text("Current Password", font_size="16px", font_weight="600", color="#22282C"),
+                        rx.text(
+                            "Current Password",
+                            font_size="16px",
+                            font_weight="600",
+                            color="#22282C",
+                        ),
                         rx.box(
                             rx.input(
-                                type=rx.cond(ProfileState.show_current_password, "text", "password"),
+                                type=rx.cond(
+                                    ProfileState.show_current_password,
+                                    "text",
+                                    "password",
+                                ),
                                 placeholder="Enter a password ( at least 6 characters )",
                                 value=ProfileState.current_password,
                                 on_change=ProfileState.set_current_password,
@@ -725,13 +740,14 @@ def password_change_modal() -> rx.Component:
                                 border_radius="12px",
                                 font_size="16px",
                                 color="#22282C",
-                                name = "current_password",
+                                name="current_password",
                                 id="current_password",
-                                background_color = "#ffffff",
-                            
+                                background_color="#ffffff",
                             ),
                             rx.icon(
-                                tag=rx.cond(ProfileState.show_current_password, "eye-off", "eye"),
+                                tag=rx.cond(
+                                    ProfileState.show_current_password, "eye-off", "eye"
+                                ),
                                 size=24,
                                 color="#9CA3AF",
                                 position="absolute",
@@ -749,7 +765,6 @@ def password_change_modal() -> rx.Component:
                         width="100%",
                         align_items="flex-start",
                     ),
-                    
                     rx.box(
                         rx.text(
                             "Forget Password ?",
@@ -762,13 +777,19 @@ def password_change_modal() -> rx.Component:
                         text_align="right",
                         margin_top="-20px",
                     ),
-                    
                     # New Password Field
                     rx.vstack(
-                        rx.text("New Password", font_size="16px", font_weight="600", color="#22282C"),
+                        rx.text(
+                            "New Password",
+                            font_size="16px",
+                            font_weight="600",
+                            color="#22282C",
+                        ),
                         rx.box(
                             rx.input(
-                                type=rx.cond(ProfileState.show_new_password, "text", "password"),
+                                type=rx.cond(
+                                    ProfileState.show_new_password, "text", "password"
+                                ),
                                 placeholder="Enter a password ( at least 6 characters )",
                                 value=ProfileState.new_password,
                                 on_change=ProfileState.set_new_password,
@@ -778,12 +799,14 @@ def password_change_modal() -> rx.Component:
                                 border_radius="12px",
                                 font_size="16px",
                                 color="#22282C",
-                                name = "new_password",
+                                name="new_password",
                                 id="new_password",
-                                background_color = "#ffffff",
+                                background_color="#ffffff",
                             ),
                             rx.icon(
-                                tag=rx.cond(ProfileState.show_new_password, "eye-off", "eye"),
+                                tag=rx.cond(
+                                    ProfileState.show_new_password, "eye-off", "eye"
+                                ),
                                 size=24,
                                 color="#9CA3AF",
                                 position="absolute",
@@ -801,13 +824,21 @@ def password_change_modal() -> rx.Component:
                         width="100%",
                         align_items="flex-start",
                     ),
-                    
                     # Confirm Password Field
                     rx.vstack(
-                        rx.text("Confirm New Password", font_size="16px", font_weight="600", color="#22282C"),
+                        rx.text(
+                            "Confirm New Password",
+                            font_size="16px",
+                            font_weight="600",
+                            color="#22282C",
+                        ),
                         rx.box(
                             rx.input(
-                                type=rx.cond(ProfileState.show_confirm_password, "text", "password"),
+                                type=rx.cond(
+                                    ProfileState.show_confirm_password,
+                                    "text",
+                                    "password",
+                                ),
                                 placeholder="Enter a password ( at least 6 characters )",
                                 value=ProfileState.confirm_password,
                                 on_change=ProfileState.set_confirm_password,
@@ -817,12 +848,14 @@ def password_change_modal() -> rx.Component:
                                 border_radius="12px",
                                 font_size="16px",
                                 color="#22282C",
-                                name = "confirm_new_password",
+                                name="confirm_new_password",
                                 id="confirm_new_password",
-                                background_color = "#ffffff",
+                                background_color="#ffffff",
                             ),
                             rx.icon(
-                                tag=rx.cond(ProfileState.show_confirm_password, "eye-off", "eye"),
+                                tag=rx.cond(
+                                    ProfileState.show_confirm_password, "eye-off", "eye"
+                                ),
                                 size=24,
                                 color="#9CA3AF",
                                 position="absolute",
@@ -840,7 +873,6 @@ def password_change_modal() -> rx.Component:
                         width="100%",
                         align_items="flex-start",
                     ),
-                    
                     rx.button(
                         "Change Password",
                         on_click=ProfileState.submit_password_change,
@@ -856,9 +888,7 @@ def password_change_modal() -> rx.Component:
                         border="none",
                         _hover={"opacity": "0.9"},
                         margin_bottom="20px",
-                        
                     ),
-                    
                     spacing="6",
                     width="100%",
                 ),
@@ -883,14 +913,17 @@ def password_change_modal() -> rx.Component:
             justify_content="center",
             z_index="1001",
         ),
-     
     )
 
+
 import json
+
+
 class Address(rx.Base):
     id: int
     address: str
     is_default: bool = False
+
 
 class AddressState(rx.State):
     show_form: bool = False
@@ -901,13 +934,11 @@ class AddressState(rx.State):
     error_message: str = ""
     success_message: str = ""
 
-
     def start_edit_address(self, address_id: int, current_address: str):
         self.editing_address_id = address_id
         self.show_form = True  # reuse the form modal for editing
         self.new_address = current_address  # pre-fill with existing address
         print(f"Starting edit for address ID {address_id}: {current_address}")
-
 
     def toggle_form(self):
         """Toggle visibility of the address form."""
@@ -967,8 +998,6 @@ class AddressState(rx.State):
         except Exception as e:
             print("Request failed:", e)
 
-
-
     async def load_addresses(self):
         """Fetch existing addresses from backend when the page loads."""
         auth_state = await self.get_state(AuthState)
@@ -987,7 +1016,7 @@ class AddressState(rx.State):
                     Address(
                         id=addr.get("id", 0),
                         address=addr.get("address", ""),
-                        is_default=addr.get("is_default", False)
+                        is_default=addr.get("is_default", False),
                     )
                     for addr in addresses_list
                 ]
@@ -996,8 +1025,6 @@ class AddressState(rx.State):
                 print("Failed to fetch addresses:", res.text)
         except Exception as e:
             print("Request failed:", e)
-
-
 
     async def delete_address(self, address_id: int):
         auth_state = await self.get_state(AuthState)
@@ -1020,7 +1047,6 @@ class AddressState(rx.State):
         else:
             print("Failed to delete address:", response.text)
 
-
     async def edit_address(self, address_id: int, new_address: str):
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies or {}
@@ -1034,7 +1060,9 @@ class AddressState(rx.State):
                 response = await client.request(
                     "PUT",
                     f"{API_BASE_URL}/users/address/edit/",
-                    data=json.dumps({"address_id": address_id, "address": new_address.strip()}),
+                    data=json.dumps(
+                        {"address_id": address_id, "address": new_address.strip()}
+                    ),
                     headers={"Content-Type": "application/json"},
                     cookies=cookies_dict,
                 )
@@ -1051,8 +1079,6 @@ class AddressState(rx.State):
         except Exception as e:
             print("Request failed:", e)
 
-
-
     async def set_default_address(self, address_id: int):
         """Set an address as the default address"""
         self.is_loading = True
@@ -1060,9 +1086,8 @@ class AddressState(rx.State):
         self.success_message = ""
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies or {}
-        
+
         try:
-            
             # Make PUT request to set default address
             async with httpx.AsyncClient() as client:
                 response = await client.put(
@@ -1070,12 +1095,12 @@ class AddressState(rx.State):
                     json={"address_id": address_id},
                     headers={"Content-Type": "application/json"},
                     cookies=cookies_dict,
-                    timeout=10.0
+                    timeout=10.0,
                 )
-                
+
                 if response.status_code == 200:
                     self.success_message = "Default address updated successfully"
-                    
+
                     updated_addresses = []
                     for addr in self.addresses:
                         addr_copy = addr.copy()
@@ -1084,10 +1109,10 @@ class AddressState(rx.State):
                         else:
                             addr_copy["is_default"] = False
                         updated_addresses.append(addr_copy)
-                    
+
                     # Assign the new list to trigger state update
                     self.addresses = updated_addresses
-                    
+
                 elif response.status_code == 401:
                     self.error_message = "Authentication required"
                 elif response.status_code == 403:
@@ -1096,8 +1121,10 @@ class AddressState(rx.State):
                     self.error_message = "Address not found"
                 else:
                     data = response.json()
-                    self.error_message = data.get("error", "Failed to set default address")
-                    
+                    self.error_message = data.get(
+                        "error", "Failed to set default address"
+                    )
+
         except httpx.TimeoutException:
             self.error_message = "Request timed out. Please try again."
         except httpx.RequestError as e:
@@ -1106,8 +1133,6 @@ class AddressState(rx.State):
             self.error_message = f"An error occurred: {str(e)}"
         finally:
             self.is_loading = False
-
-
 
 
 def new_address_modal() -> rx.Component:
@@ -1130,7 +1155,6 @@ def new_address_modal() -> rx.Component:
                         display="flex",
                         justify_content="flex-end",
                     ),
-                    
                     # Modal Title (changes based on mode)
                     rx.center(
                         rx.cond(
@@ -1163,7 +1187,6 @@ def new_address_modal() -> rx.Component:
                             color="#22282C",
                         ),
                     ),
-                    
                     # Address Input Field
                     rx.vstack(
                         rx.input(
@@ -1182,7 +1205,6 @@ def new_address_modal() -> rx.Component:
                         width="100%",
                         align_items="flex-start",
                     ),
-                    
                     # Submit Button (text changes based on mode)
                     rx.button(
                         rx.cond(
@@ -1202,7 +1224,6 @@ def new_address_modal() -> rx.Component:
                         _hover={"opacity": "0.9"},
                         margin_top="20px",
                     ),
-                    
                     spacing="4",
                     width="100%",
                 ),
@@ -1240,20 +1261,46 @@ def address_card(address: dict):
                 ),
                 rx.spacer(),
                 rx.hstack(
-                    rx.icon("pencil", size=18, color="#2E6FF2", cursor="pointer",on_click=lambda: AddressState.start_edit_address(address["id"], address["address"])),
-                    rx.text("Edit", font_weight="semibold", color="#2E6FF2", cursor="pointer",on_click=lambda: AddressState.start_edit_address(address["id"], address["address"])),
-                    rx.icon("trash", size=18, color="#FF4D4D", cursor="pointer",on_click=lambda: AddressState.delete_address(address["id"])),
-                    rx.text("Delete", font_weight="semibold", color="#FF4D4D", cursor="pointer",on_click=lambda: AddressState.delete_address(address["id"])),
+                    rx.icon(
+                        "pencil",
+                        size=18,
+                        color="#2E6FF2",
+                        cursor="pointer",
+                        on_click=lambda: AddressState.start_edit_address(
+                            address["id"], address["address"]
+                        ),
+                    ),
+                    rx.text(
+                        "Edit",
+                        font_weight="semibold",
+                        color="#2E6FF2",
+                        cursor="pointer",
+                        on_click=lambda: AddressState.start_edit_address(
+                            address["id"], address["address"]
+                        ),
+                    ),
+                    rx.icon(
+                        "trash",
+                        size=18,
+                        color="#FF4D4D",
+                        cursor="pointer",
+                        on_click=lambda: AddressState.delete_address(address["id"]),
+                    ),
+                    rx.text(
+                        "Delete",
+                        font_weight="semibold",
+                        color="#FF4D4D",
+                        cursor="pointer",
+                        on_click=lambda: AddressState.delete_address(address["id"]),
+                    ),
                     spacing="3",
                     align="center",
                 ),
                 align="center",
                 width="100%",
             ),
-
             # Row 2: Phone number
             rx.text(ProfileState.phone_number, color="#555", mt="5px"),
-
             rx.hstack(
                 # Left side: address with icon
                 rx.hstack(
@@ -1262,7 +1309,6 @@ def address_card(address: dict):
                     align="center",
                     spacing="2",
                 ),
-
                 # Right side: default indicator or button
                 rx.cond(
                     address["is_default"],
@@ -1276,17 +1322,16 @@ def address_card(address: dict):
                         padding="6px 12px",
                         cursor="pointer",
                         _hover={"opacity": "0.9"},
-                       
-                        on_click=lambda: AddressState.set_default_address(address["id"]),
+                        on_click=lambda: AddressState.set_default_address(
+                            address["id"]
+                        ),
                     ),
                 ),
-
                 justify="between",  # Spread items left/right
                 align="center",
                 width="100%",
                 mt="5px",
-            )
-
+            ),
         ),
         # Card styling
         border="1px solid #E0E0E0",
@@ -1300,10 +1345,15 @@ def address_card(address: dict):
 
 
 def address_content() -> rx.Component:
-
     return rx.vstack(
         rx.center(
-            rx.text("My Address", font_size="20px", font_weight="bold", margin_bottom="20px", color="#22282c"),
+            rx.text(
+                "My Address",
+                font_size="20px",
+                font_weight="bold",
+                margin_bottom="20px",
+                color="#22282c",
+            ),
             width="100%",
         ),
         # Add New Address Button
@@ -1325,10 +1375,8 @@ def address_content() -> rx.Component:
         rx.foreach(AddressState.addresses, lambda a: address_card(a)),
         spacing="2",
         width="100%",
-        on_mount=AddressState.load_addresses,  
+        on_mount=AddressState.load_addresses,
     )
-
-
 
 
 def wishlist_content() -> rx.Component:
@@ -1339,7 +1387,7 @@ def wishlist_content() -> rx.Component:
                 font_size="20px",
                 font_weight="bold",
                 margin_bottom="20px",
-                color="#22282c"
+                color="#22282c",
             ),
             width="100%",
         ),
@@ -1347,6 +1395,7 @@ def wishlist_content() -> rx.Component:
         spacing="5",
         width="100%",
     )
+
 
 def orders_content() -> rx.Component:
     return rx.vstack(
@@ -1356,7 +1405,7 @@ def orders_content() -> rx.Component:
                 font_size="20px",
                 font_weight="bold",
                 margin_bottom="20px",
-                color="#22282c"
+                color="#22282c",
             ),
             width="100%",
         ),
@@ -1364,6 +1413,7 @@ def orders_content() -> rx.Component:
         spacing="5",
         width="100%",
     )
+
 
 def reviews_content() -> rx.Component:
     return rx.vstack(
@@ -1373,7 +1423,7 @@ def reviews_content() -> rx.Component:
                 font_size="20px",
                 font_weight="bold",
                 margin_bottom="20px",
-                color="#22282c"
+                color="#22282c",
             ),
             width="100%",
         ),
@@ -1381,6 +1431,7 @@ def reviews_content() -> rx.Component:
         spacing="5",
         width="100%",
     )
+
 
 def notification_content() -> rx.Component:
     return rx.vstack(
@@ -1390,7 +1441,7 @@ def notification_content() -> rx.Component:
                 font_size="20px",
                 font_weight="bold",
                 margin_bottom="20px",
-                color="#22282c"
+                color="#22282c",
             ),
             width="100%",
         ),
@@ -1399,15 +1450,18 @@ def notification_content() -> rx.Component:
         width="100%",
     )
 
-def input_with_label(label: str, value: str = "", on_change: Optional[Callable] = None) -> rx.Component:
+
+def input_with_label(
+    label: str, value: str = "", on_change: Optional[Callable] = None
+) -> rx.Component:
     return rx.vstack(
         rx.text(label, font_size="14px", font_weight="500", margin_bottom="4px"),
         rx.input(
-            value=value,        # reactive binding
+            value=value,  # reactive binding
             placeholder=label,
             width="100%",
             style=input_style,
-            on_change=on_change # update state on user input
+            on_change=on_change,  # update state on user input
         ),
         spacing="1",
         width="100%",
@@ -1416,19 +1470,17 @@ def input_with_label(label: str, value: str = "", on_change: Optional[Callable] 
 
 
 def input_with_label_date(
-    label: str,
-    value: str = "",
-    on_change: Optional[Callable] = None
+    label: str, value: str = "", on_change: Optional[Callable] = None
 ) -> rx.Component:
     return rx.vstack(
         rx.text(label, font_size="14px", font_weight="500", margin_bottom="4px"),
         rx.input(
             type="date",
-            value=value,            # use `value` instead of default_value
+            value=value,  # use `value` instead of default_value
             placeholder=label,
             width="100%",
             style=input_style,
-            on_change=on_change     # reactive binding
+            on_change=on_change,  # reactive binding
         ),
         spacing="1",
         width="100%",
@@ -1440,16 +1492,12 @@ def select_with_label(
     label: str,
     options: list[str],
     value: str = "",
-    on_change: Optional[Callable] = None
+    on_change: Optional[Callable] = None,
 ) -> rx.Component:
     return rx.vstack(
         rx.text(label, font_size="14px", font_weight="500", margin_bottom="4px"),
         rx.select(
-            options,
-            value=value,
-            placeholder=label,
-            width="100%",
-            on_change=on_change
+            options, value=value, placeholder=label, width="100%", on_change=on_change
         ),
         spacing="1",
         width="100%",
@@ -1469,15 +1517,13 @@ def menu_item_style(active: bool = False):
         "background_color": "#F9FAFB" if active else "white",
         "color": "#22282C" if active else "#6B7280",
         "font_weight": "600" if active else "400",
-        "_hover": {"background_color": "#F3F4F6", "color": "#22282C"}
-        
+        "_hover": {"background_color": "#F3F4F6", "color": "#22282C"},
     }
 
+
 def profile_page() -> rx.Component:
-    return rx.box(
-        template(profile_content),
-        on_mount=ProfileState.load_user_data  
-    )
+    return rx.box(template(profile_content), on_mount=ProfileState.load_user_data)
+
 
 input_style = {
     "color": "#22282C",
