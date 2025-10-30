@@ -137,6 +137,15 @@ class Product(persistent.Persistent):
     
     def set_display_scenes(self, display_scenes):
         self.display_scenes = display_scenes
+        
+    def add_review(self, review_id):
+        self.reviews.append(review_id)
+
+    def remove_review(self, review_id):
+        self.reviews.remove(review_id)
+
+    def set_rating(self, rating):
+        self.rating = rating
     
 class OwnedItem(Item):
     def __init__(self, id, name, description, model_id, category, type, is_container, spatial_id, texture_id, created_at):
