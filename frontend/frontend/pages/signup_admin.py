@@ -1,12 +1,11 @@
 import reflex as rx
 import httpx
-import os
-
-API_BASE_URL = os.getenv("API_URL", "http://localhost:8001")
+from ..config import API_BASE_URL
 
 
 class AdminSignupState(rx.State):
     """State management for admin signup form."""
+
     first_name: str = ""
     last_name: str = ""
     username: str = ""
@@ -31,7 +30,9 @@ class AdminSignupState(rx.State):
 
         try:
             async with httpx.AsyncClient() as client:
-                res = await client.post(f"{API_BASE_URL}/users/admin/register/", data=data)
+                res = await client.post(
+                    f"{API_BASE_URL}/users/admin/register/", data=data
+                )
 
             if res.status_code == 201:
                 self.success_message = "Admin account created successfully!"
@@ -47,12 +48,19 @@ class AdminSignupState(rx.State):
             self.is_loading = False
 
 
-def form_field(label, icon_name, placeholder, field_value, set_field, field_type="text"):
+def form_field(
+    label, icon_name, placeholder, field_value, set_field, field_type="text"
+):
     """Reusable input field with consistent style."""
     return rx.vstack(
         rx.text(label, size="3", weight="medium", color="#22282C", width="100%"),
         rx.input(
-            rx.input.slot(rx.icon(icon_name, style={"color": "#929FA7", "width": "20px", "height": "20px"})),
+            rx.input.slot(
+                rx.icon(
+                    icon_name,
+                    style={"color": "#929FA7", "width": "20px", "height": "20px"},
+                )
+            ),
             placeholder=placeholder,
             type=field_type,
             size="3",
@@ -82,7 +90,7 @@ def adminsignup_page() -> rx.Component:
                         color_scheme="red",
                         size="2",
                         width="100%",
-                    )
+                    ),
                 ),
                 rx.cond(
                     AdminSignupState.success_message != "",
@@ -92,9 +100,8 @@ def adminsignup_page() -> rx.Component:
                         color_scheme="green",
                         size="2",
                         width="100%",
-                    )
+                    ),
                 ),
-
                 # Header
                 rx.flex(
                     rx.heading(
@@ -120,51 +127,67 @@ def adminsignup_page() -> rx.Component:
                     direction="column",
                     spacing="4",
                     width="100%",
-                    margin_bottom="-1rem"
+                    margin_bottom="-1rem",
                 ),
-
                 # Name fields
                 rx.hstack(
                     form_field(
-                        "First Name", "user", "John",
-                        AdminSignupState.first_name, AdminSignupState.set_first_name
+                        "First Name",
+                        "user",
+                        "John",
+                        AdminSignupState.first_name,
+                        AdminSignupState.set_first_name,
                     ),
                     form_field(
-                        "Last Name", "user", "Doe",
-                        AdminSignupState.last_name, AdminSignupState.set_last_name
+                        "Last Name",
+                        "user",
+                        "Doe",
+                        AdminSignupState.last_name,
+                        AdminSignupState.set_last_name,
                     ),
                     spacing="4",
                     width="100%",
                 ),
-
                 # Username
                 form_field(
-                    "Username", "user", "admin_username",
-                    AdminSignupState.username, AdminSignupState.set_username
+                    "Username",
+                    "user",
+                    "admin_username",
+                    AdminSignupState.username,
+                    AdminSignupState.set_username,
                 ),
-
                 # Password
                 form_field(
-                    "Password", "lock", "Enter password",
-                    AdminSignupState.password, AdminSignupState.set_password, "password"
+                    "Password",
+                    "lock",
+                    "Enter password",
+                    AdminSignupState.password,
+                    AdminSignupState.set_password,
+                    "password",
                 ),
-
                 # Register Button
                 rx.button(
                     rx.cond(
                         AdminSignupState.is_loading,
-                        rx.hstack(rx.spinner(size="3"), rx.text("Creating account..."), spacing="2"),
+                        rx.hstack(
+                            rx.spinner(size="3"),
+                            rx.text("Creating account..."),
+                            spacing="2",
+                        ),
                         rx.text("Sign Up as Admin"),
                     ),
                     size="3",
                     width="100%",
                     background_color="#22282C",
                     border_radius="8px",
-                    _hover={"background_color": "white", "color": "#22282C", "border": "1px solid #929FA7"},
+                    _hover={
+                        "background_color": "white",
+                        "color": "#22282C",
+                        "border": "1px solid #929FA7",
+                    },
                     on_click=AdminSignupState.handle_admin_signup,
                     disabled=AdminSignupState.is_loading,
                 ),
-
                 spacing="6",
                 width="100%",
             ),

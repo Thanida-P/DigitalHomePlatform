@@ -35,9 +35,11 @@ def index() -> rx.Component:
 app = rx.App()
 app.add_page(index)
 '''
+
 import reflex as rx
 from .pages.home import home_page
-#from .pages.about import about_page
+
+# from .pages.about import about_page
 from .pages.shop import shop_page
 from .pages.signup import signup_page
 from .pages.login import login_page
@@ -54,29 +56,27 @@ from .state import DynamicState
 app = rx.App()
 
 
-app.add_page(room_page,route="/rooms/[room]",on_load=DynamicState.on_load,)
 app.add_page(
-    room_page, route="/static/x", on_load=DynamicState.on_load
+    room_page,
+    route="/rooms/[room]",
+    on_load=DynamicState.on_load,
 )
+app.add_page(room_page, route="/static/x", on_load=DynamicState.on_load)
 app.add_page(room_page)
 
 app.add_page(home_page, route="/")
-#app.add_page(about_page, route="/about")
+# app.add_page(about_page, route="/about")
 app.add_page(shop_page, route="/shop")
 app.add_page(signup_page, route="/signup")
 app.add_page(login_page, route="/login")
 app.add_page(profile_page, route="/profile")
-app.add_page(product_detail_page,route="/product_detail")
-app.add_page(cart_page,route="/cart")
-app.add_page(admin_dashboard,route="/admin_dashboard")
+app.add_page(product_detail_page, route="/product_detail")
+app.add_page(cart_page, route="/cart")
+app.add_page(admin_dashboard, route="/admin_dashboard")
 app.add_page(adminsignup_page, route="/signup_admin")
-app.add_page(my_digital_home_page,route="/my_home")
-app.add_page(room_page,route="/room")
-
-
-
+# app.add_page(my_digital_home_page,route="/my_home")
+app.add_page(room_page, route="/room")
 
 
 if __name__ == "__main__":
     app.run()
-
