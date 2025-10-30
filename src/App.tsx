@@ -19,12 +19,11 @@ export default function App() {
   const [showFurniture, setShowFurniture] = React.useState(false);
 
   React.useEffect(() => {
-    const checkVRState = () => {
-      setIsVRActive(xrStore.isPresenting);
-    };
+    const unsubscribe = xrStore.subscribe((state) => {
+      setIsVRActive(state !== null);
+    });
     
-    const interval = setInterval(checkVRState, 100);
-    return () => clearInterval(interval);
+    return () => unsubscribe();
   }, []);
 
   const furnitureItems = [
