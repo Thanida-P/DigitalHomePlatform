@@ -62,6 +62,7 @@ urlpatterns = [
     path('products/categories/', product_views.get_all_categories),
     path('products/types/', product_views.get_all_product_types),
     path('carts/add_item/', cart_views.add_to_cart),
+    path('carts/decrease_item/<int:cart_item_id>/', cart_views.decrease_cart_item_quantity),
     path('carts/remove_item/<int:cart_item_id>/', cart_views.remove_from_cart),
     path('carts/view/', cart_views.view_cart),
     path('carts/clear_cart/', cart_views.clear_cart),
@@ -76,12 +77,4 @@ urlpatterns = [
     path('reviews/delete/<int:review_id>/', review_views.delete_review),
     path('reviews/get_product_reviews/<int:product_id>/', review_views.get_reviews_for_product),
     path('reviews/get_customer_reviews/', review_views.get_reviews_by_customer),
-
-    # For debugging purposes
-    path('test/add_3d_model/', product_views.add_3d_model),
-    path('test/add_texture/', product_views.add_texture),
-    path('test/get_texture/<int:texture_id>/', product_views.get_texture),
-    path('test/add_display_scene/', product_views.add_display_scene),
-    path('test/get_display_scene/<int:product_id>/', product_views.get_display_scenes),
-
 ]

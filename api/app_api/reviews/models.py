@@ -1,7 +1,7 @@
 from django.db import models
 
 class Review(models.Model):
-    product = models.ForeignKey('products.Product', on_delete=models.CASCADE, related_name='product_reviews')
+    product_id = models.IntegerField()
     customer = models.ForeignKey('users.Customer', on_delete=models.CASCADE, related_name='customer_reviews')
     rating = models.IntegerField(choices=[(i, str(i)) for i in range(1, 6)])
     comment = models.TextField(null=True, blank=True)

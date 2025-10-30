@@ -2,32 +2,42 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
-from app_api.products.models import Product
+from app_api.products.objectModels import Product
+from zodb.zodb_management import *
 
 @csrf_exempt
 @login_required
 @require_http_methods(["POST"])
 def add_to_wishlist(request):
-    customer = request.user.customer
+    connection, root = get_connection()
+    try:
+        customer = request.user.customer
 
-    if not customer:
-        return JsonResponse({'error': 'Only customers can manage wishlists'}, status=403)
+        if not customer:
+            return JsonResponse({'error': 'Only customers can manage wishlists'}, status=403)
 
-    product_id = int(request.POST.get('product_id'))
+        product_id = int(request.POST.get('product_id'))
 
-    if not product_id:
-        return JsonResponse({'error': 'Product ID is required'}, status=400)
+        if not product_id:
+            return JsonResponse({'error': 'Product ID is required'}, status=400)
+        
+        try:
+            _ = root.products[product_id]
+        except (KeyError, TypeError):
+            return JsonResponse({'error': 'Product not found'}, status=404)
 
-    wishlist = customer.wishlist
+        wishlist = customer.wishlist
 
-    if product_id in wishlist:
-        return JsonResponse({'message': 'Item already in wishlist'}, status=200)
+        if product_id in wishlist:
+            return JsonResponse({'message': 'Item already in wishlist'}, status=200)
 
-    wishlist.append(product_id)
-    customer.wishlist = wishlist
-    customer.save()
+        wishlist.append(product_id)
+        customer.wishlist = wishlist
+        customer.save()
 
-    return JsonResponse({'message': 'Item added to wishlist successfully'}, status=201)
+        return JsonResponse({'message': 'Item added to wishlist successfully'}, status=201)
+    finally:
+        connection.close()
 
 @csrf_exempt
 @login_required
@@ -52,25 +62,30 @@ def remove_from_wishlist(request, product_id):
 @login_required
 @require_http_methods(["GET"])
 def get_wishlist(request):
-    customer = request.user.customer
+    connection, root = get_connection()
+    try:
+        customer = request.user.customer
 
-    if not customer:
-        return JsonResponse({'error': 'Only customers can view wishlists'}, status=403)
+        if not customer:
+            return JsonResponse({'error': 'Only customers can view wishlists'}, status=403)
 
-    wishlist = customer.wishlist
-    products = []
+        wishlist = customer.wishlist
+        products = []
 
-    for item_id in wishlist:
-        product = Product.objects.get(id=item_id)
-        product_data = {
-            'id': product.id,
-            'name': product.name,
-            'digital_price': str(product.digital_price),
-            'physical_price': str(product.physical_price),
-            'category': product.category,
-            'type': product.type,
-            'image': product.image,
-        }
-        products.append(product_data)
+        for item_id in wishlist:
+            product = root.products[item_id]
+            item = product.get_item()
+            product_data = {
+                'id': product.get_id(),
+                'name': item.get_name(),
+                'digital_price': str(product.get_digital_price()),
+                'physical_price': str(product.get_physical_price()),
+                'category': item.get_category(),
+                'type': item.get_type(),
+                'image': product.get_image(),
+            }
+            products.append(product_data)
 
-    return JsonResponse({'wishlist': products}, status=200)
+        return JsonResponse({'wishlist': products}, status=200)
+    finally:
+        connection.close()

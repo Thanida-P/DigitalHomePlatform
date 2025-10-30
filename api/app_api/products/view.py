@@ -5,6 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import FileResponse
 
 from .product_func import *
+from zodb.zodb_management import *
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -37,9 +38,9 @@ def add_product(request):
         if not digital_available and not physical_available:
             return JsonResponse({'error': 'At least one of digital or physical availability must be true'}, status=400)
 
-        product = create_product(name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, is_container, texture_files)
+        product_id = create_product(name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, is_container, texture_files)
 
-        return JsonResponse({'message': 'Product created successfully', 'product_id': product.id}, status=201)
+        return JsonResponse({'message': 'Product created successfully', 'product_id': product_id}, status=201)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
@@ -77,8 +78,8 @@ def update_product(request):
         if not digital_available and not physical_available:
             return JsonResponse({'error': 'At least one of digital or physical availability must be true'}, status=400)
         
-        product = update_existing_product(product_id, name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, is_container, texture_files)
-        return JsonResponse({'message': 'Product updated successfully', 'product_id': product.id}, status=200)
+        update_existing_product(product_id, name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, is_container, texture_files)
+        return JsonResponse({'message': 'Product updated successfully', 'product_id': product_id}, status=200)
     except Product.DoesNotExist:
         return JsonResponse({'error': 'Product not found'}, status=404)
     except Exception as e:
@@ -88,8 +89,8 @@ def update_product(request):
 @require_http_methods(["POST"])
 @login_required
 def get_products(request):
+    connection, root = get_connection()
     try:
-        products = Product.objects.all()
         search_query = request.POST.get('search_query', None)
         category = request.POST.get('category', None)
         min_price = request.POST.get('min_price', None)
@@ -99,47 +100,49 @@ def get_products(request):
         sort_by = request.POST.get('sort_by', None)
         
         product_list = []
-        for product in products:
-            item = product.item
+        for product in root.products.values():
+            item = product.get_item()
+            item_category = item.get_category().lower()
+            item_name = item.get_name().lower()
             if search_query is not None:
-                if search_query and search_query.lower() not in item.name.lower():
+                if search_query and search_query.lower() not in item_name:
                     continue
-            if category is not None and category.lower() != product.category.lower():
+            if category is not None and category.lower() != item_category:
                 continue
             if min_price is not None:
                 try:
                     min_price_val = float(min_price)
-                    if (product.digital_price is not None and product.digital_price < min_price_val) and (product.physical_price is not None and product.physical_price < min_price_val):
+                    if (product.get_digital_price() is not None and product.get_digital_price() < min_price_val) and (product.get_physical_price() is not None and product.get_physical_price() < min_price_val):
                         continue
                 except ValueError:
                     return JsonResponse({'error': 'Invalid min_price value'}, status=400)
             if max_price is not None:
                 try:
                     max_price_val = float(max_price)
-                    if (product.digital_price is not None and product.digital_price > max_price_val) and (product.physical_price is not None and product.physical_price > max_price_val):
+                    if (product.get_digital_price() is not None and product.get_digital_price() > max_price_val) and (product.get_physical_price() is not None and product.get_physical_price() > max_price_val):
                         continue
                 except ValueError:
                     return JsonResponse({'error': 'Invalid max_price value'}, status=400)
             if format is not None:
-                if format.lower() == 'digital' and not product.digital_available:
+                if format.lower() == 'digital' and not product.is_digital_available():
                     continue
-                if format.lower() == 'physical' and not product.physical_available:
+                if format.lower() == 'physical' and not product.is_physical_available():
                     continue
-                
-            if product_type is not None and product_type.lower() != product.type.lower():
+
+            if product_type is not None and product_type.lower() != item.get_type().lower():
                 continue
 
             product_data = {
                 'id': product.id,
-                'name': item.name,
-                'description': item.description,
-                'category': item.category,
-                'digital_price': str(product.digital_price),
-                'physical_price': str(product.physical_price),
-                'image': product.image,
-                'rating': product.rating,
-                'product_type': item.type,
-                'created_at': item.created_at,
+                'name': item.get_name(),
+                'description': item.get_description(),
+                'category': item.get_category(),
+                'digital_price': str(product.get_digital_price()),
+                'physical_price': str(product.get_physical_price()),
+                'image': product.get_image(),
+                'rating': product.get_rating(),
+                'product_type': item.get_type(),
+                'created_at': item.get_created_at(),
             }
             product_list.append(product_data)
         if sort_by is not None:
@@ -159,38 +162,43 @@ def get_products(request):
         return JsonResponse({'products': product_list}, status=200)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+    finally:
+        connection.close()
 
 @require_http_methods(["GET"])
 @login_required
 def get_product_detail(request, product_id):
+    connection, root = get_connection()
     try:
         if not product_id:
             return JsonResponse({'error': 'Product ID is required'}, status=400)
-        product = Product.objects.get(id=product_id)
+        product = root.products[product_id]
         item = product.item
         
         product_data = {
             'id': product.id,
-            'name': item.name,
-            'description': item.description,
-            'digital_price': str(product.digital_price),
-            'physical_price': str(product.physical_price),
-            'category': item.category,
-            'type': item.type,
-            'image': product.image,
-            'stock': product.stock,
-            'reviews': product.reviews,
-            'rating': product.rating,
-            'created_at': item.created_at,
-            'updated_at': item.updated_at,
-            'model_id': item.model_id,
-            'display_scenes_ids': product.display_scenes
+            'name': item.get_name(),
+            'description': item.get_description(),
+            'digital_price': str(product.get_digital_price()),
+            'physical_price': str(product.get_physical_price()),
+            'category': item.get_category(),
+            'type': item.get_type(),
+            'image': product.get_image(),
+            'stock': product.get_stock(),
+            'reviews': product.get_reviews(),
+            'rating': product.get_rating(),
+            'created_at': item.get_created_at(),
+            'updated_at': item.get_updated_at(),
+            'model_id': item.get_model_id(),
+            'display_scenes_ids': product.get_display_scenes()
         }
         return JsonResponse({'product': product_data}, status=200)
     except Product.DoesNotExist:
         return JsonResponse({'error': 'Product not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+    finally:
+        connection.close()
 
 @csrf_exempt
 @require_http_methods(["DELETE"])
@@ -263,101 +271,33 @@ def get_textures(request, model_id):
 @require_http_methods(["GET"])
 @login_required
 def get_all_categories(request):
+    connection, root = get_connection()
     try:
-        categories = Item.objects.values_list('category', flat=True).distinct()
+        categories = set()
+        for obj in root.objectItems.values():
+            try:
+                categories.add(obj.get_category())
+            except Exception:
+                continue
         return JsonResponse({'categories': list(categories)}, status=200)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
-    
+    finally:
+        connection.close()
+        
 @require_http_methods(["GET"])
 @login_required
 def get_all_product_types(request):
+    connection, root = get_connection()
     try:
-        product_types = Item.objects.values_list('type', flat=True).distinct()
+        product_types = set()
+        for obj in root.objectItems.values():
+            try:
+                product_types.add(obj.get_type())
+            except Exception:
+                continue
         return JsonResponse({'product_types': list(product_types)}, status=200)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
-    
-# testing endpoints for ZODB operations
-@csrf_exempt
-@require_http_methods(["POST"])
-@login_required
-def add_3d_model(request):
-    try:
-        model_file = request.FILES.get('model_file')
-        texture_files = request.FILES.getlist('texture_files')
-        
-        if not model_file:
-            return JsonResponse({'error': 'Model file is required'}, status=400)
-        
-        model_id = create_3d_model(model_file, texture_files)
-        
-        return JsonResponse({'message': '3D model added successfully', 'model_id': model_id}, status=201)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
-    
-@csrf_exempt
-@require_http_methods(["POST"])
-@login_required
-def add_texture(request):
-    try:
-        texture_file = request.FILES.get('texture_file')
-        
-        if not texture_file:
-            return JsonResponse({'error': 'Texture file is required'}, status=400)
-        
-        texture_id = direct_create_Texture(texture_file)
-        
-        return JsonResponse({'message': 'Texture added successfully', 'texture_id': texture_id}, status=201)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
-    
-@csrf_exempt
-@require_http_methods(["POST"])
-@login_required
-def add_display_scene(request):
-    try:
-        scene_file = request.FILES.get('scene_file')
-        
-        if not scene_file:
-            return JsonResponse({'error': 'Display scene file is required'}, status=400)
-        
-        display_scene_id = create_display_scene(scene_file)
-        
-        return JsonResponse({'message': 'Display scene added successfully', 'display_scene_id': display_scene_id}, status=201)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
-    
-@require_http_methods(["GET"])
-@login_required
-def get_texture(request, texture_id):
-    try:
-        response = fetch_texture(texture_id)
-        if not response:
-            return JsonResponse({'error': 'Texture not found'}, status=404)
-
-        return JsonResponse({'texture_file': response}, status=200)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
-    
-@require_http_methods(["GET"])
-@login_required
-def get_display_scenes(request, product_id):
-    try:
-        product = Product.objects.get(id=product_id)
-        if not product:
-            return JsonResponse({'error': 'Product not found'}, status=404)
-
-        scenes = []
-        for scene_id in product.display_scenes:
-            scene = fetch_display_scene(scene_id)
-            if scene:
-                scenes.append({
-                    'scene_id': scene_id,
-                    'filename': scene.get_filename()
-                })
-        return JsonResponse({'display_scenes': scenes}, status=200)
-    except Product.DoesNotExist:
-        return JsonResponse({'error': 'Product not found'}, status=404)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+    finally:
+        connection.close()
