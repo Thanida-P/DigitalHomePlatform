@@ -1,7 +1,7 @@
 import React from "react";
-import { Canvas, ThreeEvent } from "@react-three/fiber";
+import { Canvas, ThreeEvent, useFrame } from "@react-three/fiber";
 import { Environment, Gltf, PerspectiveCamera, Text } from "@react-three/drei";
-import { createXRStore, XR } from "@react-three/xr";
+import { createXRStore, XR, useXRInputSourceState } from "@react-three/xr";
 import * as THREE from "three";
 
 const xrStore = createXRStore();
@@ -25,6 +25,69 @@ const FURNITURE_CATALOG: Furniture[] = [
   { id: "cabinet1", name: "Cabinet", modelPath: "/tv.glb" },
   { id: "equipment1", name: "Equipment", modelPath: "/target.glb" },
 ];
+
+// VR Locomotion Component
+function VRLocomotion() {
+  const leftInputSource = useXRInputSourceState("controller", "left");
+  const rightInputSource = useXRInputSourceState("controller", "right");
+  
+  useFrame((state, delta) => {
+    if (!state.camera) return;
+
+    // Get thumbstick input from controllers
+    let moveX = 0;
+    let moveZ = 0;
+    let rotateY = 0;
+
+    // Left controller - movement (forward/backward/strafe)
+    if (leftInputSource && leftInputSource.gamepad) {
+      const axes = leftInputSource.gamepad.axes as unknown as number[];
+      if (axes && axes.length >= 4) {
+        moveX = axes[2];
+        moveZ = axes[3];
+      }
+    }
+
+    if (rightInputSource && rightInputSource.gamepad) {
+      const axes = rightInputSource.gamepad.axes as unknown as number[];
+      if (axes && axes.length >= 4) {
+        rotateY = axes[2];
+      }
+    }
+
+    // Apply movement
+    const moveSpeed = 2.0; // Units per second
+    const rotateSpeed = 1.5; // Radians per second
+
+    if (Math.abs(moveX) > 0.1 || Math.abs(moveZ) > 0.1) {
+      // Get camera's forward and right directions
+      const cameraDirection = new THREE.Vector3();
+      state.camera.getWorldDirection(cameraDirection);
+      cameraDirection.y = 0; // Keep movement horizontal
+      cameraDirection.normalize();
+
+      const cameraRight = new THREE.Vector3();
+      cameraRight.crossVectors(cameraDirection, new THREE.Vector3(0, 1, 0));
+      cameraRight.normalize();
+
+      // Calculate movement vector
+      const movement = new THREE.Vector3();
+      movement.addScaledVector(cameraRight, moveX * moveSpeed * delta);
+      movement.addScaledVector(cameraDirection, -moveZ * moveSpeed * delta);
+
+      // Apply movement to camera
+      state.camera.position.add(movement);
+    }
+
+    // Apply rotation
+    if (Math.abs(rotateY) > 0.1) {
+      const rotation = rotateY * rotateSpeed * delta;
+      state.camera.rotateY(-rotation);
+    }
+  });
+
+  return null;
+}
 
 function DraggableFurniture({ 
   item, 
@@ -63,16 +126,12 @@ function DraggableFurniture({
     if (!isDragging) return;
     event.stopPropagation();
 
-    // Project the pointer onto the drag plane
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2(event.pointer.x, event.pointer.y);
     raycaster.setFromCamera(pointer, event.camera);
 
     const intersectPoint = new THREE.Vector3();
-    raycaster.ray.intersectPlane(dragPlane, intersectPoint);
-
-    if (intersectPoint) {
-      // Add the offset back
+    if (raycaster.ray.intersectPlane(dragPlane, intersectPoint)) {
       intersectPoint.add(offset);
       onPositionChange([intersectPoint.x, item.position[1], intersectPoint.z]);
     }
@@ -374,6 +433,7 @@ export default function App() {
         <Gltf src="/labPlan.glb" />
         
         <XR store={xrStore}>
+          <VRLocomotion />
           <VREditButton 
             onClick={() => {
               setShowSlider(!showSlider);
