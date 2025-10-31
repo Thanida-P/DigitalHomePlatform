@@ -1,200 +1,420 @@
 import React from "react";
-import { Canvas } from "@react-three/fiber";
-import { GlobalProvider } from "./context/global-context";
-import { Environment, Gltf, PerspectiveCamera } from "@react-three/drei";
+import { Canvas, useFrame, ThreeEvent } from "@react-three/fiber";
+import { Environment, Gltf, PerspectiveCamera, Text } from "@react-three/drei";
 import { createXRStore, XR } from "@react-three/xr";
-// import Gun from "./components/gun";
-// import Bullets from "./components/bullets";
-// import Target from "./components/target";
-// import Score from "./components/score";
+import * as THREE from "three";
 
-const xrStore = createXRStore({
-  // controller: {
-  //   right: Gun,
-  // },
-});
+const xrStore = createXRStore();
 
-export default function App() {
-  const [isVRActive, setIsVRActive] = React.useState(false);
-  const [showFurniture, setShowFurniture] = React.useState(false);
+type Furniture = {
+  id: string;
+  name?: string;
+  modelPath: string;
+};
 
-  React.useEffect(() => {
-    const unsubscribe = xrStore.subscribe((state) => {
-      setIsVRActive(state !== null);
-    });
-    
-    return () => unsubscribe();
-  }, []);
+type PlacedItem = Furniture & {
+  position: [number, number, number];
+  rotation?: [number, number, number];
+  scale?: number;
+};
 
-  const furnitureItems = [
-    { id: 1, name: "Modern Stylish Mini Table", category: "Chairs", image: "/chair1.jpg" },
-    { id: 2, name: "Modern Stylish Mini Table", category: "Chairs", image: "/chair2.jpg" },
-    { id: 3, name: "Modern Stylish Mini Table", category: "Tables", image: "/table.jpg" },
-    { id: 4, name: "Modern Stylish Mini Table", category: "Sofas", image: "/sofa.jpg" },
-    { id: 5, name: "Modern Stylish Mini Table", category: "Chairs", image: "/chair3.jpg" },
-  ];
+// Available furniture items
+const FURNITURE_CATALOG: Furniture[] = [
+  { id: "table1", name: "Lab Table", modelPath: "/target.glb" },
+  { id: "chair1", name: "Lab Chair", modelPath: "/chair1.glb" },
+  { id: "cabinet1", name: "Cabinet", modelPath: "/tv.glb" },
+  { id: "equipment1", name: "Equipment", modelPath: "/target.glb" },
+];
+
+function DraggableFurniture({ 
+  item, 
+  index,
+  isSelected,
+  onSelect,
+  onPositionChange 
+}: { 
+  item: PlacedItem; 
+  index: number;
+  isSelected: boolean;
+  onSelect: () => void;
+  onPositionChange: (newPosition: [number, number, number]) => void;
+}) {
+  const groupRef = React.useRef<THREE.Group>(null);
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [dragPlane] = React.useState(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
+  const [offset] = React.useState(() => new THREE.Vector3());
+
+  const handlePointerDown = (event: ThreeEvent<PointerEvent>) => {
+    event.stopPropagation();
+    onSelect();
+    setIsDragging(true);
+
+    // Calculate offset between click point and object position
+    if (groupRef.current && event.point) {
+      const objectPosition = new THREE.Vector3();
+      groupRef.current.getWorldPosition(objectPosition);
+      
+      // Set the drag plane at the object's Y position
+      dragPlane.constant = -objectPosition.y;
+      
+      offset.copy(objectPosition).sub(event.point);
+    }
+  };
+
+  const handlePointerMove = (event: ThreeEvent<PointerEvent>) => {
+    if (!isDragging) return;
+    event.stopPropagation();
+
+    // Project the pointer onto the drag plane
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(
+      {
+        x: (event.pointer.x),
+        y: (event.pointer.y)
+      },
+      event.camera
+    );
+
+    const intersectPoint = new THREE.Vector3();
+    raycaster.ray.intersectPlane(dragPlane, intersectPoint);
+
+    if (intersectPoint) {
+      // Add the offset back
+      intersectPoint.add(offset);
+      onPositionChange([intersectPoint.x, item.position[1], intersectPoint.z]);
+    }
+  };
+
+  const handlePointerUp = (event: ThreeEvent<PointerEvent>) => {
+    if (isDragging) {
+      event.stopPropagation();
+      setIsDragging(false);
+    }
+  };
 
   return (
-    <GlobalProvider>
-      <>
-        <Canvas
-          style={{
-            width: "100vw",
-            height: "100vh",
-            position: "fixed",
-          }}
-        >
-          <color args={[0x808080]} attach={"background"} />
-          <PerspectiveCamera makeDefault position={[0, 1.6, 2]} fov={75} />
-          <Environment preset="warehouse" />
-          <Gltf src="/labPlan.glb" />
-          <XR store={xrStore} />
-          {/* <Bullets />
-          <Target targetIdx={0} />
-          <Target targetIdx={1} />
-          <Target targetIdx={2} />
-          <Score /> */}
-        </Canvas>
-        <div
-          style={{
-            position: "fixed",
-            display: "flex",
-            width: "100vw",
-            height: "100vh",
-            flexDirection: "column",
-            justifyContent: "space-between",
-            alignItems: "center",
-            color: "white",
-            pointerEvents: "none",
-          }}
-        >
-          {!isVRActive ? (
-            <button
-              style={{
-                position: "fixed",
-                bottom: "20px",
-                left: "50%",
-                transform: "translateX(-50%)",
-                fontSize: "20px",
-                pointerEvents: "auto",
-                padding: "12px 24px",
-                backgroundColor: "#4CAF50",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                cursor: "pointer",
-              }}
-              onClick={() => {
-                xrStore.enterVR();
-              }}
-            >
-              Enter VR
-            </button>
-          ) : (
-            <button
-              style={{
-                position: "fixed",
-                top: "20px",
-                right: "20px",
-                fontSize: "16px",
-                pointerEvents: "auto",
-                padding: "10px 20px",
-                backgroundColor: "#2196F3",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                cursor: "pointer",
-                zIndex: 1000,
-              }}
-              onClick={() => setShowFurniture(!showFurniture)}
-            >
-              {showFurniture ? "Close" : "Edit"}
-            </button>
-          )}
+    <group
+      ref={groupRef}
+      position={item.position}
+      rotation={item.rotation}
+      scale={item.scale || 1}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
+    >
+      <Gltf src={item.modelPath} />
+      
+      {/* Selection indicator */}
+      {isSelected && (
+        <mesh position={[0, 0.5, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.3, 0.35, 32]} />
+          <meshBasicMaterial color="#00ff00" transparent opacity={0.7} side={THREE.DoubleSide} />
+        </mesh>
+      )}
+      
+      {/* Hover/interaction helper - invisible box around furniture */}
+      <mesh visible={false}>
+        <boxGeometry args={[1, 2, 1]} />
+      </mesh>
+    </group>
+  );
+}
 
-          {/* Furniture Slider */}
-          <div
-            style={{
-              position: "fixed",
-              bottom: showFurniture ? "0" : "-400px",
-              left: "0",
-              width: "100%",
-              height: "350px",
-              backgroundColor: "rgba(255, 255, 255, 0.95)",
-              transition: "bottom 0.3s ease-in-out",
-              pointerEvents: "auto",
-              padding: "20px",
-              boxShadow: "0 -4px 20px rgba(0, 0, 0, 0.2)",
-              zIndex: 999,
-            }}
-          >
-            <h2 style={{ color: "#333", marginBottom: "20px", marginTop: "0" }}>
-              My Inventory
-            </h2>
-            <div
-              style={{
-                display: "flex",
-                gap: "15px",
-                overflowX: "auto",
-                paddingBottom: "10px",
-              }}
+function PlacedFurniture({ 
+  items, 
+  selectedIndex,
+  onSelectItem,
+  onUpdatePosition 
+}: { 
+  items: PlacedItem[];
+  selectedIndex: number | null;
+  onSelectItem: (index: number) => void;
+  onUpdatePosition: (index: number, position: [number, number, number]) => void;
+}) {
+  return (
+    <>
+      {items.map((item, index) => (
+        <DraggableFurniture
+          key={`${item.id}-${index}`}
+          item={item}
+          index={index}
+          isSelected={selectedIndex === index}
+          onSelect={() => onSelectItem(index)}
+          onPositionChange={(newPosition) => onUpdatePosition(index, newPosition)}
+        />
+      ))}
+    </>
+  );
+}
+
+function VREditButton({ onClick, showSlider }: { onClick: () => void; showSlider: boolean; }) {
+  const meshRef = React.useRef<THREE.Mesh>(null);
+
+  return (
+    <group position={[-1.5, 1.6, -1]}>
+      <mesh
+        ref={meshRef}
+        onClick={onClick}
+        onPointerDown={onClick}
+      >
+        <boxGeometry args={[0.3, 0.15, 0.05]} />
+        <meshStandardMaterial color={showSlider ? "#ff6b6b" : "#4CAF50"} />
+      </mesh>
+      <Text
+        position={[0, 0, 0.03]}
+        fontSize={0.05}
+        color="white"
+        anchorX="center"
+        anchorY="middle"
+      >
+        {showSlider ? "Hide" : "Edit"}
+      </Text>
+    </group>
+  );
+}
+
+function VRSlider(
+  { show, value, onChange, label, min = 0, max = 1, position = [0, 1.6, -1.5] }:
+  { show: boolean; value: number; onChange: (value: number) => void; label: string; min?: number; 
+    max?: number; position?: [number, number, number]; }
+  ) {
+  const handleRef = React.useRef<THREE.Mesh | null>(null);
+  const [isDragging, setIsDragging] = React.useState(false);
+
+  if (!show) return null;
+
+  const handleSliderInteraction = (event: ThreeEvent<PointerEvent>) => {
+    if (event.point) {
+      const localPoint = event.point;
+      const normalizedX = (localPoint.x - position[0] + 0.4) / 0.8;
+      const clampedX = Math.max(0, Math.min(1, normalizedX));
+      const newValue = min + clampedX * (max - min);
+      onChange(newValue);
+    }
+  };
+
+  const sliderPosition = ((value - min) / (max - min)) * 0.8 - 0.4;
+
+  return (
+    <group position={position}>
+      {/* Background panel */}
+      <mesh position={[0, 0, -0.01]}>
+        <planeGeometry args={[1, 0.3]} />
+        <meshStandardMaterial color="#2c3e50" opacity={0.9} transparent />
+      </mesh>
+
+      {/* Label */}
+      <Text
+        position={[0, 0.1, 0]}
+        fontSize={0.04}
+        color="white"
+        anchorX="center"
+        anchorY="middle"
+      >
+        {label}: {value.toFixed(2)}
+      </Text>
+
+      {/* Slider track */}
+      <mesh position={[0, -0.05, 0]}>
+        <boxGeometry args={[0.8, 0.02, 0.01]} />
+        <meshStandardMaterial color="#34495e" />
+      </mesh>
+
+      {/* Slider handle */}
+      <mesh 
+        ref={handleRef}
+        position={[sliderPosition, -0.05, 0.01]}
+        onClick={handleSliderInteraction}
+        onPointerDown={(e) => {
+          setIsDragging(true);
+          handleSliderInteraction(e);
+        }}
+        onPointerUp={() => setIsDragging(false)}
+        onPointerMove={(e) => {
+          if (isDragging || e.buttons > 0) {
+            handleSliderInteraction(e);
+          }
+        }}
+      >
+        <sphereGeometry args={[0.04, 16, 16]} />
+        <meshStandardMaterial color="#3498db" />
+      </mesh>
+    </group>
+  );
+}
+
+function VRFurniturePanel({ show, onSelectItem }: { show: boolean; onSelectItem: (furniture: Furniture) => void; }) {
+  if (!show) return null;
+
+  return (
+    <group position={[0, 1.6, -1.5]}>
+      {/* Panel background */}
+      <mesh position={[0, 0, 0]}>
+        <planeGeometry args={[1.5, 1]} />
+        <meshStandardMaterial color="#2c3e50" opacity={0.9} transparent />
+      </mesh>
+
+      {/* Title */}
+      <Text
+        position={[0, 0.45, 0.01]}
+        fontSize={0.06}
+        color="white"
+        anchorX="center"
+        anchorY="middle"
+      >
+        Select Furniture
+      </Text>
+      
+      {/* Furniture buttons */}
+      {FURNITURE_CATALOG.map((furniture, index) => {
+        const x = (index % 2) * 0.6 - 0.3;
+        const y = Math.floor(index / 2) * -0.3 + 0.15;
+        
+        return (
+          <group key={furniture.id} position={[x, y, 0.01]}>
+            <mesh
+              onClick={() => onSelectItem(furniture)}
+              onPointerDown={() => onSelectItem(furniture)}
             >
-              {furnitureItems.map((item) => (
-                <div
-                  key={item.id}
-                  style={{
-                    minWidth: "200px",
-                    backgroundColor: "white",
-                    borderRadius: "12px",
-                    padding: "15px",
-                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
-                    cursor: "pointer",
-                    transition: "transform 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "scale(1.05)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "scale(1)";
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "100%",
-                      height: "150px",
-                      backgroundColor: "#f5f5f5",
-                      borderRadius: "8px",
-                      marginBottom: "10px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#999",
-                    }}
-                  >
-                    {item.category}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "11px",
-                      color: "#666",
-                      backgroundColor: "#f0f0f0",
-                      padding: "4px 8px",
-                      borderRadius: "4px",
-                      display: "inline-block",
-                      marginBottom: "8px",
-                    }}
-                  >
-                    {item.category}
-                  </div>
-                  <div style={{ fontSize: "14px", color: "#333", fontWeight: "500" }}>
-                    {item.name}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </>
-    </GlobalProvider>
+              <boxGeometry args={[0.5, 0.2, 0.05]} />
+              <meshStandardMaterial color="#3498db" />
+            </mesh>
+            <Text
+              position={[0, 0, 0.03]}
+              fontSize={0.04}
+              color="white"
+              anchorX="center"
+              anchorY="middle"
+            >
+              {furniture.name}
+            </Text>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+export default function App() {
+  const [showSlider, setShowSlider] = React.useState<boolean>(false);
+  const [showFurniture, setShowFurniture] = React.useState<boolean>(false);
+  const [sliderValue, setSliderValue] = React.useState<number>(0.5);
+  const [placedItems, setPlacedItems] = React.useState<PlacedItem[]>([]);
+  const [selectedItemIndex, setSelectedItemIndex] = React.useState<number | null>(null);
+
+  const handleSelectFurniture = (furniture: Furniture) => {
+    // Place furniture in front of the user at a default position
+    const newItem: PlacedItem = {
+      ...furniture,
+      position: [0, 0, -2 - placedItems.length * 0.5],
+      rotation: [0, 0, 0],
+      scale: sliderValue, // Use slider value for scale
+    };
+    
+    setPlacedItems([...placedItems, newItem]);
+    setSelectedItemIndex(placedItems.length); // Select the newly added item
+    console.log(`Added ${furniture.name} to the room with scale ${sliderValue}`);
+  };
+
+  const handleUpdateItemPosition = (index: number, newPosition: [number, number, number]) => {
+    setPlacedItems(prevItems => {
+      const updatedItems = [...prevItems];
+      updatedItems[index] = {
+        ...updatedItems[index],
+        position: newPosition,
+      };
+      return updatedItems;
+    });
+  };
+
+  const handleSelectItem = (index: number) => {
+    setSelectedItemIndex(index);
+  };
+
+  return (
+    <>
+      <Canvas
+        style={{
+          width: "100vw",
+          height: "100vh",
+          position: "fixed",
+        }}
+      >
+        <color args={["#808080"]} attach="background" />
+        <PerspectiveCamera makeDefault position={[0, 1.6, 2]} fov={75} />
+        <ambientLight intensity={0.5} />
+        <directionalLight position={[5, 5, 5]} intensity={1} />
+        <Environment preset="warehouse" />
+        
+        <Gltf src="/labPlan.glb" />
+        
+        <XR store={xrStore}>
+          <VREditButton 
+            onClick={() => {
+              setShowSlider(!showSlider);
+              setShowFurniture(!showFurniture);
+            }} 
+            showSlider={showSlider}
+          />
+          <VRSlider
+            show={showSlider}
+            value={sliderValue}
+            onChange={setSliderValue}
+            label="Furniture Scale"
+            min={0.1}
+            max={2}
+            position={[-1.5, 1.2, -1]}
+          />
+          <VRFurniturePanel 
+            show={showFurniture} 
+            onSelectItem={handleSelectFurniture}
+          />
+        </XR>
+        
+        <PlacedFurniture 
+          items={placedItems}
+          selectedIndex={selectedItemIndex}
+          onSelectItem={handleSelectItem}
+          onUpdatePosition={handleUpdateItemPosition}
+        />
+      </Canvas>
+      
+      <div
+        style={{
+          position: "fixed",
+          display: "flex",
+          width: "100vw",
+          height: "100vh",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          alignItems: "center",
+          color: "white",
+          pointerEvents: "none",
+        }}
+      >
+        <button
+          style={{
+            position: "fixed",
+            bottom: "20px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            fontSize: "20px",
+            pointerEvents: "auto",
+            padding: "12px 24px",
+            backgroundColor: "#4CAF50",
+            color: "white",
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer",
+          }}
+          onClick={() => {
+            xrStore.enterVR();
+          }}
+        >
+          Enter VR
+        </button>
+      </div>
+    </>
   );
 }
