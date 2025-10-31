@@ -257,14 +257,13 @@ def update_3d_model(root, model_id, model_file=None, texture_files=None):
             model.file = blob
             model.filename = filename
 
-        if texture_files:
-            for tex_id in model.get_textures():
-                delete_texture(tex_id, root)
-            
-            model.textures = []
-            for tex in texture_files:
-                new_tex_id = create_Texture(tex, root)
-                model.textures.append(new_tex_id)
+        for tex_id in model.get_textures():
+            delete_texture(tex_id, root)
+        
+        model.textures = []
+        for tex in texture_files:
+            new_tex_id = create_Texture(tex, root)
+            model.textures.append(new_tex_id)
 
         transaction.commit()
     except Exception:

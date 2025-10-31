@@ -6,7 +6,7 @@ from .models import Order, OrderItem
 from app_api.products.objectModels import OwnedItem, ContainerOwnedItem, NonContainerOwnedItem
 from zodb.zodb_management import *
 from app_api.orders.funcHelper import *
-import datetime
+from datetime import datetime
 import transaction
 
 @csrf_exempt
@@ -133,6 +133,8 @@ def complete_order(request, order_id):
             return JsonResponse({'error': 'Only customers can update orders'}, status=403)
         try:
             order = Order.objects.get(id=order_id, customer=customer)
+            if order.status == 'complete':
+                return JsonResponse({'error': 'Order is already completed'}, status=400)
         except Order.DoesNotExist:
             return JsonResponse({'error': 'Order not found'}, status=404)
         
@@ -162,7 +164,7 @@ def complete_order(request, order_id):
                             contained_item=[],
                             created_at=current_time
                         )
-                        root.containerOwnedItems[container_id] = categorizedItem
+                        root.containerOwnedItems[str(container_id)] = categorizedItem
                     else:
                         noncontainer_id = get_noncontainer_owned_item_id(root)
                         categorizedItem = NonContainerOwnedItem(
@@ -179,7 +181,7 @@ def complete_order(request, order_id):
                             composition=[],
                             created_at=current_time
                         )
-                        root.nonContainerOwnedItems[noncontainer_id] = categorizedItem
+                        root.nonContainerOwnedItems[str(noncontainer_id)] = categorizedItem
                     transaction.commit()
                     customer.owned_digital_products.append({ 'id': categorizedItem.get_id(), 'is_container': categorizedItem.is_container})
         customer.save()

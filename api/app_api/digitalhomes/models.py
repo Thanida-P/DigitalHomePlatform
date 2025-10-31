@@ -13,7 +13,7 @@ class PointZMField(gis_models.GeometryField):
     def geom_type(self):
         return 'POINTZM'
 
-class SpatialData(models.Model):
+class HomeSpatialData(models.Model):
     positions = PointZMField()
     rotation = gis_models.PointField(dim=3, srid=SRID_3D)
     scale = gis_models.PointField(dim=3, srid=SRID_3D)

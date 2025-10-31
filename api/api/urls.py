@@ -86,4 +86,9 @@ urlpatterns = [
     path('digitalhomes/download_digital_home/<int:home_id>/', digitalhome_views.get_home_model),
     path('digitalhomes/get_textures/<int:home_id>/', digitalhome_views.get_textures),
     path('digitalhomes/delete_digital_home/<int:id>/', digitalhome_views.delete_digital_home),
+    path('digitalhomes/update_texture/', digitalhome_views.update_texture),
+    path('digitalhomes/update_home_design/', digitalhome_views.update_home_design),
+    path('digitalhomes/add_custom_item/', digitalhome_views.add_custom_item),
+    path('digitalhomes/get_deployed_items_details/<int:id>/', digitalhome_views.get_deployed_item_details),
+    path('digitalhomes/get_deployed_item_detail/<int:id>/', digitalhome_views.get_deployed_item_detail),
 ]

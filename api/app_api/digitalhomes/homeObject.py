@@ -7,9 +7,9 @@ class HomeObject(persistent.Persistent):
         self.home_id = home_id
         self.deployedItems = deployedItems
         self.spatialData_id = spatialData_id
+        self.texture_id = None
         self.created_at = created_at
         self.updated_at = created_at
-        
         
     def get_id(self):
         return self.id
@@ -26,6 +26,18 @@ class HomeObject(persistent.Persistent):
     def get_deployedItems(self):
         return self.deployedItems
     
+    def set_deployedItems(self, deployedItems):
+        self.deployedItems = deployedItems
+    
+    def get_spatialData_id(self):
+        return self.spatialData_id
+
+    def get_texture_id(self):
+        return self.texture_id
+    
+    def set_texture_id(self, texture_id):
+        self.texture_id = texture_id
+        
     def get_created_at(self):
         return self.created_at
     

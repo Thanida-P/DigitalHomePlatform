@@ -162,6 +162,9 @@ class OwnedItem(Item):
      
     def get_texture_id(self):
         return self.texture_id
+    
+    def set_texture_id(self, texture_id):
+        self.texture_id = texture_id
 class ContainerOwnedItem(OwnedItem):
     def __init__(self, id, owner_id, name, description, model_id, category, type, is_container, spatial_id, texture_id, contained_item, created_at):
         super().__init__(id=id, owner_id=owner_id, name=name, description=description, model_id=model_id, category=category, type=type, is_container=is_container, spatial_id=spatial_id, texture_id=texture_id, created_at=created_at)
@@ -169,6 +172,9 @@ class ContainerOwnedItem(OwnedItem):
 
     def get_contained_item(self):
         return self.contained_item
+    
+    def set_contained_item(self, contained_item):
+        self.contained_item = contained_item
 
 class NonContainerOwnedItem(OwnedItem):
     def __init__(self, id, owner_id, name, description, model_id, category, type, is_container, spatial_id, texture_id, composition, created_at):
@@ -177,3 +183,6 @@ class NonContainerOwnedItem(OwnedItem):
     
     def get_composition(self):
         return self.composition
+    
+    def set_composition(self, composition):
+        self.composition = composition
