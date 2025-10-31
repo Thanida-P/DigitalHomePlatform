@@ -380,7 +380,7 @@ def update_home_design(request):
     
         updated_item_ids = []
         for item_id, item_data in deployed_items.items():
-            update_deployed_item(root, item_id, item_data)
+            update_deployed_item(root, item_id, home.id, item_data)
             updated_item_ids.append({"id": item_id, "is_container": item_data.get('is_container', False)})
 
         home.set_deployedItems(updated_item_ids)
@@ -401,10 +401,11 @@ def get_deployed_item_details(request, id):
         for itemIdentifier in home.get_deployedItems():
             item_id = int(itemIdentifier.get('id'))
             is_container = itemIdentifier.get('is_container', False)
+            key = f'item_{int(item_id)}_home_{int(id)}'
             if is_container:
-                item = root.containerOwnedItems[f'copy_{item_id}']
+                item = root.containerOwnedItems[key]
             else:
-                item = root.nonContainerOwnedItems[f'copy_{item_id}']
+                item = root.nonContainerOwnedItems[key]
             spatial_id = item.get_spatial_id()
             spatial_data = SpatialData.objects.get(id=spatial_id)
             position = get_item_position(spatial_id)
@@ -412,7 +413,7 @@ def get_deployed_item_details(request, id):
             scale = parse_coordinates(spatial_data.scale)
             position_history = spatial_data.position_history
 
-            deployed_items_details.append({item.get_id(): {
+            deployed_items_details.append({item_id: {
                 'name': item.get_name(),
                 'description': item.get_description(),
                 'model_id': item.get_model_id(),
@@ -445,11 +446,11 @@ def get_deployed_item_detail(request, id):
         is_container = request.POST.get('is_container', 'false').lower() == 'true'
         if item_id not in [item.get('id') for item in root.digitalHomes[int(id)].get_deployedItems()]:
             return JsonResponse({'error': 'Item not deployed in this home'}, status=403)
-        
+        key = f'item_{int(item_id)}_home_{int(id)}'
         if is_container:
-            item = root.containerOwnedItems[f'copy_{int(item_id)}']
+            item = root.containerOwnedItems[key]
         else:
-            item = root.nonContainerOwnedItems[f'copy_{int(item_id)}']
+            item = root.nonContainerOwnedItems[key]
         spatial_id = item.get_spatial_id()
         spatial_data = SpatialData.objects.get(id=spatial_id)
         position = get_item_position(spatial_id)
@@ -458,7 +459,7 @@ def get_deployed_item_detail(request, id):
         position_history = spatial_data.position_history
 
         item_detail = {
-            'id': item.get_id(),
+            'id': item_id,
             'name': item.get_name(),
             'description': item.get_description(),
             'model_id': item.get_model_id(),

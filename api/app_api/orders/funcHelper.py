@@ -7,7 +7,7 @@ def get_container_owned_item_id(root):
         return 1
     existing_ids = [
         int(key)
-        for key in root.containerOwnedItems.keys()
+        for key in root.containerOwnedItems.keys() if key.isdigit()
     ]
     return max(existing_ids) + 1
 
@@ -16,7 +16,7 @@ def get_noncontainer_owned_item_id(root):
         return 1
     existing_ids = [
         int(key)
-        for key in root.nonContainerOwnedItems.keys()
+        for key in root.nonContainerOwnedItems.keys() if key.isdigit()
     ]
     return max(existing_ids) + 1
 

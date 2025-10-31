@@ -1,5 +1,7 @@
+from datetime import datetime
 from django.db import connection
-from app_api.orders.funcHelper import create_spatial_instance
+from app_api.products.objectModels import ContainerOwnedItem, NonContainerOwnedItem
+from app_api.orders.funcHelper import create_spatial_instance, get_container_owned_item_id, get_noncontainer_owned_item_id
 from zodb.zodb_management import *
 from ZODB.blob import Blob
 from app_api.digitalhomes.homeObject import Home3D
@@ -195,17 +197,59 @@ def parse_coordinates(coor):
     coords = [float(c) for c in coor.split('(')[1].rstrip(')').split()]
     return coords
 
-def update_deployed_item(root, item_id, item_data):
-    if item_data.get('is_container'):
-        root.containerOwnedItems[f'copy_{int(item_id)}'] = root.containerOwnedItems[item_id]
-        item = root.containerOwnedItems[f'copy_{int(item_id)}']
-        item.set_contained_item(item_data.get('contain', []))
+def update_deployed_item(root, item_id, id, item_data):
+    key_item = f'item_{int(item_id)}_home_{int(id)}'
+    if key_item in root.containerOwnedItems or key_item in root.nonContainerOwnedItems:
+        if item_data.get('is_container'):
+            item = root.containerOwnedItems[key_item]
+            item.set_contained_item(item_data.get('contain', []))
+        else:
+            item = root.nonContainerOwnedItems[key_item]
+            item.set_composition(item_data.get('composite', []))
+        spatial_id = item.get_spatial_id()
     else:
-        root.nonContainerOwnedItems[f'copy_{int(item_id)}'] = root.nonContainerOwnedItems[item_id]
-        item = root.nonContainerOwnedItems[f'copy_{int(item_id)}']
-        item.set_composition(item_data.get('composite', []))
+        current_date = datetime.now()
+        if item_data.get('is_container'):
+            containerId = get_container_owned_item_id(root)
+            copy_item = root.containerOwnedItems.get(str(item_id))
+            root.containerOwnedItems[key_item] = ContainerOwnedItem(
+                id=containerId,
+                owner_id=copy_item.get_owner_id(),
+                name=copy_item.get_name(),
+                description=copy_item.get_description(),
+                model_id=copy_item.get_model_id(),
+                category=copy_item.get_category(),
+                type=copy_item.get_type(),
+                is_container=True,
+                spatial_id=None,
+                texture_id=copy_item.get_texture_id(),
+                contained_item=item_data.get('contain', []),
+                created_at=current_date
+            )
+            item = root.containerOwnedItems[key_item]
+            item.set_contained_item(item_data.get('contain', []))
+        else:
+            copy_item = root.nonContainerOwnedItems.get(str(item_id))
+            nonContainerId = get_noncontainer_owned_item_id(root)
+            root.nonContainerOwnedItems[key_item] = NonContainerOwnedItem(
+                id=nonContainerId,
+                owner_id=copy_item.get_owner_id(),
+                name=copy_item.get_name(),
+                description=copy_item.get_description(),
+                model_id=copy_item.get_model_id(),
+                category=copy_item.get_category(),
+                type=copy_item.get_type(),
+                is_container=False,
+                spatial_id=None,
+                texture_id=copy_item.get_texture_id(),
+                composition=item_data.get('composite', []),
+                created_at=current_date
+            )
+            item = root.nonContainerOwnedItems[key_item]
+            item.set_composition(item_data.get('composite', []))
         
-    spatial_id = create_spatial_instance()
+        spatial_id = create_spatial_instance()
+        item.set_spatial_id(spatial_id)
 
     with connection.cursor() as cursor:
         old_coords = get_item_position(spatial_id)

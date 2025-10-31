@@ -165,6 +165,9 @@ class OwnedItem(Item):
     
     def set_texture_id(self, texture_id):
         self.texture_id = texture_id
+        
+    def set_spatial_id(self, spatial_id):
+        self.spatial_id = spatial_id    
 class ContainerOwnedItem(OwnedItem):
     def __init__(self, id, owner_id, name, description, model_id, category, type, is_container, spatial_id, texture_id, contained_item, created_at):
         super().__init__(id=id, owner_id=owner_id, name=name, description=description, model_id=model_id, category=category, type=type, is_container=is_container, spatial_id=spatial_id, texture_id=texture_id, created_at=created_at)
