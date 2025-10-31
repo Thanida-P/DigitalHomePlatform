@@ -145,7 +145,7 @@ def complete_order(request, order_id):
                     product = root.products[order_item.product_id]
                     item = product.item
                     spatial_id = create_spatial_instance()
-                    current_time = datetime.datetime.utcnow()
+                    current_time = datetime.now()
                     if item.is_container:
                         container_id = get_container_owned_item_id(root)
                         categorizedItem = ContainerOwnedItem(

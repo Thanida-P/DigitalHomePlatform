@@ -1,8 +1,5 @@
-from app_api.products.models import SpatialData, SRID_3D
-from django.contrib.gis.geos import Point
-from django.db.models import Func, Value
+from app_api.products.models import SRID_3D
 from django.db import connection
-from django.contrib.gis.db import models as gis_models
 from zodb.zodb_management import *
 
 def get_container_owned_item_id(root):

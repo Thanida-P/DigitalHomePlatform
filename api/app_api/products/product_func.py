@@ -121,7 +121,7 @@ def delete_existing_product(product_id):
         model_id = item.model_id
 
         if model_id is not None:
-            delete_product_3d_assets(model_id, product.display_scenes)
+            delete_product_3d_assets(root, model_id, product.display_scenes)
         
         del root.products[product_id]
         del root.objectItems[item.id]
@@ -358,8 +358,7 @@ def update_display_scene(root, display_scene_ids, model_files):
             pass
         raise
         
-def delete_product_3d_assets(model_id, display_scene_ids):
-    connection, root = get_connection()
+def delete_product_3d_assets(root, model_id, display_scene_ids):
     try:
         object_models = root.objectModels
         if not object_models or f'model_{model_id}' not in object_models:
@@ -385,18 +384,17 @@ def delete_product_3d_assets(model_id, display_scene_ids):
         except Exception:
             pass
         raise
-    finally:
-        connection.close()
 
 def fetch_3d_model(model_id: int):
-    connection, root = get_connection()
+    _, root = get_connection()
     object_models = root.objectModels
     if not object_models:
         return None
     return object_models[f"model_{model_id}"]
 
+
 def fetch_display_scene(display_scene_id: int):
-    connection, root = get_connection()
+    _, root = get_connection()
     display_scenes = root.displayScenes
     if not display_scenes:
         return None
@@ -404,7 +402,10 @@ def fetch_display_scene(display_scene_id: int):
 
 def fetch_texture(texture_id: int):
     connection, root = get_connection()
-    textures = root.textures
-    if not textures:
-        return None
-    return textures[f"texture_{texture_id}"].get_file()
+    try:
+        textures = root.textures
+        if not textures:
+            return None
+        return textures[f"texture_{texture_id}"].get_file()
+    finally:
+        connection.close()

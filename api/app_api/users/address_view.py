@@ -110,7 +110,6 @@ def remove_address(request):
     return JsonResponse({'message': 'Address removed successfully'}, status=200)
 
 # Get Addresses
-@csrf_exempt
 @require_http_methods(["GET"])
 @login_required
 def get_addresses(request):

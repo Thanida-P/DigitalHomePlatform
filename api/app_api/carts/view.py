@@ -131,7 +131,6 @@ def remove_from_cart(request, cart_item_id):
     finally:
         connection.close()
 
-@csrf_exempt
 @login_required
 @require_http_methods(["GET"])
 def view_cart(request):
