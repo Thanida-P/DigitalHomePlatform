@@ -46,7 +46,7 @@ function DraggableFurniture({
   const camera = useThree((state) => state.camera);
   const isPresenting = !!xr.session;
 
-    useFrame((delta) => {
+  useFrame((_state, delta) => {
     if (!isSelected || !groupRef.current || !isPresenting) return; 
 
     const session = xr.session;
@@ -95,17 +95,17 @@ function DraggableFurniture({
       right.normalize();
 
       const deltaPosition = new THREE.Vector3();
-      deltaPosition.addScaledVector(forward, -moveVector.z * moveSpeed * Number(delta));
-      deltaPosition.addScaledVector(right, moveVector.x * moveSpeed * Number(delta));
+      deltaPosition.addScaledVector(forward, -moveVector.z * moveSpeed * delta);
+      deltaPosition.addScaledVector(right, moveVector.x * moveSpeed * delta);
 
       const newPosition = new THREE.Vector3().fromArray(item.position);
       newPosition.add(deltaPosition);
       onPositionChange([newPosition.x, item.position[1], newPosition.z]);
     }
 
-// Handle rotation change
+    // Handle rotation change 
     if (Math.abs(rotateDelta) > deadzone) {
-      const deltaRotation = rotateDelta * rotateSpeed * Number(delta);
+      const deltaRotation = rotateDelta * rotateSpeed * delta;
 
       const currentRotationY = (item.rotation && typeof item.rotation[1] === 'number' && !isNaN(item.rotation[1])) ? item.rotation[1] : 0;
       
@@ -298,7 +298,7 @@ export default function App() {
               selectedIndex={selectedItemIndex}
               onSelectItem={handleSelectItem}
               onUpdatePosition={handleUpdateItemPosition}
-              onUpdateRotation={handleUpdateItemRotation} // Pass new handler
+              onUpdateRotation={handleUpdateItemRotation}
             />
           </group>
 
@@ -323,4 +323,3 @@ export default function App() {
     </>
   );
 }
-
