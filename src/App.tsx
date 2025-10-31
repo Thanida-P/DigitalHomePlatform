@@ -1,7 +1,7 @@
 import React from "react";
 import { Canvas, ThreeEvent, useFrame } from "@react-three/fiber";
 import { Environment, Gltf, PerspectiveCamera, Text } from "@react-three/drei";
-import { createXRStore, XR, useXRInputSourceState, useXR } from "@react-three/xr";
+import { createXRStore, XR, useXRInputSourceState } from "@react-three/xr";
 import * as THREE from "three";
 
 const xrStore = createXRStore();
