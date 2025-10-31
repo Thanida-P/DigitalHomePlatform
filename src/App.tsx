@@ -28,13 +28,11 @@ const FURNITURE_CATALOG: Furniture[] = [
 
 function DraggableFurniture({ 
   item, 
-  index,
   isSelected,
   onSelect,
   onPositionChange 
 }: { 
   item: PlacedItem; 
-  index: number;
   isSelected: boolean;
   onSelect: () => void;
   onPositionChange: (newPosition: [number, number, number]) => void;
@@ -67,13 +65,8 @@ function DraggableFurniture({
 
     // Project the pointer onto the drag plane
     const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(
-      {
-        x: (event.pointer.x),
-        y: (event.pointer.y)
-      },
-      event.camera
-    );
+    const pointer = new THREE.Vector2(event.pointer.x, event.pointer.y);
+    raycaster.setFromCamera(pointer, event.camera);
 
     const intersectPoint = new THREE.Vector3();
     raycaster.ray.intersectPlane(dragPlane, intersectPoint);
@@ -107,10 +100,17 @@ function DraggableFurniture({
       
       {/* Selection indicator */}
       {isSelected && (
-        <mesh position={[0, 0.5, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.3, 0.35, 32]} />
-          <meshBasicMaterial color="#00ff00" transparent opacity={0.7} side={THREE.DoubleSide} />
-        </mesh>
+        <>
+          <mesh position={[0, 0.5, 0]} rotation={[Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[0.3, 0.35, 32]} />
+            <meshBasicMaterial color="#00ff00" transparent opacity={0.7} side={THREE.DoubleSide} />
+          </mesh>
+          {/* Rotation direction indicator */}
+          <mesh position={[0, 0.5, 0.35]} rotation={[Math.PI / 2, 0, 0]}>
+            <coneGeometry args={[0.05, 0.1, 8]} />
+            <meshBasicMaterial color="#ffff00" />
+          </mesh>
+        </>
       )}
       
       {/* Hover/interaction helper - invisible box around furniture */}
@@ -138,7 +138,6 @@ function PlacedFurniture({
         <DraggableFurniture
           key={`${item.id}-${index}`}
           item={item}
-          index={index}
           isSelected={selectedIndex === index}
           onSelect={() => onSelectItem(index)}
           onPositionChange={(newPosition) => onUpdatePosition(index, newPosition)}
@@ -175,16 +174,16 @@ function VREditButton({ onClick, showSlider }: { onClick: () => void; showSlider
 }
 
 function VRSlider(
-  { show, value, onChange, label, min = 0, max = 1, position = [0, 1.6, -1.5] }:
+  { show, value, onChange, label, min = 0, max = 1, position = [0, 1.6, -1.5], showDegrees = false }:
   { show: boolean; value: number; onChange: (value: number) => void; label: string; min?: number; 
-    max?: number; position?: [number, number, number]; }
+    max?: number; position?: [number, number, number]; showDegrees?: boolean; }
   ) {
   const handleRef = React.useRef<THREE.Mesh | null>(null);
   const [isDragging, setIsDragging] = React.useState(false);
 
   if (!show) return null;
 
-  const handleSliderInteraction = (event: ThreeEvent<PointerEvent>) => {
+  const handleSliderInteraction = (event: ThreeEvent<MouseEvent> | ThreeEvent<PointerEvent>) => {
     if (event.point) {
       const localPoint = event.point;
       const normalizedX = (localPoint.x - position[0] + 0.4) / 0.8;
@@ -195,6 +194,9 @@ function VRSlider(
   };
 
   const sliderPosition = ((value - min) / (max - min)) * 0.8 - 0.4;
+  
+  // Display value in degrees if showDegrees is true
+  const displayValue = showDegrees ? (value * 180 / Math.PI).toFixed(0) + "°" : value.toFixed(2);
 
   return (
     <group position={position}>
@@ -212,7 +214,7 @@ function VRSlider(
         anchorX="center"
         anchorY="middle"
       >
-        {label}: {value.toFixed(2)}
+        {label}: {displayValue}
       </Text>
 
       {/* Slider track */}
@@ -225,7 +227,7 @@ function VRSlider(
       <mesh 
         ref={handleRef}
         position={[sliderPosition, -0.05, 0.01]}
-        onClick={handleSliderInteraction}
+        onClick={(e) => handleSliderInteraction(e)}
         onPointerDown={(e) => {
           setIsDragging(true);
           handleSliderInteraction(e);
@@ -300,6 +302,7 @@ export default function App() {
   const [showSlider, setShowSlider] = React.useState<boolean>(false);
   const [showFurniture, setShowFurniture] = React.useState<boolean>(false);
   const [sliderValue, setSliderValue] = React.useState<number>(0.5);
+  const [rotationValue, setRotationValue] = React.useState<number>(0);
   const [placedItems, setPlacedItems] = React.useState<PlacedItem[]>([]);
   const [selectedItemIndex, setSelectedItemIndex] = React.useState<number | null>(null);
 
@@ -314,6 +317,7 @@ export default function App() {
     
     setPlacedItems([...placedItems, newItem]);
     setSelectedItemIndex(placedItems.length); // Select the newly added item
+    setRotationValue(0); // Reset rotation for new item
     console.log(`Added ${furniture.name} to the room with scale ${sliderValue}`);
   };
 
@@ -330,6 +334,26 @@ export default function App() {
 
   const handleSelectItem = (index: number) => {
     setSelectedItemIndex(index);
+    // Update rotation slider to match selected item's rotation
+    if (placedItems[index].rotation) {
+      setRotationValue(placedItems[index].rotation![1]);
+    }
+  };
+
+  const handleRotationChange = (newRotation: number) => {
+    setRotationValue(newRotation);
+    
+    // Update the selected item's rotation
+    if (selectedItemIndex !== null) {
+      setPlacedItems(prevItems => {
+        const updatedItems = [...prevItems];
+        updatedItems[selectedItemIndex] = {
+          ...updatedItems[selectedItemIndex],
+          rotation: [0, newRotation, 0],
+        };
+        return updatedItems;
+      });
+    }
   };
 
   return (
@@ -365,6 +389,16 @@ export default function App() {
             min={0.1}
             max={2}
             position={[-1.5, 1.2, -1]}
+          />
+          <VRSlider
+            show={showSlider && selectedItemIndex !== null}
+            value={rotationValue}
+            onChange={handleRotationChange}
+            label="Rotation"
+            min={0}
+            max={Math.PI * 2}
+            position={[-1.5, 0.8, -1]}
+            showDegrees={true}
           />
           <VRFurniturePanel 
             show={showFurniture} 
