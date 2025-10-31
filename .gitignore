@@ -224,3 +224,6 @@ frontend/assets/models/
 frontend/assets/external/
 frontend/.states
 frontend/*.db
+
+#local env files
+local.env
