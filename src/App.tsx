@@ -1,11 +1,11 @@
 import React from "react";
+import * as THREE from "three";
 import { Canvas, ThreeEvent, useThree, useFrame } from "@react-three/fiber";
 import { Environment, Gltf, PerspectiveCamera, Text } from "@react-three/drei";
 import { createXRStore, XR, useXR } from "@react-three/xr";
-import { VRSlider } from "./components/catalog/VRSlider";
-import { ControllerUIToggle } from "./components/catalog/ControllerUIToggle";
-import { VRInstructionPanel } from "./components/catalog/VRInstructionPanel";
-import * as THREE from "three";
+import { ControllerUIToggle } from "./components/ControllerUIToggle";
+import { VRInstructionPanel } from "./components/VRInstructionPanel";
+import { VRSlider } from "./components/rotateControl";
 
 const xrStore = createXRStore();
 
@@ -21,7 +21,6 @@ type PlacedItem = Furniture & {
   scale?: number;
 };
 
-// furniture items
 const FURNITURE_CATALOG: Furniture[] = [
   { id: "table1", name: "Lab Table", modelPath: "/target.glb" },
   { id: "chair1", name: "Lab Chair", modelPath: "/chair1.glb" },
@@ -34,18 +33,21 @@ function DraggableFurniture({
   isSelected,
   onSelect,
   onPositionChange,
+  onRotationChange,
 }: {
   item: PlacedItem;
   isSelected: boolean;
   onSelect: () => void;
   onPositionChange: (newPosition: [number, number, number]) => void;
+  onRotationChange: (newRotation: [number, number, number]) => void;
 }) {
   const groupRef = React.useRef<THREE.Group>(null);
   const xr = useXR();
   const camera = useThree((state) => state.camera);
+  const isPresenting = !!xr.session;
 
-  useFrame((frame) => {
-    if (!isSelected || !groupRef.current || !frame) return;
+    useFrame((delta) => {
+    if (!isSelected || !groupRef.current || !isPresenting) return; 
 
     const session = xr.session;
     const referenceSpace = xr.originReferenceSpace;
@@ -55,21 +57,32 @@ function DraggableFurniture({
     if (!inputSources || inputSources.length === 0) return;
 
     const moveSpeed = 1.5;
+    const rotateSpeed = 1.5; 
     const deadzone = 0.1;
     const moveVector = new THREE.Vector3(0, 0, 0);
+    let rotateDelta = 0;
 
     for (const inputSource of inputSources) {
       const gamepad = inputSource.gamepad;
       if (!gamepad || gamepad.axes.length < 4) continue;
 
-      const dx = gamepad.axes[2];
-      const dy = gamepad.axes[3];
+      if (inputSource.handedness === 'right') {
+        // RIGHT STICK for Movement
+        const dx = gamepad.axes[2];
+        const dy = gamepad.axes[3];
+        if (typeof dx === 'number' && !isNaN(dx) && Math.abs(dx) > deadzone) moveVector.x = dx;
+        if (typeof dy === 'number' && !isNaN(dy) && Math.abs(dy) > deadzone) moveVector.z = dy;
 
-      if (Math.abs(dx) > deadzone) moveVector.x = dx;
-      if (Math.abs(dy) > deadzone) moveVector.z = dy;
-      if (moveVector.length() > deadzone) break;
+      } else if (inputSource.handedness === 'left') {
+        // LEFT STICK for Rotation (X-axis)
+        const dr = gamepad.axes[2];
+        if (typeof dr === 'number' && !isNaN(dr) && Math.abs(dr) > deadzone) {
+          rotateDelta = -dr;
+        }
+      }
     }
 
+    // Handle position change
     if (moveVector.length() > deadzone) {
       const forward = new THREE.Vector3();
       camera.getWorldDirection(forward);
@@ -82,14 +95,25 @@ function DraggableFurniture({
       right.normalize();
 
       const deltaPosition = new THREE.Vector3();
-      deltaPosition.addScaledVector(forward, -moveVector.z * moveSpeed * (1 / 60));
-      deltaPosition.addScaledVector(right, moveVector.x * moveSpeed * (1 / 60));
+      deltaPosition.addScaledVector(forward, -moveVector.z * moveSpeed * Number(delta));
+      deltaPosition.addScaledVector(right, moveVector.x * moveSpeed * Number(delta));
 
       const newPosition = new THREE.Vector3().fromArray(item.position);
       newPosition.add(deltaPosition);
       onPositionChange([newPosition.x, item.position[1], newPosition.z]);
     }
+
+// Handle rotation change
+    if (Math.abs(rotateDelta) > deadzone) {
+      const deltaRotation = rotateDelta * rotateSpeed * Number(delta);
+
+      const currentRotationY = (item.rotation && typeof item.rotation[1] === 'number' && !isNaN(item.rotation[1])) ? item.rotation[1] : 0;
+      
+      const newRotationY = currentRotationY + deltaRotation;
+      onRotationChange([0, newRotationY, 0]);
+    }
   });
+
 
   const handleSelect = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
@@ -121,7 +145,7 @@ function DraggableFurniture({
   );
 }
 
-function PlacedFurniture({ items, selectedIndex, onSelectItem, onUpdatePosition }: any) {
+function PlacedFurniture({ items, selectedIndex, onSelectItem, onUpdatePosition, onUpdateRotation }: any) {
   return (
     <>
       {items.map((item: PlacedItem, index: number) => (
@@ -131,6 +155,7 @@ function PlacedFurniture({ items, selectedIndex, onSelectItem, onUpdatePosition 
           isSelected={selectedIndex === index}
           onSelect={() => onSelectItem(index)}
           onPositionChange={(newPosition) => onUpdatePosition(index, newPosition)}
+          onRotationChange={(newRotation) => onUpdateRotation(index, newRotation)}
         />
       ))}
     </>
@@ -210,11 +235,41 @@ export default function App() {
     });
   };
 
-  const handleSelectItem = (index: number) => {
-    setSelectedItemIndex(index);
-    if (placedItems[index]?.rotation) setRotationValue(placedItems[index].rotation![1]);
+  const handleUpdateItemRotation = (index: number, newRotation: [number, number, number]) => {
+    setPlacedItems((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], rotation: newRotation };
+      return updated;
+    });
+
+    // Keep slider in sync if the selected item is being rotated
+    if (selectedItemIndex === index) {
+      // We normalize the rotation to keep the slider value within 0 to 2*PI
+      const twoPi = Math.PI * 2;
+      let normalizedRotation = newRotation[1] % twoPi;
+      if (normalizedRotation < 0) {
+        normalizedRotation += twoPi;
+      }
+      setRotationValue(normalizedRotation);
+    }
   };
 
+
+  const handleSelectItem = (index: number) => {
+    setSelectedItemIndex(index);
+    if (placedItems[index]?.rotation) {
+      const twoPi = Math.PI * 2;
+      let normalizedRotation = placedItems[index].rotation![1] % twoPi;
+      if (normalizedRotation < 0) {
+        normalizedRotation += twoPi;
+      }
+      setRotationValue(normalizedRotation);
+    } else {
+      setRotationValue(0);
+    }
+  };
+
+  // This handler is for the SLIDER
   const handleRotationChange = (r: number) => {
     setRotationValue(r);
     if (selectedItemIndex !== null) {
@@ -236,13 +291,14 @@ export default function App() {
           <directionalLight position={[5, 5, 5]} intensity={1} />
           <Environment preset="warehouse" />
 
-          <group position={[0, 0, -5]}>
+          <group position={[0, 0, 0]}>
             <Gltf src="/labPlan.glb" />
             <PlacedFurniture
               items={placedItems}
               selectedIndex={selectedItemIndex}
               onSelectItem={handleSelectItem}
               onUpdatePosition={handleUpdateItemPosition}
+              onUpdateRotation={handleUpdateItemRotation} // Pass new handler
             />
           </group>
 
@@ -267,3 +323,4 @@ export default function App() {
     </>
   );
 }
+
