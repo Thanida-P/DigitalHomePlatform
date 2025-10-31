@@ -1,5 +1,5 @@
 import React from "react";
-import { Canvas, useFrame, ThreeEvent } from "@react-three/fiber";
+import { Canvas, ThreeEvent } from "@react-three/fiber";
 import { Environment, Gltf, PerspectiveCamera, Text } from "@react-three/drei";
 import { createXRStore, XR } from "@react-three/xr";
 import * as THREE from "three";
