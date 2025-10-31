@@ -2,7 +2,9 @@ import React from "react";
 import { Canvas, ThreeEvent, useThree, useFrame } from "@react-three/fiber";
 import { Environment, Gltf, PerspectiveCamera, Text } from "@react-three/drei";
 import { createXRStore, XR, useXR } from "@react-three/xr";
-
+import { VRSlider } from "./components/catalog/VRSlider";
+import { ControllerUIToggle } from "./components/catalog/ControllerUIToggle";
+import { VRInstructionPanel } from "./components/catalog/VRInstructionPanel";
 import * as THREE from "three";
 
 const xrStore = createXRStore();
@@ -27,42 +29,6 @@ const FURNITURE_CATALOG: Furniture[] = [
   { id: "equipment1", name: "Equipment", modelPath: "/target.glb" },
 ];
 
-function ControllerUIToggle({ onToggle }: { onToggle: () => void }) {
-  const xr = useXR();
-  const prevButtonStateRef = React.useRef<Map<string, boolean>>(new Map());
-
-  useFrame(() => {
-    const session = xr.session;
-    if (!session || !session.inputSources) return;
-
-    session.inputSources.forEach((inputSource, controllerIndex: number) => {
-      const gamepad = inputSource.gamepad;
-      if (!gamepad || !gamepad.buttons) return;
-
-      const buttonIndexes = [4, 5]; // Y and B
-      buttonIndexes.forEach((buttonIndex) => {
-        const button = gamepad.buttons[buttonIndex];
-        if (!button) return;
-
-        const isPressed = button.pressed;
-        const key = `${controllerIndex}-${buttonIndex}`;
-        const wasPressed = prevButtonStateRef.current.get(key) || false;
-
-        if (isPressed && !wasPressed) {
-          onToggle();
-        }
-
-        prevButtonStateRef.current.set(key, isPressed);
-      });
-    });
-  });
-
-  return null;
-}
-
-/* ──────────────────────────────────────────────
-   DraggableFurniture — adds null safety & useXRFrame
-────────────────────────────────────────────── */
 function DraggableFurniture({
   item,
   isSelected,
@@ -171,65 +137,6 @@ function PlacedFurniture({ items, selectedIndex, onSelectItem, onUpdatePosition 
   );
 }
 
-function VRSlider({ show, value, onChange, label, min = 0, max = 1, position = [0, 1.6, -1.5], showDegrees = false }: any) {
-  const [isDragging, setIsDragging] = React.useState(false);
-  const trackRef = React.useRef<THREE.Mesh>(null);
-  if (!show) return null;
-
-  const handleSliderInteraction = (e: ThreeEvent<PointerEvent>) => {
-    if (!trackRef.current || !e.point) return;
-    const trackMatrix = trackRef.current.matrixWorld;
-    const inverseTrackMatrix = new THREE.Matrix4().copy(trackMatrix).invert();
-    const localPoint = e.point.clone().applyMatrix4(inverseTrackMatrix);
-    const normalizedX = (localPoint.x + 0.4) / 0.8;
-    const clampedX = Math.max(0, Math.min(1, normalizedX));
-    const newValue = min + clampedX * (max - min);
-    onChange(newValue);
-  };
-
-  const sliderPosition = ((value - min) / (max - min)) * 0.8 - 0.4;
-  const displayValue = showDegrees ? ((value * 180) / Math.PI).toFixed(0) + "°" : value.toFixed(2);
-
-  return (
-    <group position={position}>
-      <mesh position={[0, 0, -0.01]}>
-        <planeGeometry args={[1, 0.3]} />
-        <meshStandardMaterial color="#2c3e50" opacity={0.9} transparent />
-      </mesh>
-
-      <Text position={[0, 0.1, 0]} fontSize={0.04} color="white" anchorX="center" anchorY="middle">
-        {label}: {displayValue}
-      </Text>
-
-      <mesh
-        ref={trackRef}
-        position={[0, -0.05, 0]}
-        onPointerDown={(e) => {
-          e.stopPropagation();
-          setIsDragging(true);
-          handleSliderInteraction(e);
-        }}
-        onPointerUp={() => setIsDragging(false)}
-        onPointerMove={(e) => {
-          if (isDragging) {
-            e.stopPropagation();
-            handleSliderInteraction(e);
-          }
-        }}
-        onPointerLeave={() => setIsDragging(false)}
-      >
-        <boxGeometry args={[0.8, 0.02, 0.01]} />
-        <meshStandardMaterial color="#34495e" />
-      </mesh>
-
-      <mesh position={[sliderPosition, -0.05, 0.01]}>
-        <sphereGeometry args={[0.04, 16, 16]} />
-        <meshStandardMaterial color="#3498db" />
-      </mesh>
-    </group>
-  );
-}
-
 function VRFurniturePanel({ show, onSelectItem }: { show: boolean; onSelectItem: (f: Furniture) => void }) {
   if (!show) return null;
   return (
@@ -256,33 +163,6 @@ function VRFurniturePanel({ show, onSelectItem }: { show: boolean; onSelectItem:
           </group>
         );
       })}
-    </group>
-  );
-}
-
-function VRInstructionPanel({ show }: { show: boolean }) {
-  if (!show) return null;
-  return (
-    <group position={[0, 1.6, -1.5]}>
-      <mesh>
-        <planeGeometry args={[1.8, 1.2]} />
-        <meshStandardMaterial color="#2c3e50" opacity={0.9} transparent />
-      </mesh>
-      <Text position={[0, 0.5, 0.01]} fontSize={0.06} color="#4CAF50" anchorX="center" anchorY="middle">
-        VR Controls
-      </Text>
-      <Text position={[0, 0.35, 0.01]} fontSize={0.04} color="white" anchorX="center" anchorY="middle">
-        Press Y or B to toggle menu
-      </Text>
-      <Text position={[0, 0.2, 0.01]} fontSize={0.035} color="#ccc" anchorX="center" anchorY="middle">
-        Trigger: Select furniture
-      </Text>
-      <Text position={[0, 0.1, 0.01]} fontSize={0.035} color="#ccc" anchorX="center" anchorY="middle">
-        Thumbstick: Move selected item
-      </Text>
-      <Text position={[0, -0.05, 0.01]} fontSize={0.035} color="#ccc" anchorX="center" anchorY="middle">
-        Use sliders to adjust scale/rotation
-      </Text>
     </group>
   );
 }
