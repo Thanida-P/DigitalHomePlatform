@@ -1,7 +1,7 @@
 import React from "react";
 import { Canvas, ThreeEvent, useFrame } from "@react-three/fiber";
 import { Environment, Gltf, PerspectiveCamera, Text } from "@react-three/drei";
-import { createXRStore, XR, useXRInputSourceState, useXR } from "@react-three/xr";
+import { createXRStore, XR, useXRInputSourceState } from "@react-three/xr";
 import * as THREE from "three";
 
 const xrStore = createXRStore();
@@ -27,62 +27,62 @@ const FURNITURE_CATALOG: Furniture[] = [
 ];
 
 // VR Locomotion Component
-
-interface VRLocomotionProps {
-  rigRef: React.RefObject<THREE.Group>;
-}
-
-export function VRLocomotion({ rigRef }: VRLocomotionProps) {
+function VRLocomotion() {
   const leftInputSource = useXRInputSourceState("controller", "left");
   const rightInputSource = useXRInputSourceState("controller", "right");
-
+  
   useFrame((state, delta) => {
-    if (!rigRef.current) return;
+    if (!state.camera) return;
 
+    // Get thumbstick input from controllers
     let moveX = 0;
     let moveZ = 0;
     let rotateY = 0;
 
-    if (leftInputSource?.gamepad?.axes) {
+    // Left controller - movement (forward/backward/strafe)
+    if (leftInputSource && leftInputSource.gamepad) {
       const axes = leftInputSource.gamepad.axes as unknown as number[];
-      if (axes.length >= 2) {
-        moveX = axes[0];
-        moveZ = axes[1];
+      if (axes && axes.length >= 4) {
+        moveX = axes[2];
+        moveZ = axes[3];
       }
     }
 
-    if (rightInputSource?.gamepad?.axes) {
+    if (rightInputSource && rightInputSource.gamepad) {
       const axes = rightInputSource.gamepad.axes as unknown as number[];
-      if (axes.length >= 1) {
-        rotateY = axes[0];
+      if (axes && axes.length >= 4) {
+        rotateY = axes[2];
       }
     }
 
-    const moveSpeed = 2.0; // units/sec
-    const rotateSpeed = 1.5; // radians/sec
+    // Apply movement
+    const moveSpeed = 2.0; // Units per second
+    const rotateSpeed = 1.5; // Radians per second
 
-    // Movement
     if (Math.abs(moveX) > 0.1 || Math.abs(moveZ) > 0.1) {
-      const camera = state.camera;
+      // Get camera's forward and right directions
+      const cameraDirection = new THREE.Vector3();
+      state.camera.getWorldDirection(cameraDirection);
+      cameraDirection.y = 0; // Keep movement horizontal
+      cameraDirection.normalize();
 
-      const forward = new THREE.Vector3();
-      camera.getWorldDirection(forward);
-      forward.y = 0;
-      forward.normalize();
+      const cameraRight = new THREE.Vector3();
+      cameraRight.crossVectors(cameraDirection, new THREE.Vector3(0, 1, 0));
+      cameraRight.normalize();
 
-      const right = new THREE.Vector3();
-      right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-
+      // Calculate movement vector
       const movement = new THREE.Vector3();
-      movement.addScaledVector(right, moveX * moveSpeed * delta);
-      movement.addScaledVector(forward, -moveZ * moveSpeed * delta);
+      movement.addScaledVector(cameraRight, moveX * moveSpeed * delta);
+      movement.addScaledVector(cameraDirection, -moveZ * moveSpeed * delta);
 
-      rigRef.current.position.add(movement);
+      // Apply movement to camera
+      state.camera.position.add(movement);
     }
 
-    // Rotation
+    // Apply rotation
     if (Math.abs(rotateY) > 0.1) {
-      rigRef.current.rotation.y -= rotateY * rotateSpeed * delta;
+      const rotation = rotateY * rotateSpeed * delta;
+      state.camera.rotateY(-rotation);
     }
   });
 
@@ -364,7 +364,6 @@ export default function App() {
   const [rotationValue, setRotationValue] = React.useState<number>(0);
   const [placedItems, setPlacedItems] = React.useState<PlacedItem[]>([]);
   const [selectedItemIndex, setSelectedItemIndex] = React.useState<number | null>(null);
-  const xrRig = React.useRef<THREE.Group>(null);
 
   const handleSelectFurniture = (furniture: Furniture) => {
     // Place furniture in front of the user at a default position
@@ -434,39 +433,37 @@ export default function App() {
         <Gltf src="/labPlan.glb" />
         
         <XR store={xrStore}>
-          <group ref={xrRig}>
-            <VRLocomotion rigRef={xrRig} />
-            <VREditButton 
-              onClick={() => {
-                setShowSlider(!showSlider);
-                setShowFurniture(!showFurniture);
-              }} 
-              showSlider={showSlider}
-            />
-            <VRSlider
-              show={showSlider}
-              value={sliderValue}
-              onChange={setSliderValue}
-              label="Furniture Scale"
-              min={0.1}
-              max={2}
-              position={[-1.5, 1.2, -1]}
-            />
-            <VRSlider
-              show={showSlider && selectedItemIndex !== null}
-              value={rotationValue}
-              onChange={handleRotationChange}
-              label="Rotation"
-              min={0}
-              max={Math.PI * 2}
-              position={[-1.5, 0.8, -1]}
-              showDegrees={true}
-            />
-            <VRFurniturePanel 
-              show={showFurniture} 
-              onSelectItem={handleSelectFurniture}
-            />
-          </group>
+          <VRLocomotion />
+          <VREditButton 
+            onClick={() => {
+              setShowSlider(!showSlider);
+              setShowFurniture(!showFurniture);
+            }} 
+            showSlider={showSlider}
+          />
+          <VRSlider
+            show={showSlider}
+            value={sliderValue}
+            onChange={setSliderValue}
+            label="Furniture Scale"
+            min={0.1}
+            max={2}
+            position={[-1.5, 1.2, -1]}
+          />
+          <VRSlider
+            show={showSlider && selectedItemIndex !== null}
+            value={rotationValue}
+            onChange={handleRotationChange}
+            label="Rotation"
+            min={0}
+            max={Math.PI * 2}
+            position={[-1.5, 0.8, -1]}
+            showDegrees={true}
+          />
+          <VRFurniturePanel 
+            show={showFurniture} 
+            onSelectItem={handleSelectFurniture}
+          />
         </XR>
         
         <PlacedFurniture 
