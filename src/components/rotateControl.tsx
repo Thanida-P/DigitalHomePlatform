@@ -3,7 +3,16 @@ import * as THREE from "three";
 import { Text } from "@react-three/drei";
 import { ThreeEvent } from "@react-three/fiber";
 
-export function VRSlider({ show, value, onChange, label, min = 0, max = 1, position = [0, 1.6, -1.5], showDegrees = false }: any) {
+export function VRSlider({ 
+  show, 
+  value, 
+  onChange, 
+  label, 
+  min = 0, 
+  max = 1, 
+  position = [0, 0, 0], 
+  showDegrees = false 
+}: any) {
   const [isDragging, setIsDragging] = React.useState(false);
   const trackRef = React.useRef<THREE.Mesh>(null);
   if (!show) return null;

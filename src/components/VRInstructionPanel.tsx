@@ -3,7 +3,7 @@ import { Text } from "@react-three/drei";
 export function VRInstructionPanel({ show }: { show: boolean }) {
   if (!show) return null;
   return (
-    <group position={[0, 1.6, -1.5]}>
+    <group>
       <mesh>
         <planeGeometry args={[1.8, 1.2]} />
         <meshStandardMaterial color="#2c3e50" opacity={0.9} transparent />
@@ -18,10 +18,13 @@ export function VRInstructionPanel({ show }: { show: boolean }) {
         Trigger: Select furniture
       </Text>
       <Text position={[0, 0.1, 0.01]} fontSize={0.035} color="#ccc" anchorX="center" anchorY="middle">
-        Thumbstick: Move selected item
+        Right Thumbstick: Move selected item
+      </Text>
+      <Text position={[0, 0, 0.01]} fontSize={0.035} color="#ccc" anchorX="center" anchorY="middle">
+        Left Thumbstick: Rotate selected item
       </Text>
       <Text position={[0, -0.05, 0.01]} fontSize={0.035} color="#ccc" anchorX="center" anchorY="middle">
-        Use sliders to adjust scale/rotation
+        Use sliders to adjust scale
       </Text>
     </group>
   );

@@ -6,6 +6,7 @@ import { createXRStore, XR, useXR } from "@react-three/xr";
 import { ControllerUIToggle } from "./components/ControllerUIToggle";
 import { VRInstructionPanel } from "./components/VRInstructionPanel";
 import { VRSlider } from "./components/rotateControl";
+import { HeadLockedUI } from "./components/HeadLockedUI";
 
 const xrStore = createXRStore();
 
@@ -165,7 +166,7 @@ function PlacedFurniture({ items, selectedIndex, onSelectItem, onUpdatePosition,
 function VRFurniturePanel({ show, onSelectItem }: { show: boolean; onSelectItem: (f: Furniture) => void }) {
   if (!show) return null;
   return (
-    <group position={[0, 1.6, -1.5]}>
+    <group>
       <mesh>
         <planeGeometry args={[1.5, 1]} />
         <meshStandardMaterial color="#2c3e50" opacity={0.9} transparent />
@@ -303,10 +304,60 @@ export default function App() {
           </group>
 
           <ControllerUIToggle onToggle={handleToggleUI} />
-          <VRInstructionPanel show={showInstructions} />
-          <VRSlider show={showSlider} value={sliderValue} onChange={setSliderValue} label="Scale" min={0.1} max={2} position={[-1.5, 1.2, -1]} />
-          <VRSlider show={showSlider && selectedItemIndex !== null} value={rotationValue} onChange={handleRotationChange} label="Rotation" min={0} max={Math.PI * 2} position={[-1.5, 0.8, -1]} showDegrees />
-          <VRFurniturePanel show={showFurniture} onSelectItem={handleSelectFurniture} />
+          
+          {/* Head-locked instruction panel - appears in front of user */}
+          <HeadLockedUI 
+            distance={1.5} 
+            verticalOffset={0} 
+            enabled={showInstructions}
+          >
+            <VRInstructionPanel show={showInstructions} />
+          </HeadLockedUI>
+
+          {/* Head-locked furniture selection panel - center position */}
+          <HeadLockedUI 
+            distance={1.5} 
+            verticalOffset={0} 
+            enabled={showFurniture}
+          >
+            <VRFurniturePanel show={showFurniture} onSelectItem={handleSelectFurniture} />
+          </HeadLockedUI>
+
+          {/* Head-locked sliders - positioned to the left side */}
+          <HeadLockedUI 
+            distance={1.0} 
+            horizontalOffset={-0.6}
+            verticalOffset={-0.4}
+            enabled={showSlider}
+          >
+            <VRSlider 
+              show={showSlider} 
+              value={sliderValue} 
+              onChange={setSliderValue} 
+              label="Scale" 
+              min={0.1} 
+              max={2} 
+              position={[0, 0.4, 0]} 
+            />
+          </HeadLockedUI>
+
+          <HeadLockedUI 
+            distance={1.0} 
+            horizontalOffset={-0.6}
+            verticalOffset={-0.4}
+            enabled={showSlider && selectedItemIndex !== null}
+          >
+            <VRSlider 
+              show={showSlider && selectedItemIndex !== null} 
+              value={rotationValue} 
+              onChange={handleRotationChange} 
+              label="Rotation" 
+              min={0} 
+              max={Math.PI * 2} 
+              position={[0, 0, 0]} 
+              showDegrees 
+            />
+          </HeadLockedUI>
         </XR>
       </Canvas>
 
