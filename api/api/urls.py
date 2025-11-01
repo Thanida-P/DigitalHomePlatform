@@ -24,6 +24,7 @@ import app_api.carts.view as cart_views
 import app_api.products.view as product_views
 import app_api.orders.view as order_views
 import app_api.reviews.view as review_views
+import app_api.digitalhomes.view as digitalhome_views
 
 urlpatterns = [
     path('users/admin/register/', account_views.register_admin),
@@ -77,4 +78,17 @@ urlpatterns = [
     path('reviews/delete/<int:review_id>/', review_views.delete_review),
     path('reviews/get_product_reviews/<int:product_id>/', review_views.get_reviews_for_product),
     path('reviews/get_customer_reviews/', review_views.get_reviews_by_customer),
+    path('digitalhomes/list_available_items/', digitalhome_views.list_available_items),
+    path('digitalhomes/get_specific_item/', digitalhome_views.get_specific_item),
+    path('digitalhomes/add_digital_home/', digitalhome_views.add_digital_home),
+    path('digitalhomes/get_digital_homes/', digitalhome_views.get_digital_homes),
+    path('digitalhomes/get_digital_home/<int:id>/', digitalhome_views.get_digital_home),
+    path('digitalhomes/download_digital_home/<int:home_id>/', digitalhome_views.get_home_model),
+    path('digitalhomes/get_textures/<int:home_id>/', digitalhome_views.get_textures),
+    path('digitalhomes/delete_digital_home/<int:id>/', digitalhome_views.delete_digital_home),
+    path('digitalhomes/update_texture/', digitalhome_views.update_texture),
+    path('digitalhomes/update_home_design/', digitalhome_views.update_home_design),
+    path('digitalhomes/add_custom_item/', digitalhome_views.add_custom_item),
+    path('digitalhomes/get_deployed_items_details/<int:id>/', digitalhome_views.get_deployed_item_details),
+    path('digitalhomes/get_deployed_item_detail/<int:id>/', digitalhome_views.get_deployed_item_detail),
 ]

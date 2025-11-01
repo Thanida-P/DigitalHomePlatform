@@ -37,6 +37,12 @@ def get_connection():
         root.nonContainerOwnedItems = BTrees.OOBTree.BTree()
     if not hasattr(root, "products"):
         root.products = BTrees.OOBTree.BTree()
+    if not hasattr(root, "digitalHomes"):
+        root.digitalHomes = BTrees.OOBTree.BTree()
+    if not hasattr(root, "homeObjectModels"):
+        root.homeObjectModels = BTrees.OOBTree.BTree()
+    if not hasattr(root, "placedItems"):
+        root.placedItems = BTrees.OOBTree.BTree()
     
     return connection, root
 
