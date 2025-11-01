@@ -1,3 +1,6 @@
+from datetime import timedelta
+from django.utils import timezone
+from django.core import signing
 from django.http import JsonResponse
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.views.decorators.http import require_http_methods
@@ -165,6 +168,64 @@ def is_logged_in(request):
     if username:
         return JsonResponse({'logged_in': False, 'username': username})
     return JsonResponse({'logged_in': False, 'username': None})
+
+@login_required
+@require_http_methods(["GET"])
+def get_login_token(request):
+    user = request.user
+
+    expires_at = (timezone.now() + timedelta(minutes=1)).timestamp()
+
+    data = {
+        "user_id": user.id,
+        "exp": expires_at
+    }
+
+    signer = signing.TimestampSigner(salt="cross-domain-login")
+    token = signer.sign_object(data)
+
+    return JsonResponse({
+        "token": token,
+        "expires_in": 60,  # seconds
+        "username": user.username
+    })
+    
+def scene_creator_login(request, user):
+    auth_login(request, user)
+    response = JsonResponse({
+        'message': 'Login successful',
+        'is_admin': getattr(user, 'is_admin', False),
+        'is_staff': getattr(user, 'is_staff', False)
+    }, status=200)
+    response.set_cookie(
+        'username',
+        getattr(user, 'username'),
+        max_age=60*60*24*30,
+        httponly=True,
+        secure=True
+    )
+    return response
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def verify_login_token(request):
+    token = request.POST.get("token")
+    if not token:
+        return JsonResponse({"error": "Token required"}, status=400)
+
+    signer = signing.TimestampSigner(salt="cross-domain-login")
+
+    try:
+        data = signer.unsign_object(token, max_age=60)
+        user = User.objects.get(id=data["user_id"])
+        scene_creator_login(request, user)
+        return JsonResponse({"message": "Login verified", "username": user.username})
+    except signing.SignatureExpired:
+        return JsonResponse({"error": "Token expired"}, status=401)
+    except signing.BadSignature:
+        return JsonResponse({"error": "Invalid token"}, status=403)
+    except User.DoesNotExist:
+        return JsonResponse({"error": "User not found"}, status=404)
 
 # Logout
 @csrf_exempt
