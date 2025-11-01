@@ -40,6 +40,7 @@ def create_product(name, description, digital_price, physical_price, category, i
             name=name,
             description=description,
             model_id=model_id,
+            image=image_base64,
             category=category,
             type=product_type,
             is_container=is_container,
@@ -53,7 +54,6 @@ def create_product(name, description, digital_price, physical_price, category, i
             item=item,
             digital_price=digital_price,
             physical_price=physical_price,
-            image=image_base64,
             stock=stock,
             digital_available=digital_available,
             physical_available=physical_available,
@@ -87,7 +87,7 @@ def update_existing_product(product_id, name, description, digital_price, physic
             item.category = category
         if image:
             image_base64 = base64.b64encode(image.read()).decode('utf-8')
-            product.image = image_base64
+            item.image = image_base64
         if product_type:
             item.type = product_type
         if stock is not None and stock >= 0:

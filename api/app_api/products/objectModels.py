@@ -50,11 +50,12 @@ class DisplayScene(persistent.Persistent):
         return self.filename
     
 class Item(persistent.Persistent):
-    def __init__(self, id, name, description, model_id, category, type, is_container, created_at):
+    def __init__(self, id, name, description, image, model_id, category, type, is_container, created_at):
         self.id = id
         self.name = name
         self.description = description
         self.model_id = model_id
+        self.image = image
         self.category = category
         self.type = type
         self.is_container = is_container
@@ -69,6 +70,9 @@ class Item(persistent.Persistent):
     
     def get_description(self):
         return self.description
+    
+    def get_image(self):
+        return self.image
     
     def get_model_id(self):
         return self.model_id
@@ -89,12 +93,11 @@ class Item(persistent.Persistent):
         return self.updated_at
     
 class Product(persistent.Persistent):
-    def __init__(self, id, item, digital_price, physical_price, image, stock, digital_available, physical_available, display_scenes):
+    def __init__(self, id, item, digital_price, physical_price, stock, digital_available, physical_available, display_scenes):
         self.id = id
         self.item = item
         self.digital_price = digital_price
         self.physical_price = physical_price
-        self.image = image
         self.stock = stock
         self.reviews = []
         self.rating = 0.0
@@ -113,9 +116,6 @@ class Product(persistent.Persistent):
     
     def get_physical_price(self):
         return self.physical_price
-    
-    def get_image(self):
-        return self.image
     
     def get_stock(self):
         return self.stock
@@ -148,8 +148,8 @@ class Product(persistent.Persistent):
         self.rating = rating
     
 class OwnedItem(Item):
-    def __init__(self, id, owner_id, name, description, model_id, category, type, is_container, spatial_id, texture_id, created_at):
-        super().__init__(id=id, name=name, description=description, model_id=model_id, category=category, type=type, is_container=is_container, created_at=created_at)
+    def __init__(self, id, owner_id, name, description, model_id, image, category, type, is_container, spatial_id, texture_id, created_at):
+        super().__init__(id=id, name=name, description=description, model_id=model_id, image=image, category=category, type=type, is_container=is_container, created_at=created_at)
         self.spatial_id = spatial_id
         self.texture_id = texture_id
         self.owner_id = owner_id
@@ -169,8 +169,8 @@ class OwnedItem(Item):
     def set_spatial_id(self, spatial_id):
         self.spatial_id = spatial_id    
 class ContainerOwnedItem(OwnedItem):
-    def __init__(self, id, owner_id, name, description, model_id, category, type, is_container, spatial_id, texture_id, contained_item, created_at):
-        super().__init__(id=id, owner_id=owner_id, name=name, description=description, model_id=model_id, category=category, type=type, is_container=is_container, spatial_id=spatial_id, texture_id=texture_id, created_at=created_at)
+    def __init__(self, id, owner_id, name, description, model_id, image, category, type, is_container, spatial_id, texture_id, contained_item, created_at):
+        super().__init__(id=id, owner_id=owner_id, name=name, description=description, model_id=model_id, image=image, category=category, type=type, is_container=is_container, spatial_id=spatial_id, texture_id=texture_id, created_at=created_at)
         self.contained_item = contained_item
 
     def get_contained_item(self):
@@ -180,8 +180,8 @@ class ContainerOwnedItem(OwnedItem):
         self.contained_item = contained_item
 
 class NonContainerOwnedItem(OwnedItem):
-    def __init__(self, id, owner_id, name, description, model_id, category, type, is_container, spatial_id, texture_id, composition, created_at):
-        super().__init__(id=id, owner_id=owner_id, name=name, description=description, model_id=model_id, category=category, type=type, is_container=is_container, spatial_id=spatial_id, texture_id=texture_id, created_at=created_at)
+    def __init__(self, id, owner_id, name, description, model_id, image, category, type, is_container, spatial_id, texture_id, composition, created_at):
+        super().__init__(id=id, owner_id=owner_id, name=name, description=description, model_id=model_id, image=image, category=category, type=type, is_container=is_container, spatial_id=spatial_id, texture_id=texture_id, created_at=created_at)
         self.composition = composition
     
     def get_composition(self):
