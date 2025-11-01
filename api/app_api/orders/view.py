@@ -2,8 +2,9 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
-from .models import Order, OrderItem
-from app_api.products.objectModels import OwnedItem, ContainerOwnedItem, NonContainerOwnedItem
+from .models import Order, OrderItem, PaymentMethod
+from app_api.products.objectModels import ContainerOwnedItem, NonContainerOwnedItem
+from app_api.users.models import CreditCard, BankAccount
 from zodb.zodb_management import *
 from app_api.orders.funcHelper import *
 from datetime import datetime
@@ -14,6 +15,9 @@ import transaction
 @require_http_methods(["POST"])
 def checkout(request):
     customer = request.user.customer
+    
+    payment_type = request.POST.get('payment_type')
+    method_id = request.POST.get('method_id')
 
     if not customer:
         return JsonResponse({'error': 'Only customers can manage carts'}, status=403)
@@ -25,13 +29,35 @@ def checkout(request):
 
     if cart.cart_items.count() == 0:
         return JsonResponse({'error': 'Cart is empty'}, status=400)
+    
+    if payment_type not in ['credit_card', 'bank_account']:
+        return JsonResponse({'error': 'Invalid payment type'}, status=400)
+
+    if not method_id:
+        return JsonResponse({'error': 'Payment method not provided'}, status=400)
+
+    if payment_type == 'credit_card':
+        if int(method_id) not in customer.credit_cards:
+            return JsonResponse({'error': 'Payment method not found'}, status=404)
+    elif payment_type == 'bank_account':
+        if int(method_id) not in customer.bank_accounts:
+            return JsonResponse({'error': 'Payment method not found'}, status=404)
+    
+    payment_method = PaymentMethod.objects.create(
+        type=payment_type,
+        credit_card=CreditCard.objects.get(id=method_id) if payment_type == 'credit_card' else None,
+        bank_account=BankAccount.objects.get(id=method_id) if payment_type == 'bank_account' else None
+    )
+    payment_method.save()
 
     order = Order.objects.create(
         customer=customer,
         order_items=[],
         total_price=cart.total_price,
-        status='pending'
+        status='pending',
+        payment_method=payment_method
     )
+    
     
     items = []
     cart_items = cart.cart_items.all()
@@ -84,6 +110,12 @@ def list_orders(request):
                 'status': order.status,
                 'created_at': order.created_at.isoformat(),
                 'updated_at': order.updated_at.isoformat(),
+                'payment_method': {
+                    'type': order.payment_method.type,
+                    'credit_card_last4': order.payment_method.credit_card.last4 if order.payment_method.credit_card else None,
+                    'bank_account_last4': order.payment_method.bank_account.last4 if order.payment_method.bank_account else None,
+                } if order.payment_method else None,
+                
             })
         transaction.commit()
         return JsonResponse({'orders': orders_data}, status=200)
