@@ -305,7 +305,6 @@ export default function App() {
 
           <ControllerUIToggle onToggle={handleToggleUI} />
           
-          {/* Head-locked instruction panel - appears in front of user */}
           <HeadLockedUI 
             distance={1.5} 
             verticalOffset={0} 
@@ -314,7 +313,6 @@ export default function App() {
             <VRInstructionPanel show={showInstructions} />
           </HeadLockedUI>
 
-          {/* Head-locked furniture selection panel - center position */}
           <HeadLockedUI 
             distance={1.5} 
             verticalOffset={0} 
@@ -323,11 +321,9 @@ export default function App() {
             <VRFurniturePanel show={showFurniture} onSelectItem={handleSelectFurniture} />
           </HeadLockedUI>
 
-          {/* Head-locked sliders - positioned to the left side */}
           <HeadLockedUI 
             distance={1.0} 
-            horizontalOffset={-0.6}
-            verticalOffset={-0.4}
+            verticalOffset={0}
             enabled={showSlider}
           >
             <VRSlider 
@@ -337,14 +333,13 @@ export default function App() {
               label="Scale" 
               min={0.1} 
               max={2} 
-              position={[0, 0.4, 0]} 
+              position={[-1.1, 0.2, 0]} 
             />
           </HeadLockedUI>
 
           <HeadLockedUI 
             distance={1.0} 
-            horizontalOffset={-0.6}
-            verticalOffset={-0.4}
+            verticalOffset={0}
             enabled={showSlider && selectedItemIndex !== null}
           >
             <VRSlider 
@@ -354,7 +349,7 @@ export default function App() {
               label="Rotation" 
               min={0} 
               max={Math.PI * 2} 
-              position={[0, 0, 0]} 
+              position={[-1.1, -0.2, 0]} 
               showDegrees 
             />
           </HeadLockedUI>

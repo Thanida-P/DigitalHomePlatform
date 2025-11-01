@@ -50,8 +50,6 @@ export function HeadLockedUI({
 
     groupRef.current.position.copy(uiPosition);
 
-    // Make the UI face the camera (billboard effect)
-    // This ensures the panel is always readable
     groupRef.current.lookAt(cameraPosition);
   });
 
