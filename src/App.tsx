@@ -29,6 +29,34 @@ const FURNITURE_CATALOG: Furniture[] = [
   { id: "equipment1", name: "Equipment", modelPath: "/target.glb" },
 ];
 
+function SpawnManager({ 
+  spawnPositionRef 
+}: { 
+  spawnPositionRef: React.MutableRefObject<[number, number, number]>
+}) {
+  const camera = useThree((state) => state.camera);
+  
+  useFrame(() => {
+    if (!camera) return;
+    
+    // Continuously update the spawn position based on camera
+    const cameraWorldPos = new THREE.Vector3();
+    camera.getWorldPosition(cameraWorldPos);
+    
+    const cameraDirection = new THREE.Vector3();
+    camera.getWorldDirection(cameraDirection);
+    
+    const spawnDistance = 2;
+    const spawnPos = cameraWorldPos.clone();
+    spawnPos.addScaledVector(cameraDirection, spawnDistance);
+    spawnPos.y = 0; // Floor level
+    
+    spawnPositionRef.current = [spawnPos.x, spawnPos.y, spawnPos.z];
+  });
+  
+  return null;
+}
+
 function DraggableFurniture({
   item,
   isSelected,
@@ -201,6 +229,7 @@ export default function App() {
   const [rotationValue, setRotationValue] = React.useState(0);
   const [placedItems, setPlacedItems] = React.useState<PlacedItem[]>([]);
   const [selectedItemIndex, setSelectedItemIndex] = React.useState<number | null>(null);
+  const currentSpawnPositionRef = React.useRef<[number, number, number]>([0, 0, -2]);
 
   const handleToggleUI = () => {
     if (showInstructions) {
@@ -217,9 +246,10 @@ export default function App() {
   };
 
   const handleSelectFurniture = (f: Furniture) => {
+    console.log("Spawning furniture at:", currentSpawnPositionRef.current);
     const newItem: PlacedItem = {
       ...f,
-      position: [0, 0, -2 - placedItems.length * 0.5],
+      position: [currentSpawnPositionRef.current[0], currentSpawnPositionRef.current[1], currentSpawnPositionRef.current[2]],
       rotation: [0, 0, 0],
       scale: sliderValue,
     };
@@ -286,6 +316,7 @@ export default function App() {
     <>
       <Canvas style={{ width: "100vw", height: "100vh", position: "fixed" }}>
         <XR store={xrStore}>
+          <SpawnManager spawnPositionRef={currentSpawnPositionRef} />
           <color args={["#808080"]} attach="background" />
           <PerspectiveCamera makeDefault position={[0, 1.6, 2]} fov={75} />
           <ambientLight intensity={0.5} />
