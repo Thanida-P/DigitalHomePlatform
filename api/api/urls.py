@@ -33,6 +33,8 @@ urlpatterns = [
     path('users/register/', account_views.register),
     path('users/logout/', account_views.logout_view),
     path('users/is_logged_in/', account_views.is_logged_in),
+    path('users/get_login_token/', account_views.get_login_token),
+    path('users/verify_login_token/', account_views.verify_login_token),
     path('users/delete/', account_views.delete_user),
     path('users/profile/', account_views.get_users_profile),
     path('users/profile/update/', account_views.update_user_profile),
