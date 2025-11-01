@@ -226,7 +226,7 @@ export default function App() {
   const [showFurniture, setShowFurniture] = React.useState(false);
   const [showInstructions, setShowInstructions] = React.useState(true);
   const [sliderValue, setSliderValue] = React.useState(0.5);
-  const [rotationValue, setRotationValue] = React.useState(0);
+  const [_rotationValue, setRotationValue] = React.useState(0);
   const [placedItems, setPlacedItems] = React.useState<PlacedItem[]>([]);
   const [selectedItemIndex, setSelectedItemIndex] = React.useState<number | null>(null);
   const currentSpawnPositionRef = React.useRef<[number, number, number]>([0, 0, -2]);
