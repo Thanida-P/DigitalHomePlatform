@@ -178,6 +178,7 @@ def get_login_token(request):
 
     data = {
         "user_id": user.id,
+        "username": user.username,
         "exp": expires_at
     }
 
@@ -194,16 +195,21 @@ def scene_creator_login(request, user):
     auth_login(request, user)
     response = JsonResponse({
         'message': 'Login successful',
+        'username': user.username,
+        'user_id': user.id,
         'is_admin': getattr(user, 'is_admin', False),
         'is_staff': getattr(user, 'is_staff', False)
     }, status=200)
+    
     response.set_cookie(
-        'username',
-        getattr(user, 'username'),
+        'sessionid',
+        request.session.session_key,
         max_age=60*60*24*30,
         httponly=True,
-        secure=True
+        secure=True,
+        samesite='None'  # Allow cross-site
     )
+    
     return response
 
 @csrf_exempt
@@ -218,8 +224,8 @@ def verify_login_token(request):
     try:
         data = signer.unsign_object(token, max_age=60)
         user = User.objects.get(id=data["user_id"])
-        scene_creator_login(request, user)
-        return JsonResponse({"message": "Login verified", "username": user.username})
+        return scene_creator_login(request, user)
+        
     except signing.SignatureExpired:
         return JsonResponse({"error": "Token expired"}, status=401)
     except signing.BadSignature:

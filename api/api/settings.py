@@ -16,6 +16,7 @@ import sys
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
@@ -31,6 +32,7 @@ ALLOWED_HOSTS = ["*"]
 # Application definition
 
 INSTALLED_APPS = [
+    'corsheaders',
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -48,6 +50,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware', 
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -56,6 +59,19 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "https://scenecreator.netlify.app",
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
+SESSION_COOKIE_SAMESITE = 'None'
+SESSION_COOKIE_SECURE = True 
+CSRF_COOKIE_SAMESITE = 'None'
+CSRF_COOKIE_SECURE = True
 
 ROOT_URLCONF = "api.urls"
 
@@ -92,15 +108,11 @@ DATABASES = {
 }
 
 # ZODB settings and GDAL library path
-# GEOS_LIBRARY_PATH = r"C:/Program Files/GDAL/bin/geos_c.dll"
-# GDAL_LIBRARY_PATH = r"C:/Program Files/GDAL/bin/gdal.dll"
-
-# GEOS_LIBRARY_PATH = "/opt/homebrew/opt/geos/lib/libgeos_c.dylib"
-# GDAL_LIBRARY_PATH = "/opt/homebrew/opt/gdal/lib/libgdal.dylib"
-
 if sys.platform == "win32":
     GEOS_LIBRARY_PATH = r"C:/OSGeo4W/bin/geos_c.dll"
     GDAL_LIBRARY_PATH = r"C:/OSGeo4W/bin/gdal311.dll"
+    # GEOS_LIBRARY_PATH = r"C:/Program Files/GDAL/bin/geos_c.dll"
+    # GDAL_LIBRARY_PATH = r"C:/Program Files/GDAL/bin/gdal.dll"
 elif sys.platform == "darwin":  # macOS
     GEOS_LIBRARY_PATH = "/opt/homebrew/opt/geos/lib/libgeos_c.dylib"
     GDAL_LIBRARY_PATH = "/opt/homebrew/opt/gdal/lib/libgdal.dylib"
