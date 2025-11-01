@@ -14,21 +14,19 @@ export function ControllerUIToggle({ onToggle }: { onToggle: () => void }) {
       const gamepad = inputSource.gamepad;
       if (!gamepad || !gamepad.buttons) return;
 
-      const buttonIndexes = [4, 5]; // Y and B
-      buttonIndexes.forEach((buttonIndex) => {
-        const button = gamepad.buttons[buttonIndex];
-        if (!button) return;
+      const buttonIndex = 5; // Y and B
+      const button = gamepad.buttons[buttonIndex];
+      if (!button) return;
 
-        const isPressed = button.pressed;
-        const key = `${controllerIndex}-${buttonIndex}`;
-        const wasPressed = prevButtonStateRef.current.get(key) || false;
+      const isPressed = button.pressed;
+      const key = `${controllerIndex}-${buttonIndex}`;
+      const wasPressed = prevButtonStateRef.current.get(key) || false;
 
-        if (isPressed && !wasPressed) {
-          onToggle();
-        }
+      if (isPressed && !wasPressed) {
+        onToggle();
+      }
 
-        prevButtonStateRef.current.set(key, isPressed);
-      });
+      prevButtonStateRef.current.set(key, isPressed);
     });
   });
 

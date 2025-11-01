@@ -5,7 +5,7 @@ import { Environment, Gltf, PerspectiveCamera, Text } from "@react-three/drei";
 import { createXRStore, XR, useXR } from "@react-three/xr";
 import { ControllerUIToggle } from "./components/ControllerUIToggle";
 import { VRInstructionPanel } from "./components/VRInstructionPanel";
-import { VRSlider } from "./components/rotateControl";
+import { VRSlider } from "./components/RotationControl";
 import { HeadLockedUI } from "./components/HeadLockedUI";
 
 const xrStore = createXRStore();
