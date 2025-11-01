@@ -71,6 +71,20 @@ def remove_credit_card(request, pm_id):
     return JsonResponse({"message":"deleted"}, status=200)
 
 @csrf_exempt
+@login_required
+@require_http_methods(["PUT"])
+def set_default_credit_card(request, pm_id):
+    customer = request.user.customer
+    try:
+        pm = CreditCard.objects.get(id=pm_id, customer=customer)
+    except CreditCard.DoesNotExist:
+        return JsonResponse({"error":"not found"}, status=404)
+    CreditCard.objects.filter(customer=customer).update(is_default=False)
+    pm.is_default = True
+    pm.save()
+    return JsonResponse({"message":"default set"}, status=200)
+
+@csrf_exempt
 @require_http_methods(["POST"])
 @login_required
 def add_bank_account(request):
@@ -136,3 +150,17 @@ def remove_bank_account(request, ba_id):
         return JsonResponse({"error": "not found"}, status=404)
     ba.delete()
     return JsonResponse({"message": "bank account removed"}, status=200)
+
+@csrf_exempt
+@login_required
+@require_http_methods(["PUT"])
+def set_default_bank_account(request, ba_id):
+    customer = request.user.customer
+    try:
+        ba = BankAccount.objects.get(id=ba_id, customer=customer)
+    except BankAccount.DoesNotExist:
+        return JsonResponse({"error":"not found"}, status=404)
+    BankAccount.objects.filter(customer=customer).update(is_default=False)
+    ba.is_default = True
+    ba.save()
+    return JsonResponse({"message":"default bank account set"}, status=200)
