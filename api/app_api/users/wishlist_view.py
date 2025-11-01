@@ -82,7 +82,7 @@ def get_wishlist(request):
                 'physical_price': str(product.get_physical_price()),
                 'category': item.get_category(),
                 'type': item.get_type(),
-                'image': product.get_image(),
+                'image': item.get_image(),
             }
             products.append(product_data)
 

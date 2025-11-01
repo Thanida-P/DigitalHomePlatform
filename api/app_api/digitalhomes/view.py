@@ -13,6 +13,7 @@ from app_api.orders.funcHelper import create_spatial_instance, get_container_own
 from datetime import datetime
 import transaction
 import json
+import base64
 
 @login_required
 @require_http_methods(["GET"])
@@ -36,6 +37,7 @@ def list_available_items(request):
                     'name': item.get_name(),
                     'description': item.get_description(),
                     'model_id': item.get_model_id(),
+                    'image': item.get_image(),
                     'category': item.get_category(),
                     'type': item.get_type(),
                     'is_container': is_container,
@@ -83,6 +85,7 @@ def get_specific_item(request):
             'type': item.get_type(),
             'is_container': is_container,
             'created_at': item.created_at.isoformat(),
+            'image': item.get_image(),
         }
         return JsonResponse({'item': item_data}, status=200)
     finally:
@@ -309,6 +312,11 @@ def add_custom_item(request):
         is_container = request.POST.get('is_container', 'false').lower() == 'true'
         model_files = request.FILES.get('model_file')
         texture_files = request.FILES.getlist('texture_files')
+        image = request.FILES.get('image')
+        
+        image_base64 = None
+        if image:
+            image_base64 = base64.b64encode(image.read()).decode('utf-8')
         
         if not name or not model_files:
             return JsonResponse({'error': 'Name and model_file are required'}, status=400)
@@ -324,6 +332,7 @@ def add_custom_item(request):
                 name=name,
                 description=description,
                 model_id=model_id,
+                image=image_base64,
                 category=category,
                 type=type,
                 is_container=is_container,
@@ -341,6 +350,7 @@ def add_custom_item(request):
                 name=name,
                 description=description,
                 model_id=model_id,
+                image=image_base64,
                 category=category,
                 type=type,
                 is_container=is_container,
