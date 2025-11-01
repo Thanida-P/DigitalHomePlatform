@@ -300,18 +300,6 @@ export default function App() {
     }
   };
 
-  // This handler is for the SLIDER
-  const handleRotationChange = (r: number) => {
-    setRotationValue(r);
-    if (selectedItemIndex !== null) {
-      setPlacedItems((prev) => {
-        const updated = [...prev];
-        updated[selectedItemIndex] = { ...updated[selectedItemIndex], rotation: [0, r, 0] };
-        return updated;
-      });
-    }
-  };
-
   return (
     <>
       <Canvas style={{ width: "100vw", height: "100vh", position: "fixed" }}>
@@ -364,24 +352,7 @@ export default function App() {
               label="Scale" 
               min={0.1} 
               max={2} 
-              position={[-1.1, 0.2, 0]} 
-            />
-          </HeadLockedUI>
-
-          <HeadLockedUI 
-            distance={1.0} 
-            verticalOffset={0}
-            enabled={showSlider && selectedItemIndex !== null}
-          >
-            <VRSlider 
-              show={showSlider && selectedItemIndex !== null} 
-              value={rotationValue} 
-              onChange={handleRotationChange} 
-              label="Rotation" 
-              min={0} 
-              max={Math.PI * 2} 
-              position={[-1.1, -0.2, 0]} 
-              showDegrees 
+              position={[0, -0.5, 0]} 
             />
           </HeadLockedUI>
         </XR>
