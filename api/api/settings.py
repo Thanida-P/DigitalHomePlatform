@@ -61,8 +61,8 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:5173",
+    os.environ.get("DIGITAL_HOME_PLATFORM_URL", ""),
+    os.environ.get("SCENE_CREATOR_URL", ""),
 ]
 
 CORS_ALLOW_CREDENTIALS = True
