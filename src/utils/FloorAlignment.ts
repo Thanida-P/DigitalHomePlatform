@@ -1,11 +1,6 @@
-// src/utils/floorAlignment.ts
 import { useEffect } from 'react';
 import * as THREE from 'three';
 
-/**
- * Hook to automatically align a 3D model to the floor
- * This calculates the bounding box and adjusts the position so the bottom sits at y=0
- */
 export function useFloorAlignment(
   modelRef: React.RefObject<THREE.Group | THREE.Object3D | null>,
   enabled = true
@@ -13,7 +8,6 @@ export function useFloorAlignment(
   useEffect(() => {
     if (!enabled || !modelRef.current) return;
 
-    // Wait a frame for the model to load
     const timer = setTimeout(() => {
       if (!modelRef.current) return;
 
@@ -36,35 +30,22 @@ export function useFloorAlignment(
   }, [enabled, modelRef]);
 }
 
-/**
- * Utility function to get the bottom Y position of any Object3D
- */
 export function getBottomY(object: THREE.Object3D): number {
   const box = new THREE.Box3().setFromObject(object);
   return box.min.y;
 }
 
-/**
- * Utility function to align an object to y=0 floor
- * Returns the adjustment that was made
- */
 export function alignToFloor(object: THREE.Object3D): number {
   const minY = getBottomY(object);
   object.position.y -= minY;
   return minY;
 }
 
-/**
- * Get the height of an object (from bottom to top)
- */
 export function getObjectHeight(object: THREE.Object3D): number {
   const box = new THREE.Box3().setFromObject(object);
   return box.max.y - box.min.y;
 }
 
-/**
- * Get the bounding box dimensions of an object
- */
 export function getObjectDimensions(object: THREE.Object3D): {
   width: number;
   height: number;

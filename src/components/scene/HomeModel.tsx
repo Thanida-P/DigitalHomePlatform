@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import * as THREE from 'three';
 import { useGLTF } from '@react-three/drei';
 import { makeAuthenticatedRequest } from '../../utils/Auth';
@@ -68,33 +68,38 @@ export function HomeModel({ homeId }: { homeId: string }) {
   return <HomeModelContent ref={groupRef} url={modelUrl} homeId={homeId} />;
 }
 
-const HomeModelContent = ({ url, homeId }: { url: string; homeId: string }) => {
-  const groupRef = useRef<THREE.Group>(null);
-  const { scene } = useGLTF(url);
+const HomeModelContent = React.forwardRef<THREE.Group, { url: string; homeId: string }>(
+  ({ url, homeId }, ref) => {
+    const internalRef = useRef<THREE.Group>(null);
+    const { scene } = useGLTF(url);
 
-  useEffect(() => {
-    if (!groupRef.current) return;
+    // Combine external and internal refs
+    React.useImperativeHandle(ref, () => internalRef.current as THREE.Group);
 
-    // Clone the scene to avoid modifying cached version
-    const clonedScene = scene.clone();
-    
-    // Clear existing children
-    groupRef.current.clear();
-    
-    // Add cloned scene
-    groupRef.current.add(clonedScene);
-    
-    // Apply floor alignment using utility function
-    setTimeout(() => {
-      if (groupRef.current) {
-        const adjustment = alignToFloor(groupRef.current);
-        console.log('🏠 Home model aligned to floor:', {
-          homeId,
-          adjustment
-        });
-      }
-    }, 100);
-  }, [scene, homeId]);
+    useEffect(() => {
+      if (!internalRef.current) return;
 
-  return <group ref={groupRef} />;
-};
+      // Clone the scene to avoid modifying cached version
+      const clonedScene = scene.clone();
+      
+      // Clear existing children
+      internalRef.current.clear();
+      
+      // Add cloned scene
+      internalRef.current.add(clonedScene);
+      
+      // Apply floor alignment using utility function
+      setTimeout(() => {
+        if (internalRef.current) {
+          const adjustment = alignToFloor(internalRef.current);
+          console.log('🏠 Home model aligned to floor:', {
+            homeId,
+            adjustment
+          });
+        }
+      }, 100);
+    }, [scene, homeId]);
+
+    return <group ref={internalRef} />;
+  }
+);

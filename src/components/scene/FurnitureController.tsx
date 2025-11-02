@@ -4,7 +4,6 @@ import { ThreeEvent, useThree, useFrame } from "@react-three/fiber";
 import { useXR } from "@react-three/xr";
 import { useGLTF } from "@react-three/drei";
 import { PlacedItem } from "../types/Furniture";
-import { alignToFloor } from "../../utils/FloorAlignment";
 
 function DraggableFurniture({
   item,
@@ -24,9 +23,8 @@ function DraggableFurniture({
   const xr = useXR();
   const camera = useThree((state) => state.camera);
   const isPresenting = !!xr.session;
-  const [modelHeight, setModelHeight] = React.useState(0);
+  const [_modelHeight, setModelHeight] = React.useState(0);
 
-  // Load the model and calculate its height for floor alignment
   const { scene } = item.modelPath ? useGLTF(item.modelPath) : { scene: null };
 
   React.useEffect(() => {
@@ -43,13 +41,10 @@ function DraggableFurniture({
     const minY = box.min.y;
     const height = box.max.y - box.min.y;
     
-    // Store the height offset
     setModelHeight(-minY);
     
-    // Adjust the model position to align bottom to y=0 within its local space
     clonedScene.position.y = -minY;
     
-    // Add to group
     modelRef.current.add(clonedScene);
     
     console.log('🪑 Furniture aligned:', {
@@ -137,10 +132,8 @@ function DraggableFurniture({
       scale={item.scale || 1}
       onPointerDown={handleSelect}
     >
-      {/* Model container with floor alignment */}
       <group ref={modelRef} />
       
-      {/* Selection indicator at floor level */}
       {isSelected && (
         <>
           <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -194,7 +187,6 @@ export function SpawnManager({
     const spawnPos = cameraWorldPos.clone();
     spawnPos.addScaledVector(cameraDirection, spawnDistance);
     
-    // Always spawn at floor level (y=0)
     spawnPos.y = 0;
     
     spawnPositionRef.current = [spawnPos.x, 0, spawnPos.z];
