@@ -14,8 +14,10 @@
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "^8.18.0",
     "@react-three/xr": "^6.6.27",
+    "axios": "^1.13.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-router-dom": "^7.9.5",
     "three": "^0.172.0"
   },
   "devDependencies": {

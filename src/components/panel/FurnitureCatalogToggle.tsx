@@ -2,7 +2,7 @@ import * as React from "react";
 import { useFrame } from "@react-three/fiber";
 import { useXR } from "@react-three/xr";
 
-export function ControllerUIToggle({ onToggle }: { onToggle: () => void }) {
+export function CatalogToggle({ onToggle }: { onToggle: () => void }) {
   const xr = useXR();
   const prevButtonStateRef = React.useRef<Map<string, boolean>>(new Map());
 

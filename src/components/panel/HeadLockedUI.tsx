@@ -2,10 +2,7 @@ import * as React from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 
-/**
- * HeadLockedUI - Positions UI elements relative to the user's head/camera
- * The UI will follow the user's view and always face them
- */
+// A UI panel that stays locked in front of the user's view in VR
 export function HeadLockedUI({
   children,
   distance = 1.5,
