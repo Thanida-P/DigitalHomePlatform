@@ -4,6 +4,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from app_api.products.objectModels import Product
 from zodb.zodb_management import *
+import transaction
 
 @csrf_exempt
 @login_required
@@ -36,6 +37,12 @@ def add_to_wishlist(request):
         customer.save()
 
         return JsonResponse({'message': 'Item added to wishlist successfully'}, status=201)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
 
@@ -87,5 +94,11 @@ def get_wishlist(request):
             products.append(product_data)
 
         return JsonResponse({'wishlist': products}, status=200)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()

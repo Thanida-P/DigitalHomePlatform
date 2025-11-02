@@ -26,12 +26,18 @@ def get_product_id(root):
 def create_product(name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, is_container, texture_files=None):
     connection, root = get_connection()
     try:
+        if digital_available and digital_price is None:
+            raise ValueError("Digital price must be provided if digital version is available")
+        if physical_available and physical_price is None:
+            raise ValueError("Physical price must be provided if physical version is available")
         image_base64 = base64.b64encode(image.read()).decode('utf-8')
-        model_id = create_3d_model(root, model_files, texture_files)
         display_scenes = []
-        for scene_file in scene_files:
-            scene_id = create_display_scene(root, scene_file)
-            display_scenes.append(scene_id)
+        model_id = None
+        if digital_available:
+            model_id = create_3d_model(root, model_files, texture_files)
+            for scene_file in scene_files:
+                scene_id = create_display_scene(root, scene_file)
+                display_scenes.append(scene_id)
             
         item_id = get_item_id(root)
         current_datetime = datetime.now()
@@ -62,6 +68,11 @@ def create_product(name, description, digital_price, physical_price, category, i
         root.products[product_id] = product
         transaction.commit()
         return product_id
+    except Exception:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
     finally:
         connection.close()
 
@@ -94,22 +105,38 @@ def update_existing_product(product_id, name, description, digital_price, physic
             product.stock = stock
         if digital_available is not None:
             product.digital_available = digital_available
+            if model_files:
+                model_id = item.get_model_id()
+                if model_id is None:
+                    model_id = create_3d_model(root, model_files, texture_files)
+                    item.model_id = model_id
+                else:
+                    update_3d_model(root, model_id, model_files, texture_files)
+            if scene_files:
+                if len(product.get_display_scenes()) == 0:
+                    display_scene_ids = []
+                    for scene_file in scene_files:
+                        scene_id = create_display_scene(root, scene_file)
+                        display_scene_ids.append(scene_id)
+                    product.set_display_scenes(display_scene_ids)
+                else:
+                    display_scene_ids = product.get_display_scenes()
+                    new_display_scene_ids = update_display_scene(root, display_scene_ids, scene_files)
+                    product.set_display_scenes(new_display_scene_ids)
         if physical_available is not None:
             product.physical_available = physical_available
-        if model_files:
-            model_id = item.get_model_id()
-            update_3d_model(root, model_id, model_files, texture_files)
         if is_container is not None:
             item.is_container = is_container
 
-        if scene_files:
-            display_scene_ids = product.get_display_scenes()
-            new_display_scene_ids = update_display_scene(root, display_scene_ids, scene_files)
-            product.set_display_scenes(new_display_scene_ids)
 
         current_datetime = datetime.now()
         item.updated_at = current_datetime
         transaction.commit()
+    except Exception:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
     finally:
         connection.close()
 
@@ -129,6 +156,11 @@ def delete_existing_product(product_id):
         return True
     except Product.DoesNotExist:
         return False
+    except Exception:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
     finally:
         connection.close()
     
@@ -406,5 +438,10 @@ def fetch_texture(texture_id: int):
         if not textures:
             return None
         return textures[f"texture_{texture_id}"].get_file()
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
     finally:
         connection.close()

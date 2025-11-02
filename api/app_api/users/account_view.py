@@ -286,6 +286,7 @@ def update_user_profile(request):
     new_phone_no = put_data.get('phone_no')
     new_gender = put_data.get('gender')
     new_date_of_birth = put_data.get('date_of_birth')
+    username = put_data.get('username')
 
     # parse date if provided as string
     if isinstance(new_date_of_birth, str):
@@ -299,11 +300,17 @@ def update_user_profile(request):
                 user.first_name = new_firstname
             if new_lastname is not None:
                 user.last_name = new_lastname
+            if username is not None:
+                if username != user.username and User.objects.filter(username=username).exists():
+                    return JsonResponse({'error': 'Username already exists'}, status=409)
+                user.username = username
             user.save()
 
             if hasattr(user, 'customer'):
                 customer = user.customer
                 if new_email is not None:
+                    if new_email != customer.email and Customer.objects.filter(email=new_email).exists():
+                        return JsonResponse({'error': 'Email already in use'}, status=409)
                     customer.email = new_email
                 if new_phone_no is not None:
                     customer.phone_no = new_phone_no
@@ -315,6 +322,8 @@ def update_user_profile(request):
             elif hasattr(user, 'staff'):
                 staff = user.staff
                 if new_email is not None:
+                    if new_email != staff.email and Staff.objects.filter(email=new_email).exists():
+                        return JsonResponse({'error': 'Email already in use'}, status=409)
                     staff.email = new_email
                 staff.save()
     except Exception as e:

@@ -55,6 +55,12 @@ def add_review(request):
         transaction.commit()
 
         return JsonResponse({'message': 'Review added successfully'}, status=201)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
 
@@ -106,6 +112,12 @@ def edit_review(request):
         transaction.commit()
         
         return JsonResponse({'message': 'Review updated successfully'}, status=200)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
 
@@ -141,6 +153,12 @@ def delete_review(request, review_id):
         transaction.commit()
         
         return JsonResponse({'message': 'Review deleted successfully'}, status=200)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
 

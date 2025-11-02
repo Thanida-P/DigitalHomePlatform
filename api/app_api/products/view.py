@@ -161,7 +161,11 @@ def get_products(request):
     
         return JsonResponse({'products': product_list}, status=200)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
 
@@ -196,7 +200,11 @@ def get_product_detail(request, product_id):
     except Product.DoesNotExist:
         return JsonResponse({'error': 'Product not found'}, status=404)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
 
@@ -281,7 +289,11 @@ def get_all_categories(request):
                 continue
         return JsonResponse({'categories': list(categories)}, status=200)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
         
@@ -298,6 +310,10 @@ def get_all_product_types(request):
                 continue
         return JsonResponse({'product_types': list(product_types)}, status=200)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()

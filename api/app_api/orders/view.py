@@ -119,6 +119,12 @@ def list_orders(request):
             })
         transaction.commit()
         return JsonResponse({'orders': orders_data}, status=200)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
 
@@ -221,5 +227,11 @@ def complete_order(request, order_id):
         customer.save()
 
         return JsonResponse({'message': 'Order status updated to complete and products granted'}, status=200)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
