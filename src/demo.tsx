@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { Canvas, ThreeEvent, useThree, useFrame } from "@react-three/fiber";
 import { Environment, Gltf, PerspectiveCamera, Text } from "@react-three/drei";
 import { createXRStore, XR, useXR } from "@react-three/xr";
-import { CatalogToggle } from "./components/panel/FurnitureCatalogToggle";
+import { CatalogToggle } from "./components/panel/furniture/FurnitureCatalogToggle";
 import { VRInstructionPanel } from "./components/panel/VRInstructionPanel";
 import { VRSlider } from "./components/panel/VRSlider";
 import { HeadLockedUI } from "./components/panel/HeadLockedUI";

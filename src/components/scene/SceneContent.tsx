@@ -1,20 +1,27 @@
 import * as React from "react";
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Environment, PerspectiveCamera } from "@react-three/drei";
-import { CatalogToggle } from "../panel/FurnitureCatalogToggle";
+import { CatalogToggle } from "../panel/furniture/FurnitureCatalogToggle";
 import { VRInstructionPanel } from "../panel/VRInstructionPanel";
-import { VRFurniturePanel } from "../panel/FurniturePanel";
+import { VRFurniturePanel } from "../panel/furniture/FurniturePanel";
 import { VRSlider } from "../panel/VRSlider";
 import { HeadLockedUI } from "../panel/HeadLockedUI";
+import { VRControlPanel } from "../panel/control/ControlPanel";
+import { ControlPanelToggle } from "../panel/control/ControlPanelToggle";
 import { HomeModel } from "./HomeModel";
 import { PlacedFurniture, SpawnManager } from "./FurnitureController";
 import { Furniture, PlacedItem } from "../types/Furniture";
-import { makeAuthenticatedRequest } from "../../utils/Auth";
+import { makeAuthenticatedRequest, logout } from "../../utils/Auth";
 
 export function SceneContent({ homeId }: { homeId: string }) {
+  const navigate = useNavigate();
   const [showSlider, setShowSlider] = React.useState(false);
   const [showFurniture, setShowFurniture] = React.useState(false);
   const [showInstructions, setShowInstructions] = React.useState(true);
+  const [showControlPanel, setShowControlPanel] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [loading, setLoading] = React.useState(true);
   const [sliderValue, setSliderValue] = React.useState(0.5);
   const [rotationValue, setRotationValue] = React.useState(0);
   const [placedItems, setPlacedItems] = React.useState<PlacedItem[]>([]);
@@ -25,6 +32,7 @@ export function SceneContent({ homeId }: { homeId: string }) {
   const [catalogLoading, setCatalogLoading] = React.useState(false);
   const [modelUrlCache, setModelUrlCache] = React.useState<Map<number, string>>(new Map());
 
+  // Load furniture catalog
   useEffect(() => {
     const loadFurnitureCatalog = async () => {
       setCatalogLoading(true);
@@ -70,6 +78,82 @@ export function SceneContent({ homeId }: { homeId: string }) {
     };
   }, []);
 
+  // Load deployed items for this home
+  useEffect(() => {
+    const loadDeployedItems = async () => {
+      setLoading(true);
+      try {
+        console.log('🔄 Loading deployed items for home:', homeId);
+        const response = await makeAuthenticatedRequest(
+          `/digitalhomes/get_deployed_items_details/${homeId}/`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ Loaded deployed items:', data.deployed_items);
+          
+          // Transform API response to PlacedItem format
+          const items: PlacedItem[] = [];
+          
+          for (const itemObj of data.deployed_items) {
+            // Each item is an object with item_id as key
+            const itemId = Object.keys(itemObj)[0];
+            const itemData = itemObj[itemId];
+            
+            // Load the 3D model for this item
+            await loadFurnitureModel(itemData.model_id);
+            const modelPath = modelUrlCache.get(itemData.model_id);
+            
+            if (!modelPath) {
+              console.warn('Model not loaded for item:', itemId);
+              continue;
+            }
+            
+            // Extract spatial data
+            const position = itemData.spatialData.positions;
+            const rotation = itemData.spatialData.rotation;
+            const scale = itemData.spatialData.scale;
+            
+            const placedItem: PlacedItem = {
+              id: itemId,
+              name: itemData.name,
+              description: itemData.description,
+              model_id: itemData.model_id,
+              modelPath: modelPath,
+              image: undefined, // Not needed for placed items
+              category: itemData.category,
+              type: itemData.type,
+              is_container: itemData.is_container,
+              // Position: API returns [x, y, z, m] but we only need [x, y, z]
+              position: [position[0], position[1], position[2]],
+              // Rotation: API returns [rx, ry, rz]
+              rotation: [rotation[0], rotation[1], rotation[2]],
+              // Scale: API returns [sx, sy, sz], we use uniform scale
+              scale: scale[0],
+            };
+            
+            items.push(placedItem);
+          }
+          
+          console.log('🪑 Placed items loaded:', items.length);
+          setPlacedItems(items);
+        } else {
+          const errorData = await response.json();
+          console.error('Failed to load deployed items:', errorData.error);
+        }
+      } catch (error) {
+        console.error('Error loading deployed items:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Only load deployed items after we have the model cache ready
+    if (modelUrlCache.size > 0) {
+      loadDeployedItems();
+    }
+  }, [homeId, modelUrlCache.size]);
+
   const loadFurnitureModel = async (modelId: number) => {
     if (modelUrlCache.has(modelId)) return;
 
@@ -100,6 +184,79 @@ export function SceneContent({ homeId }: { homeId: string }) {
       setShowFurniture(true);
       setShowSlider(true);
     }
+  };
+
+  const handleToggleControlPanel = () => {
+    setShowControlPanel(!showControlPanel);
+  };
+
+  const handleSaveScene = async () => {
+    if (saving) return;
+    
+    setSaving(true);
+    try {
+      console.log('💾 Saving scene with', placedItems.length, 'items...');
+
+      // Transform placedItems into the format expected by the API
+      const deployedItems: Record<string, any> = {};
+      
+      placedItems.forEach((item) => {
+        const scale = typeof item.scale === 'number' ? item.scale : 1;
+        
+        deployedItems[item.id] = {
+          position: [
+            item.position[0],
+            item.position[1],
+            item.position[2],
+            0 // m coordinate (not used, set to 0)
+          ],
+          rotation: item.rotation || [0, 0, 0],
+          scale: [scale, scale, scale],
+          is_container: item.is_container,
+          contain: item.is_container ? [] : undefined,
+          composite: !item.is_container ? [] : undefined,
+          texture_id: null
+        };
+      });
+
+      const formData = new FormData();
+      formData.append('id', homeId);
+      formData.append('deployedItems', JSON.stringify(deployedItems));
+
+      const response = await makeAuthenticatedRequest(
+        '/digitalhomes/update_home_design/',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Scene saved successfully:', result.message);
+        alert('Scene saved successfully!');
+      } else {
+        const error = await response.json();
+        console.error('❌ Failed to save scene:', error);
+        alert(`Failed to save scene: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('❌ Error saving scene:', error);
+      alert('Error saving scene. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleBackToHome = () => {
+    console.log('🔙 Navigating back to home...');
+    navigate('/');
+  };
+
+  const handleLogout = async () => {
+    console.log('👋 Logging out...');
+    await logout();
+    window.location.href = 'http://localhost:3000';
   };
 
   const handleSelectFurniture = (f: Furniture) => {
@@ -192,6 +349,24 @@ export function SceneContent({ homeId }: { homeId: string }) {
     }
   };
 
+  // Show loading state while deployed items are loading
+  if (loading && placedItems.length === 0) {
+    return (
+      <>
+        <color args={["#808080"]} attach="background" />
+        <PerspectiveCamera makeDefault position={[0, 1.6, 2]} fov={75} />
+        <ambientLight intensity={0.5} />
+        
+        <group position={[0, 1.6, -2]}>
+          <mesh>
+            <boxGeometry args={[0.3, 0.3, 0.3]} />
+            <meshStandardMaterial color="#4CAF50" wireframe />
+          </mesh>
+        </group>
+      </>
+    );
+  }
+
   return (
     <>
       <SpawnManager spawnPositionRef={currentSpawnPositionRef} />
@@ -212,8 +387,13 @@ export function SceneContent({ homeId }: { homeId: string }) {
         />
       </group>
 
+      {/* Toggle for furniture panel (Y/B button) */}
       <CatalogToggle onToggle={handleToggleUI} />
       
+      {/* Toggle for control panel (X/A button) */}
+      <ControlPanelToggle onToggle={handleToggleControlPanel} />
+      
+      {/* Instructions Panel */}
       <HeadLockedUI 
         distance={1.5} 
         verticalOffset={0} 
@@ -222,6 +402,7 @@ export function SceneContent({ homeId }: { homeId: string }) {
         <VRInstructionPanel show={showInstructions} />
       </HeadLockedUI>
 
+      {/* Furniture Catalog Panel */}
       <HeadLockedUI 
         distance={1.5} 
         verticalOffset={0} 
@@ -235,6 +416,22 @@ export function SceneContent({ homeId }: { homeId: string }) {
         />
       </HeadLockedUI>
 
+      {/* Control Panel (Save, Back, Logout) */}
+      <HeadLockedUI 
+        distance={1.5} 
+        verticalOffset={0} 
+        enabled={showControlPanel}
+      >
+        <VRControlPanel
+          show={showControlPanel}
+          onSave={handleSaveScene}
+          onBack={handleBackToHome}
+          onLogout={handleLogout}
+          saving={saving}
+        />
+      </HeadLockedUI>
+
+      {/* Scale and Rotation Sliders */}
       <HeadLockedUI 
         distance={1.0} 
         enabled={showSlider && selectedItemIndex !== null}
@@ -250,13 +447,13 @@ export function SceneContent({ homeId }: { homeId: string }) {
             position={[0, -0.4, 0]} 
           />
           <VRSlider
-            show={ null} 
+            show={showSlider && selectedItemIndex !== null} 
             value={rotationValue} 
             onChange={handleRotationSliderChange} 
             label="Rotation" 
             min={0} 
             max={Math.PI * 2} 
-            position={[0, -0.4, 0]} 
+            position={[0, -0.75, 0]} 
             showDegrees={true}
           />
         </group>
