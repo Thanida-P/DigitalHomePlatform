@@ -13,14 +13,460 @@ class Address(rx.Base):
     is_default: bool
 
 
+class Address(rx.Base):
+    id: int
+    address: str
+    is_default: bool = False
+
+class AddressState(rx.State):
+    show_form: bool = False
+    addresses: list[Address] = []
+    new_address: str = ""
+    editing_address_id: int = 0
+    is_loading: bool = False
+    error_message: str = ""
+    success_message: str = ""
+
+
+    def start_edit_address(self, address_id: int, current_address: str):
+        self.editing_address_id = address_id
+        self.show_form = True  # reuse the form modal for editing
+        self.new_address = current_address  # pre-fill with existing address
+        print(f"Starting edit for address ID {address_id}: {current_address}")
+
+
+    def toggle_form(self):
+        """Toggle visibility of the address form."""
+        self.show_form = True
+        self.editing_address_id = 0  # Reset editing state
+        self.new_address = ""  # Clear input field
+        print("Opening address form.")
+
+    def close_form(self):
+        """Close the address form and clear input."""
+        self.show_form = False
+        self.new_address = ""
+        self.editing_address_id = 0  # Reset editing state
+
+    def set_new_address(self, value: str):
+        """Update the new_address field."""
+        self.new_address = value
+
+    async def save_address(self):
+        """Save address (add new or update existing)."""
+        if self.editing_address_id == 0:
+            # Adding new address
+            await self.add_address()
+        else:
+            # Editing existing address
+            await self.edit_address(self.editing_address_id, self.new_address)
+
+    async def add_address(self):
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+
+        if not self.new_address.strip():
+            print("No address entered. Skipping.")
+            return
+
+        data = {"address": self.new_address.strip(), "is_default": False}
+        print("Sending new address to backend:", data)
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{API_BASE_URL}/users/address/add/",
+                    data=data,
+                    cookies=cookies_dict,
+                )
+            print("POST response status:", response.status_code)
+
+            if response.status_code == 201:
+                # Reload addresses
+                await self.load_addresses()
+                self.new_address = ""
+                self.show_form = False
+                self.editing_address_id = 0
+                print("Address added successfully.")
+            else:
+                print("Error adding address:", response.text)
+        except Exception as e:
+            print("Request failed:", e)
+
+
+
+    async def load_addresses(self):
+        """Fetch existing addresses from backend when the page loads."""
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+
+        try:
+            async with httpx.AsyncClient() as client:
+                res = await client.get(
+                    f"{API_BASE_URL}/users/address/",
+                    cookies=cookies_dict,
+                )
+            if res.status_code == 200:
+                addresses_data = res.json()
+                addresses_list = addresses_data.get("addresses", [])
+                self.addresses = [
+                    Address(
+                        id=addr.get("id", 0),
+                        address=addr.get("address", ""),
+                        is_default=addr.get("is_default", False)
+                    )
+                    for addr in addresses_list
+                ]
+                print("Addresses loaded:", self.addresses)
+            else:
+                print("Failed to fetch addresses:", res.text)
+        except Exception as e:
+            print("Request failed:", e)
+
+
+
+    async def delete_address(self, address_id: int):
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies or {}
+
+        # Make DELETE request
+        async with httpx.AsyncClient() as client:
+            response = await client.request(
+                "DELETE",
+                f"{API_BASE_URL}/users/address/delete/",
+                data=json.dumps({"address_id": address_id}),
+                headers={"Content-Type": "application/json"},
+                cookies=cookies_dict,
+            )
+
+        if response.status_code == 200:
+            # Update reactive list safely
+            new_addresses = [addr for addr in self.addresses if addr.id != address_id]
+            self.addresses = new_addresses
+        else:
+            print("Failed to delete address:", response.text)
+
+
+    async def edit_address(self, address_id: int, new_address: str):
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies or {}
+
+        if not new_address.strip():
+            print("No address entered. Skipping.")
+            return
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.request(
+                    "PUT",
+                    f"{API_BASE_URL}/users/address/edit/",
+                    data=json.dumps({"address_id": address_id, "address": new_address.strip()}),
+                    headers={"Content-Type": "application/json"},
+                    cookies=cookies_dict,
+                )
+
+            if response.status_code == 200:
+                # Reload addresses from backend
+                await self.load_addresses()
+                self.new_address = ""
+                self.show_form = False
+                self.editing_address_id = 0
+                print("Address updated successfully.")
+            else:
+                print("Failed to edit address:", response.text)
+        except Exception as e:
+            print("Request failed:", e)
+
+
+
+    async def set_default_address(self, address_id: int):
+        """Set an address as the default address"""
+        self.is_loading = True
+        self.error_message = ""
+        self.success_message = ""
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies or {}
+        
+        try:
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.put(
+                    f"{API_BASE_URL}/users/address/set_default/",
+                    json={"address_id": address_id},
+                    headers={"Content-Type": "application/json"},
+                    cookies=cookies_dict,
+                    timeout=10.0
+                )
+                
+                if response.status_code == 200:
+                    self.success_message = "Default address updated successfully"
+                    
+                    updated_addresses = []
+                    for addr in self.addresses:
+                        addr_copy = addr.copy()
+                        if addr_copy["id"] == address_id:
+                            addr_copy["is_default"] = True
+                        else:
+                            addr_copy["is_default"] = False
+                        updated_addresses.append(addr_copy)
+                    
+                    self.addresses = updated_addresses
+                    
+                elif response.status_code == 401:
+                    self.error_message = "Authentication required"
+                elif response.status_code == 403:
+                    self.error_message = "Only customers can manage addresses"
+                elif response.status_code == 404:
+                    self.error_message = "Address not found"
+                else:
+                    data = response.json()
+                    self.error_message = data.get("error", "Failed to set default address")
+                    
+        except httpx.TimeoutException:
+            self.error_message = "Request timed out. Please try again."
+        except httpx.RequestError as e:
+            self.error_message = f"Connection error: {str(e)}"
+        except Exception as e:
+            self.error_message = f"An error occurred: {str(e)}"
+        finally:
+            self.is_loading = False
+
+
+
+class CreditCard(rx.Base):
+    id: int = 0
+    card_brand: str = ""
+    last4: str = ""
+    exp_month: int = 0
+    exp_year: int = 0
+    is_default: bool = False
+    provider: str = ""
+    provider_token: str = ""
+
+
+class BankAccount(rx.Base):
+    id: int = 0
+    bank_name: str = ""
+    account_holder: str = ""
+    last4: str = ""
+    is_default: bool = False
+    provider: str = ""
+    provider_token: str = ""
+
+
+    def start_edit_address(self, address_id: int, current_address: str):
+        self.editing_address_id = address_id
+        self.show_form = True  # reuse the form modal for editing
+        self.new_address = current_address  # pre-fill with existing address
+        print(f"Starting edit for address ID {address_id}: {current_address}")
+
+
+    def toggle_form(self):
+        """Toggle visibility of the address form."""
+        self.show_form = True
+        self.editing_address_id = 0  # Reset editing state
+        self.new_address = ""  # Clear input field
+        print("Opening address form.")
+
+    def close_form(self):
+        """Close the address form and clear input."""
+        self.show_form = False
+        self.new_address = ""
+        self.editing_address_id = 0  # Reset editing state
+
+    def set_new_address(self, value: str):
+        """Update the new_address field."""
+        self.new_address = value
+
+    async def save_address(self):
+        """Save address (add new or update existing)."""
+        if self.editing_address_id == 0:
+            # Adding new address
+            await self.add_address()
+        else:
+            # Editing existing address
+            await self.edit_address(self.editing_address_id, self.new_address)
+
+    async def add_address(self):
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+
+        if not self.new_address.strip():
+            print("No address entered. Skipping.")
+            return
+
+        data = {"address": self.new_address.strip(), "is_default": False}
+        print("Sending new address to backend:", data)
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{API_BASE_URL}/users/address/add/",
+                    data=data,
+                    cookies=cookies_dict,
+                )
+            print("POST response status:", response.status_code)
+
+            if response.status_code == 201:
+                # Reload addresses
+                await self.load_addresses()
+                self.new_address = ""
+                self.show_form = False
+                self.editing_address_id = 0
+                print("Address added successfully.")
+            else:
+                print("Error adding address:", response.text)
+        except Exception as e:
+            print("Request failed:", e)
+
+
+
+    async def load_addresses(self):
+        """Fetch existing addresses from backend when the page loads."""
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+
+        try:
+            async with httpx.AsyncClient() as client:
+                res = await client.get(
+                    f"{API_BASE_URL}/users/address/",
+                    cookies=cookies_dict,
+                )
+            if res.status_code == 200:
+                addresses_data = res.json()
+                addresses_list = addresses_data.get("addresses", [])
+                self.addresses = [
+                    Address(
+                        id=addr.get("id", 0),
+                        address=addr.get("address", ""),
+                        is_default=addr.get("is_default", False)
+                    )
+                    for addr in addresses_list
+                ]
+                print("Addresses loaded:", self.addresses)
+            else:
+                print("Failed to fetch addresses:", res.text)
+        except Exception as e:
+            print("Request failed:", e)
+
+
+
+    async def delete_address(self, address_id: int):
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies or {}
+
+        # Make DELETE request
+        async with httpx.AsyncClient() as client:
+            response = await client.request(
+                "DELETE",
+                f"{API_BASE_URL}/users/address/delete/",
+                data=json.dumps({"address_id": address_id}),
+                headers={"Content-Type": "application/json"},
+                cookies=cookies_dict,
+            )
+
+        if response.status_code == 200:
+            # Update reactive list safely
+            new_addresses = [addr for addr in self.addresses if addr.id != address_id]
+            self.addresses = new_addresses
+        else:
+            print("Failed to delete address:", response.text)
+
+
+    async def edit_address(self, address_id: int, new_address: str):
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies or {}
+
+        if not new_address.strip():
+            print("No address entered. Skipping.")
+            return
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.request(
+                    "PUT",
+                    f"{API_BASE_URL}/users/address/edit/",
+                    data=json.dumps({"address_id": address_id, "address": new_address.strip()}),
+                    headers={"Content-Type": "application/json"},
+                    cookies=cookies_dict,
+                )
+
+            if response.status_code == 200:
+                # Reload addresses from backend
+                await self.load_addresses()
+                self.new_address = ""
+                self.show_form = False
+                self.editing_address_id = 0
+                print("Address updated successfully.")
+            else:
+                print("Failed to edit address:", response.text)
+        except Exception as e:
+            print("Request failed:", e)
+
+
+
+    async def set_default_address(self, address_id: int):
+        """Set an address as the default address"""
+        self.is_loading = True
+        self.error_message = ""
+        self.success_message = ""
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies or {}
+        
+        try:
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.put(
+                    f"{API_BASE_URL}/users/address/set_default/",
+                    json={"address_id": address_id},
+                    headers={"Content-Type": "application/json"},
+                    cookies=cookies_dict,
+                    timeout=10.0
+                )
+                
+                if response.status_code == 200:
+                    self.success_message = "Default address updated successfully"
+                    
+                    updated_addresses = []
+                    for addr in self.addresses:
+                        addr_copy = addr.copy()
+                        if addr_copy["id"] == address_id:
+                            addr_copy["is_default"] = True
+                        else:
+                            addr_copy["is_default"] = False
+                        updated_addresses.append(addr_copy)
+                    
+                    self.addresses = updated_addresses
+                    
+                elif response.status_code == 401:
+                    self.error_message = "Authentication required"
+                elif response.status_code == 403:
+                    self.error_message = "Only customers can manage addresses"
+                elif response.status_code == 404:
+                    self.error_message = "Address not found"
+                else:
+                    data = response.json()
+                    self.error_message = data.get("error", "Failed to set default address")
+                    
+        except httpx.TimeoutException:
+            self.error_message = "Request timed out. Please try again."
+        except httpx.RequestError as e:
+            self.error_message = f"Connection error: {str(e)}"
+        except Exception as e:
+            self.error_message = f"An error occurred: {str(e)}"
+        finally:
+            self.is_loading = False
+
+
+
 class ProfileState(rx.State):
-    # Menu / section
+ 
     active_section: str = "profile"
     show_password_form: bool = False
     has_addresses: bool = False
     selected_menu: str = "personal_info"
 
-    profile_picture: str = ""  # Base64 encoded image or URL
+    profile_picture: str = ""  
     is_uploading: bool = False
     upload_error: str = ""
 
@@ -465,6 +911,600 @@ class ProfileState(rx.State):
             self.is_uploading = False
 
 
+class PaymentState(rx.State):
+    show_card_form: bool = False
+    show_bank_form: bool = False
+
+    # User input fields for credit card (what user enters)
+    card_number: str = ""
+    card_holder_name: str = ""
+    cvv: str = ""
+    exp_month: str = ""
+    exp_year: str = ""
+    is_default: bool = False
+
+    # For backend (processed data)
+    provider: str = "stripe"
+    provider_token: str = ""
+    card_brand: str = ""
+    last4: str = ""
+
+    # Form fields for bank account
+    bank_provider: str = "scb"
+    bank_name: str = ""
+    account_holder: str = ""
+    bank_last4: str = ""
+    bank_provider_token: str = ""
+    bank_is_default: bool = False
+    
+    # UI state
+    error_message: str = ""
+    success_message: str = ""
+    credit_cards: list = []
+
+    # Setters for card form
+    def set_card_number(self, value: str):
+        self.card_number = value
+    
+    def set_card_holder_name(self, value: str):
+        self.card_holder_name = value
+    
+    def set_cvv(self, value: str):
+        self.cvv = value
+    
+    def set_exp_month(self, value: str):
+        self.exp_month = value
+    
+    def set_exp_year(self, value: str):
+        self.exp_year = value
+
+    def set_is_default(self, checked: bool):
+        self.is_default = checked
+
+
+    def toggle_card_form(self):
+        self.show_card_form = True
+        self.error_message = ""
+        self.success_message = ""
+
+    def set_bank_provider(self, value: str):
+        self.bank_provider = value
+
+    def close_card_form(self):
+        self.show_card_form = False
+        self.clear_card_form()
+
+    def toggle_bank_form(self):
+        self.show_bank_form = True
+        self.show_card_form = False
+
+    def close_bank_form(self):
+        self.show_bank_form = False
+    
+    def clear_card_form(self):
+        """Clear all card form fields"""
+        self.card_number = ""
+        self.card_holder_name = ""
+        self.cvv = ""
+        self.exp_month = ""
+        self.exp_year = ""
+        self.is_default = False
+        self.error_message = ""
+        self.success_message = ""
+
+    def generate_mock_token(self) -> str:
+        """Generate a mock provider token like 'pm_xxx'."""
+        random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=24))
+        return f"pm_{random_str}"
+    
+    def detect_card_brand(self, card_number: str) -> str:
+        """Detect card brand from card number (simplified logic)."""
+        clean_number = card_number.replace(" ", "")
+        
+        if not clean_number:
+            return "Unknown"
+        
+        first_digit = clean_number[0] if len(clean_number) >= 1 else ""
+        first_two = clean_number[:2] if len(clean_number) >= 2 else ""
+        
+        if first_digit == "4":
+            return "Visa"
+        elif first_two in ["51", "52", "53", "54", "55"]:
+            return "Mastercard"
+        elif first_two in ["34", "37"]:
+            return "American Express"
+        elif first_two in ["60", "65"]:
+            return "Discover"
+        elif first_two in ["35"]:
+            return "JCB"
+        else:
+            return "Visa"
+    
+    def get_last4(self, card_number: str) -> str:
+        """Extract last 4 digits from card number."""
+        clean_number = card_number.replace(" ", "")
+        return clean_number[-4:] if len(clean_number) >= 4 else "0000"
+    
+    def validate_card_input(self) -> bool:
+        """Validate user input before submission."""
+        clean_number = self.card_number.replace(" ", "")
+        
+        if not clean_number.isdigit() or len(clean_number) < 13 or len(clean_number) > 19:
+            self.error_message = "Please enter a valid card number (13-19 digits)"
+            return False
+        
+        if not self.exp_month or not self.exp_month.isdigit():
+            self.error_message = "Please enter a valid expiration month"
+            return False
+        
+        month = int(self.exp_month)
+        if month < 1 or month > 12:
+            self.error_message = "Expiration month must be between 1 and 12"
+            return False
+        
+        if not self.exp_year or not self.exp_year.isdigit():
+            self.error_message = "Please enter a valid expiration year"
+            return False
+        
+        year = int(self.exp_year)
+        if year < 2024 or year > 2050:
+            self.error_message = "Please enter a valid expiration year"
+            return False
+        
+        if not self.cvv or not self.cvv.isdigit() or len(self.cvv) < 3 or len(self.cvv) > 4:
+            self.error_message = "Please enter a valid CVV (3-4 digits)"
+            return False
+        
+        if not self.card_holder_name or len(self.card_holder_name.strip()) < 3:
+            self.error_message = "Please enter the cardholder name"
+            return False
+        
+        self.error_message = ""
+        return True
+ 
+    def set_bank_name(self, value: str):
+        self.bank_name = value
+
+    def set_account_holder(self, value: str):
+        self.account_holder = value
+
+    def set_bank_last4(self, value: str):
+        self.bank_last4 = value
+
+    def set_bank_provider_token(self, value: str):
+        self.bank_provider_token = value
+
+    def set_bank_is_default(self, checked: bool):
+        self.bank_is_default = checked
+    
+    def clear_bank_form(self):
+        """Clear all bank form fields"""
+        self.bank_provider = "scb"
+        self.bank_name = ""
+        self.account_holder = ""
+        self.bank_last4 = ""
+        self.bank_provider_token = ""
+        self.bank_is_default = False
+        self.error_message = ""
+        self.success_message = ""
+    
+    def validate_bank_input(self) -> bool:
+        """Validate bank account input before submission."""
+        if not self.bank_name or len(self.bank_name.strip()) < 2:
+            self.error_message = "Please enter a valid bank name"
+            return False
+        
+        if not self.account_holder or len(self.account_holder.strip()) < 3:
+            self.error_message = "Please enter the account holder name"
+            return False
+        
+        if not self.bank_last4 or not self.bank_last4.isdigit() or len(self.bank_last4) != 4:
+            self.error_message = "Please enter the last 4 digits of account number"
+            return False
+        
+        self.error_message = ""
+        return True
+    
+    def generate_bank_token(self) -> str:
+        """Generate a mock bank account token like 'ba_xxx'."""
+        random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=24))
+        return f"ba_{random_str}"
+
+    async def submit_bank(self):
+        """Add a new bank account with mock data."""
+        # Validate input
+        if not self.validate_bank_input():
+            return
+        
+        # Generate mock provider token if not provided
+        if not self.bank_provider_token:
+            self.bank_provider_token = self.generate_bank_token()
+        
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+        
+        print(f"=== SUBMIT BANK ACCOUNT DEBUG ===")
+        print(f"Cookies: {cookies_dict}")
+        print(f"API URL: {API_BASE_URL}/users/payment_methods/add_bank_account/")
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                # Prepare the form data
+                form_data = {
+                    "provider": self.bank_provider,
+                    "provider_token": self.bank_provider_token,
+                    "bank_name": self.bank_name.strip(),
+                    "account_holder": self.account_holder.strip(),
+                    "last4": self.bank_last4,
+                    "is_default": str(self.bank_is_default).lower()
+                }
+                
+                print("Sending bank account data:", form_data)
+                
+                res = await client.post(
+                    f"{API_BASE_URL}/users/payment_methods/add_bank_account/",
+                    data=form_data,
+                    cookies=cookies_dict,
+                    timeout=10.0
+                )
+                
+                print(f"Response status code: {res.status_code}")
+                print(f"Response text: '{res.text}'")
+                print(f"Response length: {len(res.text)}")
+                
+                if res.status_code == 201:
+                    try:
+                        response_data = res.json()
+                        print("Bank account added successfully:", response_data)
+                    except Exception as json_err:
+                        print(f"JSON parse error on success: {json_err}")
+                        print("Bank account might have been added despite JSON error")
+                    
+                    self.success_message = "Bank account added successfully!"
+                    self.error_message = ""
+                    self.clear_bank_form()
+                    self.show_bank_form = False
+
+                    await self.load_bank_accounts() 
+                    return rx.toast.success("🏦 Bank account added successfully!")
+                    
+                elif res.status_code == 302 or res.status_code == 301:
+                    print("REDIRECT DETECTED - Authentication issue")
+                    self.error_message = "Authentication error. Please log in again."
+                    
+                elif res.status_code == 403:
+                    print("FORBIDDEN - CSRF or permission issue")
+                    self.error_message = "Permission denied. Please check authentication."
+                    
+                elif res.status_code == 404:
+                    print("NOT FOUND - Check your endpoint URL")
+                    self.error_message = "API endpoint not found. Check URL configuration."
+                    
+                elif res.status_code == 400:
+                    try:
+                        error_data = res.json()
+                        self.error_message = error_data.get("error", "Invalid data provided")
+                    except:
+                        self.error_message = "Invalid data provided"
+                    print(f"Bad request: {self.error_message}")
+                    
+                else:
+                    try:
+                        error_data = res.json()
+                        self.error_message = error_data.get("error", f"Error: {res.status_code}")
+                    except Exception as json_err:
+                        print(f"JSON parse error: {json_err}")
+                        self.error_message = f"Server error: {res.status_code} - {res.text[:200]}"
+                    
+                    self.success_message = ""
+                    
+        except httpx.TimeoutException:
+            self.error_message = "Request timed out. Please try again."
+            print("Request timeout")
+        except httpx.RequestError as e:
+            self.error_message = "Network error. Please check your connection."
+            print(f"Request error: {e}")
+        except Exception as e:
+            print(f"Unexpected error: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            self.error_message = "Failed to add bank account. Please try again."
+            self.success_message = ""
+    
+    async def submit_card(self):
+        """Add a new credit card with mock data."""
+        # Validate input
+        if not self.validate_card_input():
+            return
+        
+        # Detect card brand and get last 4 digits
+        self.card_brand = self.detect_card_brand(self.card_number)
+        self.last4 = self.get_last4(self.card_number)
+        
+        # Generate mock provider token
+        self.provider_token = self.generate_mock_token()
+        
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+        
+        print(f"=== SUBMIT CARD DEBUG ===")
+        print(f"Cookies: {cookies_dict}")
+        print(f"API URL: {API_BASE_URL}/users/credit-card/")
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                # Prepare the form data with mock provider info
+                form_data = {
+                    "provider": self.provider,
+                    "provider_token": self.provider_token,
+                    "card_brand": self.card_brand,
+                    "last4": self.last4,
+                    "exp_month": self.exp_month,
+                    "exp_year": self.exp_year,
+                    "is_default": str(self.is_default).lower()
+                }
+                
+                print("Sending mock payment data:", form_data)
+                
+                res = await client.post(
+                    f"{API_BASE_URL}/users/payment_methods/add_credit_card/",
+                    data=form_data,
+                    cookies=cookies_dict,
+                    timeout=10.0
+                )
+                
+                print(f"Response status code: {res.status_code}")
+                print(f"Response headers: {res.headers}")
+                print(f"Response text: '{res.text}'")
+                print(f"Response length: {len(res.text)}")
+                
+                if res.status_code == 201:
+                    try:
+                        response_data = res.json()
+                        print("Credit card added successfully:", response_data)
+                    except Exception as json_err:
+                        print(f"JSON parse error on success: {json_err}")
+                        print("Card might have been added despite JSON error")
+                    
+                    self.success_message = "Card added successfully!"
+                    self.error_message = ""
+                    self.clear_card_form()
+                    self.show_card_form = False
+
+                    await self.load_credit_cards()
+                    
+                    return rx.toast.success("✅ Credit card added successfully!")
+                    
+                elif res.status_code == 302 or res.status_code == 301:
+                    print("REDIRECT DETECTED - Authentication issue")
+                    self.error_message = "Authentication error. Please log in again."
+                    
+                elif res.status_code == 403:
+                    print("FORBIDDEN - CSRF or permission issue")
+                    self.error_message = "Permission denied. Please check authentication."
+                    
+                elif res.status_code == 404:
+                    print("NOT FOUND - Check your endpoint URL")
+                    self.error_message = "API endpoint not found. Check URL configuration."
+                    
+                else:
+                    try:
+                        error_data = res.json()
+                        self.error_message = error_data.get("error", f"Error: {res.status_code}")
+                    except Exception as json_err:
+                        print(f"JSON parse error: {json_err}")
+                        self.error_message = f"Server error: {res.status_code} - {res.text[:200]}"
+                    
+                    self.success_message = ""
+                    
+        except httpx.TimeoutException:
+            self.error_message = "Request timed out. Please try again."
+            print("Request timeout")
+        except httpx.RequestError as e:
+            self.error_message = "Network error. Please check your connection."
+            print(f"Request error: {e}")
+        except Exception as e:
+            print(f"Unexpected error: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            self.error_message = "Failed to add card. Please try again."
+            self.success_message = ""
+
+    credit_cards: list[CreditCard] = []
+    bank_accounts: list[BankAccount] = []
+    is_loading_payments: bool = False
+    
+    async def load_payment_methods(self):
+        """Load all payment methods (credit cards and bank accounts)."""
+        self.is_loading_payments = True
+        await self.load_credit_cards()
+        await self.load_bank_accounts()
+        self.is_loading_payments = False 
+    
+    async def load_credit_cards(self):
+        """Fetch all credit cards from backend."""
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                res = await client.get(
+                    f"{API_BASE_URL}/users/payment_methods/",  # ✅ Correct endpoint
+                    cookies=cookies_dict,
+                    timeout=10.0
+                )
+            
+            if res.status_code == 200:
+                data = res.json()
+                cards_data = data.get("payment_methods", [])  # ✅ Changed from "credit_cards" to "payment_methods"
+                # Convert to typed objects
+                self.credit_cards = [
+                    CreditCard(
+                        id=card.get("id", 0),
+                        card_brand=card.get("card_brand", ""),
+                        last4=card.get("last4", ""),
+                        exp_month=card.get("exp_month", 0),
+                        exp_year=card.get("exp_year", 0),
+                        is_default=card.get("is_default", False),
+                        provider=card.get("provider", ""),
+                        provider_token=card.get("provider_token", "")
+                    )
+                    for card in cards_data
+                ]
+                print(f"Loaded {len(self.credit_cards)} credit cards")
+            else:
+                print(f"Failed to load credit cards: {res.status_code}")
+                self.credit_cards = []
+                
+        except Exception as e:
+            print(f"Error loading credit cards: {e}")
+            self.credit_cards = []
+
+    async def load_bank_accounts(self):
+        """Fetch all bank accounts from backend."""
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                res = await client.get(
+                    f"{API_BASE_URL}/users/payment_methods/list_bank_accounts/",
+                    cookies=cookies_dict,
+                    timeout=10.0
+                )
+            
+            if res.status_code == 200:
+                data = res.json()
+                accounts_data = data.get("bank_accounts", [])
+                # Convert to typed objects
+                self.bank_accounts = [
+                    BankAccount(
+                        id=account.get("id", 0),
+                        bank_name=account.get("bank_name", ""),
+                        account_holder=account.get("account_holder", ""),
+                        last4=account.get("last4", ""),
+                        is_default=account.get("is_default", False),
+                        provider=account.get("provider", ""),
+                        provider_token=account.get("provider_token", "")
+                    )
+                    for account in accounts_data
+                ]
+                print(f"Loaded {len(self.bank_accounts)} bank accounts")
+            else:
+                print(f"Failed to load bank accounts: {res.status_code}")
+                self.bank_accounts = []
+                
+        except Exception as e:
+            print(f"Error loading bank accounts: {e}")
+            self.bank_accounts = []
+    
+    async def delete_credit_card(self, card_id: int):
+        """Delete a credit card."""
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                res = await client.delete(
+                    f"{API_BASE_URL}/users/payment_methods/remove_credit_card/{card_id}/",  # ✅ Add trailing slash
+                    cookies=cookies_dict,
+                    timeout=10.0
+                    # ✅ REMOVE json={"card_id": card_id} - not needed since ID is in URL
+                )
+            
+            if res.status_code == 200:
+                print(f"Credit card {card_id} deleted successfully")
+                await self.load_credit_cards()
+                return rx.toast.success("Credit card deleted successfully!")
+            else:
+                print(f"Failed to delete credit card: {res.status_code}")
+                print(f"Response: {res.text}")  # ✅ Add this for debugging
+                return rx.toast.error("Failed to delete credit card")
+                
+        except Exception as e:
+            print(f"Error deleting credit card: {e}")
+            import traceback
+            traceback.print_exc()  # ✅ Add full traceback
+            return rx.toast.error("Error deleting credit card")
+
+    async def delete_bank_account(self, account_id: int):
+        """Delete a bank account."""
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                res = await client.delete(
+                    f"{API_BASE_URL}/users/payment_methods/remove_bank_account/{account_id}/",  # ✅ Add trailing slash
+                    cookies=cookies_dict,
+                    timeout=10.0
+                    # ✅ REMOVE json={"account_id": account_id} - not needed since ID is in URL
+                )
+            
+            if res.status_code == 200:
+                print(f"Bank account {account_id} deleted successfully")
+                await self.load_bank_accounts()
+                return rx.toast.success("Bank account deleted successfully!")
+            else:
+                print(f"Failed to delete bank account: {res.status_code}")
+                print(f"Response: {res.text}")  # ✅ Add this for debugging
+                return rx.toast.error("Failed to delete bank account")
+                
+        except Exception as e:
+            print(f"Error deleting bank account: {e}")
+            import traceback
+            traceback.print_exc()  # ✅ Add full traceback
+            return rx.toast.error("Error deleting bank account")
+    
+    async def set_default_card(self, card_id: int):
+        """Set a credit card as default."""
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                res = await client.put(
+                    f"{API_BASE_URL}/users/payment_methods/set_default_credit_card/",
+                    json={"card_id": card_id},
+                    cookies=cookies_dict,
+                    timeout=10.0
+                )
+            
+            if res.status_code == 200:
+                await self.load_credit_cards()
+                return rx.toast.success("Default card updated!")
+            else:
+                return rx.toast.error("Failed to update default card")
+                
+        except Exception as e:
+            print(f"Error setting default card: {e}")
+            return rx.toast.error("Error updating default card")
+    
+    async def set_default_bank(self, account_id: int):
+        """Set a bank account as default."""
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                res = await client.put(
+                    f"{API_BASE_URL}/users/payment_methods/set_default_bank_account/",
+                    json={"account_id": account_id},
+                    cookies=cookies_dict,
+                    timeout=10.0
+                )
+            
+            if res.status_code == 200:
+                await self.load_bank_accounts()
+                return rx.toast.success("Default bank account updated!")
+            else:
+                return rx.toast.error("Failed to update default bank account")
+                
+        except Exception as e:
+            print(f"Error setting default bank: {e}")
+            return rx.toast.error("Error updating default bank account")
+
+
 def profile_avatar_section() -> rx.Component:
     """Profile avatar with upload functionality"""
     return rx.vstack(
@@ -493,7 +1533,7 @@ def profile_avatar_section() -> rx.Component:
             width="100%",
             padding="20px 0px",
         ),
-        # Upload component with button
+     
         rx.upload(
             rx.button(
                 rx.icon("camera", size=16),
@@ -510,7 +1550,7 @@ def profile_avatar_section() -> rx.Component:
             max_files=1,
             on_drop=ProfileState.handle_upload,
         ),
-        # Username display
+        
         rx.center(
             rx.text(
                 rx.cond(ProfileState.username != "", ProfileState.username, "User"),
@@ -520,7 +1560,7 @@ def profile_avatar_section() -> rx.Component:
             ),
             width="100%",
         ),
-        # Upload status messages
+     
         rx.cond(
             ProfileState.is_uploading,
             rx.center(
@@ -558,23 +1598,27 @@ def profile_content() -> rx.Component:
                 rx.vstack(
                     nav_button("Personal Information", "profile"),
                     nav_button("My Address", "address"),
+                    nav_button("My Payment Medthods", "card"),
                     nav_button("Wishlist", "wishlist"),
                     nav_button("My Orders", "orders"),
                     nav_button("My Reviews", "reviews"),
                     nav_button("Notification", "notification"),
                     rx.link("Logout", href="/logout", style=menu_item_style(False)),
                     spacing="3",
+                    
                 ),
             ),
             width="280px",
             height="100%",
-            bg="#F9FAFB",
+            background= "#E4EEF6"
+           
         ),
         rx.box(
             rx.match(
                 ProfileState.active_section,
                 ("profile", profile_info_content()),
                 ("address", address_content()),
+                ("card", card_content() ),
                 ("wishlist", wishlist_content()),
                 ("orders", orders_content()),
                 ("reviews", reviews_content()),
@@ -602,6 +1646,7 @@ def nav_button(text: str, section: str) -> rx.Component:
             menu_item_style(False),
         ),
         color="#22282c",
+        background = "#E4EEF6"
     )
 
 
@@ -1248,7 +2293,6 @@ def new_address_modal() -> rx.Component:
         ),
     )
 
-
 def address_card(address: dict):
     return rx.box(
         rx.vstack(
@@ -1299,16 +2343,21 @@ def address_card(address: dict):
                 align="center",
                 width="100%",
             ),
+
+  
             # Row 2: Phone number
             rx.text(ProfileState.phone_number, color="#555", mt="5px"),
+
             rx.hstack(
-                # Left side: address with icon
+              
                 rx.hstack(
                     rx.icon("map-pin", color="#2E6FF2"),
                     rx.text(address["address"], font_weight="medium", color="#22282C"),
                     align="center",
                     spacing="2",
                 ),
+
+        
                 # Right side: default indicator or button
                 rx.cond(
                     address["is_default"],
@@ -1328,21 +2377,17 @@ def address_card(address: dict):
                     ),
                 ),
                 justify="between",  # Spread items left/right
+                       
+                        on_click=lambda: AddressState.set_default_address(address["id"]),
+                    ),
+                ),
+
+                justify="between",  
                 align="center",
                 width="100%",
                 mt="5px",
             ),
-        ),
-        # Card styling
-        border="1px solid #E0E0E0",
-        border_radius="10px",
-        padding="20px",
-        width="100%",
-        background_color="white",
-        box_shadow="sm",
-        mt="15px",
-    )
-
+   
 
 def address_content() -> rx.Component:
     return rx.vstack(
@@ -1356,7 +2401,7 @@ def address_content() -> rx.Component:
             ),
             width="100%",
         ),
-        # Add New Address Button
+      
         rx.button(
             "Add New Address",
             on_click=AddressState.toggle_form,
@@ -1369,15 +2414,470 @@ def address_content() -> rx.Component:
             font_weight="bold",
             cursor="pointer",
         ),
-        # Address Form Modal
+      
         new_address_modal(),
-        # Dynamic Address List
+
+      
         rx.foreach(AddressState.addresses, lambda a: address_card(a)),
         spacing="2",
         width="100%",
         on_mount=AddressState.load_addresses,
     )
 
+
+def card_content() -> rx.Component:
+    return rx.vstack(
+        # Header
+        rx.hstack(
+            rx.heading("Payment Methods", size="6", color="#22282c"),
+            rx.spacer(),
+            rx.hstack(
+                rx.button(
+                    rx.icon("credit-card", size=18),
+                    "Add Card",
+                    on_click=PaymentState.toggle_card_form,
+                    color_scheme="blue",
+                    variant="soft",
+                ),
+                rx.button(
+                    rx.icon("landmark", size=18),
+                    "Add Bank",
+                    on_click=PaymentState.toggle_bank_form,
+                    color_scheme="green",
+                    variant="soft",
+                ),
+                spacing="3",
+            ),
+            width="100%",
+            align_items="center",
+            margin_bottom="20px",
+        ),
+        
+        # Loading state
+        rx.cond(
+            PaymentState.is_loading_payments,
+            rx.center(
+                rx.spinner(size="3"),
+                padding="40px",
+                width="100%",
+            ),
+            rx.vstack(
+                # Credit Cards Section
+                rx.cond(
+                    PaymentState.credit_cards.length() > 0,
+                    rx.vstack(
+                        rx.hstack(
+                            rx.icon("credit-card", size=20, color="#2E6FF2"),
+                            rx.text(
+                                "Credit Cards",
+                                font_size="18px",
+                                font_weight="600",
+                                color="#22282C",
+                            ),
+                            spacing="2",
+                            align_items="center",
+                        ),
+                        rx.vstack(
+                            rx.foreach(
+                                PaymentState.credit_cards,
+                                credit_card_item
+                            ),
+                            spacing="3",
+                            width="100%",
+                        ),
+                        spacing="3",
+                        width="100%",
+                    ),
+                    rx.fragment(),
+                ),
+                
+                # Bank Accounts Section
+                rx.cond(
+                    PaymentState.bank_accounts.length() > 0,
+                    rx.vstack(
+                        rx.hstack(
+                            rx.icon("landmark", size=20, color="#10B981"),
+                            rx.text(
+                                "Bank Accounts",
+                                font_size="18px",
+                                font_weight="600",
+                                color="#22282C",
+                            ),
+                            spacing="2",
+                            align_items="center",
+                        ),
+                        rx.vstack(
+                            rx.foreach(
+                                PaymentState.bank_accounts,
+                                bank_account_item
+                            ),
+                            spacing="3",
+                            width="100%",
+                        ),
+                        spacing="3",
+                        width="100%",
+                        margin_top="20px",
+                    ),
+                    rx.fragment(),
+                ),
+                
+                # Empty state
+                rx.cond(
+                    (PaymentState.credit_cards.length() == 0) & (PaymentState.bank_accounts.length() == 0),
+                    rx.center(
+                        rx.vstack(
+                            rx.icon("wallet", size=48, color="#9CA3AF"),
+                            rx.text(
+                                "No payment methods yet",
+                                font_size="18px",
+                                font_weight="600",
+                                color="#6B7280",
+                            ),
+                            rx.text(
+                                "Add a credit card or bank account to get started",
+                                font_size="14px",
+                                color="#9CA3AF",
+                            ),
+                            spacing="2",
+                            align_items="center",
+                        ),
+                        padding="60px 20px",
+                        width="100%",
+                    ),
+                    rx.fragment(),
+                ),
+                
+                spacing="4",
+                width="100%",
+            ),
+        ),
+        
+        # Modals
+        new_card_modal(),
+        new_bank_model(),
+        
+        spacing="4",
+        width="100%",
+        padding="20px",
+        on_mount=PaymentState.load_payment_methods,
+    )
+
+
+def new_card_modal() -> rx.Component:
+    return rx.cond(
+        PaymentState.show_card_form,
+        rx.box(
+            rx.box(
+                rx.vstack(
+                    # Close button
+                    rx.box(
+                        rx.icon(
+                            tag="x",
+                            size=28,
+                            color="#6B7280",
+                            cursor="pointer",
+                            on_click=PaymentState.close_card_form,
+                            _hover={"color": "#22282C"},
+                        ),
+                        width="100%",
+                        display="flex",
+                        justify_content="flex-end",
+                    ),
+                    
+                    rx.center(
+                        rx.text(
+                            "Add Credit Card",
+                            font_size="24px",
+                            font_weight="bold",
+                            color="#22282C",
+                        ),
+                        width="100%",
+                    ),
+                    
+                    rx.text(
+                        "Enter your card details (mock data for testing)",
+                        font_size="14px",
+                        color="#929FA7",
+                        margin_bottom="10px",
+                    ),
+                    
+                    # Card Number
+                    rx.vstack(
+                        rx.text("Card Number", font_size="14px", font_weight="500", color="#22282c"),
+                        rx.input(
+                            placeholder="1234 5678 9012 3456",
+                            value=PaymentState.card_number,
+                            on_change=PaymentState.set_card_number,
+                            style=input_style,
+                        ),
+                        spacing="1",
+                        align_items="start",
+                        width="100%",
+                    ),
+                    
+                    # Cardholder Name
+                    rx.vstack(
+                        rx.text("Cardholder Name", font_size="14px", font_weight="500", color="#22282c"),
+                        rx.input(
+                            placeholder="John Smith",
+                            value=PaymentState.card_holder_name,
+                            on_change=PaymentState.set_card_holder_name,
+                            style=input_style,
+                        ),
+                        spacing="1",
+                        align_items="start",
+                        width="100%",
+                    ),
+                    
+                    # Expiration and CVV
+                    rx.hstack(
+                        rx.vstack(
+                            rx.text("Exp. Month", font_size="14px", font_weight="500", color="#22282c"),
+                            rx.input(
+                                placeholder="12",
+                                value=PaymentState.exp_month,
+                                on_change=PaymentState.set_exp_month,
+                                style=input_style,
+                                max_length=2,
+                            ),
+                            spacing="1",
+                            align_items="start",
+                            width="100%",
+                        ),
+                        rx.vstack(
+                            rx.text("Exp. Year", font_size="14px", font_weight="500", color="#22282c"),
+                            rx.input(
+                                placeholder="2026",
+                                value=PaymentState.exp_year,
+                                on_change=PaymentState.set_exp_year,
+                                style=input_style,
+                                max_length=4,
+                            ),
+                            spacing="1",
+                            align_items="start",
+                            width="100%",
+                        ),
+                        rx.vstack(
+                            rx.text("CVV", font_size="14px", font_weight="500", color="#22282c"),
+                            rx.input(
+                                placeholder="123",
+                                value=PaymentState.cvv,
+                                on_change=PaymentState.set_cvv,
+                                style=input_style,
+                                max_length=4,
+                                type="password",
+                            ),
+                            spacing="1",
+                            align_items="start",
+                            width="100%",
+                        ),
+                        width="100%",
+                        spacing="3",
+                    ),
+                    
+                    # Set as default
+                    rx.hstack(
+                        rx.checkbox(
+                            checked=PaymentState.is_default,
+                            on_change=PaymentState.set_is_default,
+                        ),
+                        rx.text("Set as default payment method", font_size="14px", color="#22282c"),
+                        align_items="center",
+                    ),
+                    
+                    # Error message
+                    rx.cond(
+                        PaymentState.error_message != "",
+                        rx.text(
+                            PaymentState.error_message,
+                            color="#EF4444",
+                            font_size="14px",
+                        ),
+                        rx.fragment(),
+                    ),
+                    
+                    # Submit button
+                    rx.button(
+                        "Add Card",
+                        on_click=PaymentState.submit_card,
+                        width="100%",
+                        bg="#2E6FF2",
+                        color="white",
+                        border_radius="12px",
+                        padding="15px",
+                        font_size="16px",
+                        font_weight="600",
+                        cursor="pointer",
+                        _hover={"opacity": "0.9"},
+                        margin_top="10px",
+                    ),
+                    
+                    spacing="4",
+                    width="100%",
+                ),
+                bg="white",
+                padding="20px 40px",
+                border_radius="20px",
+                width="500px",
+                max_width="90vw",
+                box_shadow="0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)",
+                position="relative",
+            ),
+            position="fixed",
+            top="0",
+            left="0",
+            right="0",
+            bottom="0",
+            bg="rgba(0, 0, 0, 0.5)",
+            display="flex",
+            align_items="center",
+            justify_content="center",
+            z_index="1001",
+        ),
+    )
+
+def new_bank_model() -> rx.Component:
+    return rx.cond(
+        PaymentState.show_bank_form,
+        rx.box(
+            rx.box(
+                rx.vstack(
+                    # Close button
+                    rx.box(
+                        rx.icon(
+                            tag="x",
+                            size=28,
+                            color="#6B7280",
+                            cursor="pointer",
+                            on_click=PaymentState.close_bank_form,
+                            _hover={"color": "#22282C"},
+                        ),
+                        width="100%",
+                        display="flex",
+                        justify_content="flex-end",
+                    ),
+                    
+                    rx.center(
+                        rx.text(
+                            "Add Bank Account",
+                            font_size="24px",
+                            font_weight="bold",
+                            color="#22282C",
+                        ),
+                        width="100%",
+                    ),
+                    
+                    rx.text(
+                        "Enter your bank account details (mock data for testing)",
+                        font_size="14px",
+                        color="#929FA7",
+                        margin_bottom="10px",
+                    ),
+                    
+                    rx.vstack(
+                        rx.text("Provider", color="#22282c", font_size="14px", font_weight="500"),    
+                        rx.input(
+                            placeholder="Provider (e.g. scb, kbank, bbl)",
+                            value=PaymentState.bank_provider,
+                            on_change=PaymentState.set_bank_provider,
+                            style=input_style
+                        ),
+                        
+                        rx.text("Bank Name", color="#22282c", font_size="14px", font_weight="500"),
+                        rx.input(
+                            placeholder="Bank Name (e.g. Siam Commercial Bank)",
+                            value=PaymentState.bank_name,
+                            on_change=PaymentState.set_bank_name,
+                            style=input_style
+                        ),
+                        
+                        rx.text("Account Holder", color="#22282c", font_size="14px", font_weight="500"),
+                        rx.input(
+                            placeholder="Account Holder Name",
+                            value=PaymentState.account_holder,
+                            on_change=PaymentState.set_account_holder,
+                            style=input_style
+                        ),
+                        
+                        rx.text("Last 4 Digits", color="#22282c", font_size="14px", font_weight="500"),
+                        rx.input(
+                            placeholder="Last 4 Digits of Account Number",
+                            value=PaymentState.bank_last4,
+                            on_change=PaymentState.set_bank_last4,
+                            style=input_style,
+                            max_length=4
+                        ),
+                        
+                        rx.text("Provider Token (Optional)", color="#22282c", font_size="14px", font_weight="500"),
+                        rx.input(
+                            placeholder="Auto-generated if left empty",
+                            value=PaymentState.bank_provider_token,
+                            on_change=PaymentState.set_bank_provider_token,
+                            style=input_style
+                        ),
+                        
+                        rx.hstack(
+                            rx.checkbox(
+                                checked=PaymentState.bank_is_default,
+                                on_change=PaymentState.set_bank_is_default
+                            ),
+                            rx.text("Set as Default", color="#22282c", font_size="14px"),
+                            align_items="center",
+                        ),
+                        
+                        # Error message
+                        rx.cond(
+                            PaymentState.error_message != "",
+                            rx.text(
+                                PaymentState.error_message,
+                                color="#EF4444",
+                                font_size="14px",
+                            ),
+                            rx.fragment(),
+                        ),
+                        
+                        rx.button(
+                            "Add Bank Account",
+                            on_click=PaymentState.submit_bank,
+                            color_scheme="green",
+                            width="100%",
+                            padding="15px",
+                            font_size="16px",
+                            font_weight="600",
+                            cursor="pointer",
+                            _hover={"opacity": "0.9"},
+                            margin_top="10px",
+                        ),
+                        
+                        spacing="3",
+                        padding="10px",
+                        width="100%"
+                    ),
+                    
+                    spacing="4",
+                    width="100%",
+                ),
+                bg="white",
+                padding="20px 40px",
+                border_radius="20px",
+                width="500px",
+                max_width="90vw",
+                box_shadow="0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)",
+                position="relative",
+            ),
+            position="fixed",
+            top="0",
+            left="0",
+            right="0",
+            bottom="0",
+            bg="rgba(0, 0, 0, 0.5)",
+            display="flex",
+            align_items="center",
+            justify_content="center",
+            z_index="1001",
+        ),
+    )
+    
 
 def wishlist_content() -> rx.Component:
     return rx.vstack(
@@ -1514,8 +3014,6 @@ def menu_item_style(active: bool = False):
         "border": "none",
         "cursor": "pointer",
         "text_align": "left",
-        "background_color": "#F9FAFB" if active else "white",
-        "color": "#22282C" if active else "#6B7280",
         "font_weight": "600" if active else "400",
         "_hover": {"background_color": "#F3F4F6", "color": "#22282C"},
     }
@@ -1530,4 +3028,215 @@ input_style = {
     "background_color": "white",
     "border": "1px solid #929FA7",
     "border_radius": "8px",
+    "width": "100%"
 }
+
+
+def get_card_brand_icon(brand: str) -> str:
+    """Return icon for card brand."""
+    brand_lower = brand.lower() if brand else ""
+    if "visa" in brand_lower:
+        return "credit-card"
+    elif "mastercard" in brand_lower:
+        return "credit-card"
+    elif "amex" in brand_lower or "american express" in brand_lower:
+        return "credit-card"
+    else:
+        return "credit-card"
+
+
+def credit_card_item(card: CreditCard) -> rx.Component:
+    """Display a single credit card."""
+    return rx.box(
+        rx.hstack(
+            # Left side - Card info
+            rx.hstack(
+                rx.box(
+                    rx.icon(
+                        "credit-card",  # Simplified - just use one icon
+                        size=32,
+                        color="#2E6FF2",
+                    ),
+                    padding="10px",
+                    border_radius="8px",
+                    bg="#EFF6FF",
+                ),
+                rx.vstack(
+                    rx.hstack(
+                        rx.text(
+                            card.card_brand,
+                            font_size="16px",
+                            font_weight="600",
+                            color="#22282C",
+                        ),
+                        rx.cond(
+                            card.is_default,
+                            rx.badge(
+                                "Default",
+                                color_scheme="green",
+                                variant="soft",
+                            ),
+                            rx.fragment(),
+                        ),
+                        spacing="2",
+                        align_items="center",
+                    ),
+                    rx.text(
+                        f"•••• •••• •••• {card.last4}",
+                        font_size="14px",
+                        color="#6B7280",
+                    ),
+                    rx.text(
+                        f"Expires {card.exp_month}/{card.exp_year}",
+                        font_size="12px",
+                        color="#9CA3AF",
+                    ),
+                    spacing="1",
+                    align_items="start",
+                ),
+                spacing="3",
+                align_items="center",
+            ),
+            
+            rx.spacer(),
+            
+            # Right side - Actions
+            rx.hstack(
+                rx.cond(
+                    ~card.is_default,
+                    rx.button(
+                        "Set Default",
+                        size="2",
+                        variant="soft",
+                        color_scheme="blue",
+                        on_click=lambda: PaymentState.set_default_card(card.id)
+                    ),
+                    rx.fragment(),
+                ),
+                rx.icon_button(
+                    rx.icon("trash-2", size=18),
+                    size="2",
+                    variant="soft",
+                    color_scheme="red",
+                    on_click=lambda: PaymentState.delete_credit_card(card.id),
+                ),
+                spacing="2",
+            ),
+            
+            width="100%",
+            align_items="center",
+        ),
+        padding="20px",
+        border="1px solid #E5E7EB",
+        border_radius="12px",
+        bg="white",
+        width="100%",
+        _hover={
+            "box_shadow": "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+            "border_color": "#2E6FF2",
+        },
+        transition="all 0.2s ease",
+    )
+
+
+def bank_account_item(account: BankAccount) -> rx.Component:
+    """Display a single bank account."""
+    return rx.box(
+        rx.hstack(
+            # Left side - Bank info
+            rx.hstack(
+                rx.box(
+                    rx.icon(
+                        "landmark",
+                        size=32,
+                        color="#10B981",
+                    ),
+                    padding="10px",
+                    border_radius="8px",
+                    bg="#D1FAE5",
+                ),
+                rx.vstack(
+                    rx.hstack(
+                        rx.text(
+                            account.bank_name,
+                            font_size="16px",
+                            font_weight="600",
+                            color="#22282C",
+                        ),
+                        rx.cond(
+                            account.is_default,
+                            rx.badge(
+                                "Default",
+                                color_scheme="green",
+                                variant="soft",
+                            ),
+                            rx.fragment(),
+                        ),
+                        spacing="2",
+                        align_items="center",
+                    ),
+                    rx.text(
+                        account.account_holder,
+                        font_size="14px",
+                        color="#6B7280",
+                    ),
+                    rx.text(
+                        f"•••• •••• •••• {account.last4}",
+                        font_size="12px",
+                        color="#9CA3AF",
+                    ),
+                    spacing="1",
+                    align_items="start",
+                ),
+                spacing="3",
+                align_items="center",
+            ),
+            
+            rx.spacer(),
+            
+            # Right side - Actions
+            rx.hstack(
+                rx.cond(
+                    ~account.is_default,
+                    rx.button(
+                        "Set Default",
+                        size="2",
+                        variant="soft",
+                        color_scheme="green",
+                        on_click=lambda: PaymentState.set_default_bank(account.id),
+                    ),
+                    rx.fragment(),
+                ),
+                rx.icon_button(
+                    rx.icon("trash-2", size=18),
+                    size="2",
+                    variant="soft",
+                    color_scheme="red",
+                    on_click=lambda: PaymentState.delete_bank_account(account.id),
+                ),
+                spacing="2",
+            ),
+            
+            width="100%",
+            align_items="center",
+        ),
+        padding="20px",
+        border="1px solid #E5E7EB",
+        border_radius="12px",
+        bg="white",
+        width="100%",
+        _hover={
+            "box_shadow": "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+            "border_color": "#10B981",
+        },
+        transition="all 0.2s ease",
+    )
+
+
+@rx.page(route="/profile", on_load=[PaymentState.load_payment_methods])
+def profile_page() -> rx.Component:
+
+    return rx.box(
+        template(profile_content),
+        on_mount=ProfileState.load_user_data  
+    )

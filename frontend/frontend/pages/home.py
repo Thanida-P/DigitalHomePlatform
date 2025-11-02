@@ -8,7 +8,31 @@ from typing import Optional
 from reflex.event import Event
 from ..rooms_data import rooms_data
 from ..components.product_card import product_list
-from ..state import DynamicState
+from ..state import DynamicState 
+
+category_images = {
+    "Bedroom": "/images/bedroom.jpg",
+    "Living Room": "/images/livingroom.jpg",
+    "Office Room": "/images/officeroom.jpg",
+    "Kitchen": "/images/kitchenroom.jpg",
+}
+
+class CategoryState(rx.State):
+    categories: list[str] = []
+ 
+
+    async def load_categories(self):
+        import httpx
+        API_BASE_URL = "http://localhost:8001"
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{API_BASE_URL}/products/categories/")
+
+            if response.status_code == 200:
+                data = response.json()
+                self.categories = data.get("categories", [])
+                print(f"✅ Fetched categories detail: {self.categories}")
+
 
 def hover_photo(name: str, img: str, link: str) -> rx.Component:
     return rx.vstack(
@@ -324,12 +348,48 @@ def home_content() -> rx.Component:
     
     ikea_showcase_layout(), 
 
+
     rx.center(
         rx.text("Design your Space",font_size = "2rem", font_weight="bold",color="#22282c",font_family="Racing Sans One",text_align="center"),
     ),
     rx.center(
          rx.text("Whether it’s your living room, bedroom, or office, we’ve got the perfect pieces to match your style.",font_size = "16px", color="#22282c",margin_bottom="50px"),
     ),
+
+        
+        rx.hstack(
+            rx.foreach(
+                CategoryState.categories,
+                lambda category: rx.link(
+                    rx.vstack(
+                        rx.image(
+                            src=category_images.get(category.strip(), "/images/default.jpg"),
+                            width="200px",
+                            height="150px",
+                            object_fit="cover",
+                            border_radius="10px",
+                        ),
+                        rx.text(
+                            category,
+                            font_size="16px",
+                            font_weight="bold",
+                            text_align="center",
+                            margin_top="8px"
+                        ),
+                        spacing="2",
+                        align="center",
+
+                    ),
+                    href=f"/rooms/{category.strip().lower().replace(' ', '-')}",
+                    style={"textDecoration": "none","color":"#22282c"}  # remove underline
+                )
+            ),
+            justify="center",
+            wrap="wrap",
+            spacing="4",
+        ),
+
+
     rx.vstack(
         
         rx.hstack(
@@ -366,7 +426,7 @@ def home_content() -> rx.Component:
             align_item = "center"
             
         ),
-    
+   
     ),
    
     rx.hstack(
@@ -523,6 +583,8 @@ def home_content() -> rx.Component:
 ),
     
     height="100%",
+    on_mount=CategoryState.load_categories,
+  
 )
 
 

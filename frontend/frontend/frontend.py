@@ -44,14 +44,13 @@ from .pages.shop import shop_page
 from .pages.signup import signup_page
 from .pages.login import login_page
 from .pages.profile import profile_page
-from .pages.product_detail import product_detail_page
 from .pages.cart import cart_page
 from .pages.admin_dashboard import admin_dashboard
 from .pages.my_home import my_digital_home_page
 from .pages.rooms.room import room_page
 from .pages.signup_admin import adminsignup_page
 from .state import DynamicState
-
+from .pages.details.product_detail import product_detail_page
 
 app = rx.App()
 
@@ -63,6 +62,8 @@ app.add_page(
 )
 app.add_page(room_page, route="/static/x", on_load=DynamicState.on_load)
 app.add_page(room_page)
+
+app.add_page(product_detail_page,route="/details/[product_Id]")
 
 app.add_page(home_page, route="/")
 # app.add_page(about_page, route="/about")
