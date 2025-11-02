@@ -2,8 +2,9 @@ import * as React from "react";
 import * as THREE from "three";
 import { ThreeEvent, useThree, useFrame } from "@react-three/fiber";
 import { useXR } from "@react-three/xr";
-import { Gltf } from "@react-three/drei";
+import { useGLTF } from "@react-three/drei";
 import { PlacedItem } from "../types/Furniture";
+import { alignToFloor } from "../../utils/FloorAlignment";
 
 function DraggableFurniture({
   item,
@@ -19,9 +20,45 @@ function DraggableFurniture({
   onRotationChange: (newRotation: [number, number, number]) => void;
 }) {
   const groupRef = React.useRef<THREE.Group>(null);
+  const modelRef = React.useRef<THREE.Group>(null);
   const xr = useXR();
   const camera = useThree((state) => state.camera);
   const isPresenting = !!xr.session;
+  const [modelHeight, setModelHeight] = React.useState(0);
+
+  // Load the model and calculate its height for floor alignment
+  const { scene } = item.modelPath ? useGLTF(item.modelPath) : { scene: null };
+
+  React.useEffect(() => {
+    if (!modelRef.current || !scene) return;
+
+    // Clone the scene
+    const clonedScene = scene.clone();
+    
+    // Clear existing children
+    modelRef.current.clear();
+    
+    // Calculate bounding box
+    const box = new THREE.Box3().setFromObject(clonedScene);
+    const minY = box.min.y;
+    const height = box.max.y - box.min.y;
+    
+    // Store the height offset
+    setModelHeight(-minY);
+    
+    // Adjust the model position to align bottom to y=0 within its local space
+    clonedScene.position.y = -minY;
+    
+    // Add to group
+    modelRef.current.add(clonedScene);
+    
+    console.log('🪑 Furniture aligned:', {
+      name: item.name,
+      originalMinY: minY,
+      height,
+      adjustment: -minY
+    });
+  }, [scene, item.modelPath]);
 
   useFrame((_state, delta) => {
     if (!isSelected || !groupRef.current || !isPresenting) return; 
@@ -74,7 +111,9 @@ function DraggableFurniture({
 
       const newPosition = new THREE.Vector3().fromArray(item.position);
       newPosition.add(deltaPosition);
-      onPositionChange([newPosition.x, item.position[1], newPosition.z]);
+      
+      // Keep Y at 0 (floor level) since the model itself is already aligned
+      onPositionChange([newPosition.x, 0, newPosition.z]);
     }
 
     if (Math.abs(rotateDelta) > deadzone) {
@@ -98,14 +137,17 @@ function DraggableFurniture({
       scale={item.scale || 1}
       onPointerDown={handleSelect}
     >
-      {item.modelPath && <Gltf src={item.modelPath} />}
+      {/* Model container with floor alignment */}
+      <group ref={modelRef} />
+      
+      {/* Selection indicator at floor level */}
       {isSelected && (
         <>
-          <mesh position={[0, 0.01, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <ringGeometry args={[0.3, 0.35, 32]} />
             <meshBasicMaterial color="#00ff00" transparent opacity={0.7} side={THREE.DoubleSide} />
           </mesh>
-          <mesh position={[0, 0.01, 0.35]} rotation={[Math.PI / 2, 0, 0]}>
+          <mesh position={[0, 0.01, 0.35]} rotation={[-Math.PI / 2, 0, 0]}>
             <coneGeometry args={[0.05, 0.1, 8]} />
             <meshBasicMaterial color="#ffff00" />
           </mesh>
@@ -151,9 +193,11 @@ export function SpawnManager({
     const spawnDistance = 2;
     const spawnPos = cameraWorldPos.clone();
     spawnPos.addScaledVector(cameraDirection, spawnDistance);
+    
+    // Always spawn at floor level (y=0)
     spawnPos.y = 0;
     
-    spawnPositionRef.current = [spawnPos.x, spawnPos.y, spawnPos.z];
+    spawnPositionRef.current = [spawnPos.x, 0, spawnPos.z];
   });
   
   return null;

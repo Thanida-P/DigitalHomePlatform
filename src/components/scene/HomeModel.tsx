@@ -1,10 +1,17 @@
-import { useEffect, useState } from 'react';
-import { Gltf, Text } from '@react-three/drei';
+import { useEffect, useState, useRef } from 'react';
+import * as THREE from 'three';
+import { useGLTF } from '@react-three/drei';
 import { makeAuthenticatedRequest } from '../../utils/Auth';
+import { useFloorAlignment, alignToFloor } from '../../utils/FloorAlignment';
 
 export function HomeModel({ homeId }: { homeId: string }) {
+  const groupRef = useRef<THREE.Group>(null);
   const [modelUrl, setModelUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Use the floor alignment hook from utilities
+  useFloorAlignment(groupRef, !loading && !error);
 
   useEffect(() => {
     const loadHomeModel = async () => {
@@ -17,9 +24,11 @@ export function HomeModel({ homeId }: { homeId: string }) {
           setModelUrl(url);
         } else {
           console.error('Failed to load home model');
+          setError('Failed to load home model');
         }
       } catch (error) {
         console.error('Error loading home model:', error);
+        setError('Error loading home model');
       } finally {
         setLoading(false);
       }
@@ -36,19 +45,56 @@ export function HomeModel({ homeId }: { homeId: string }) {
 
   if (loading) {
     return (
-      <Text position={[0, 1, 0]} fontSize={0.2} color="white">
-        Loading home model...
-      </Text>
+      <group position={[0, 1, 0]}>
+        <mesh>
+          <boxGeometry args={[0.3, 0.3, 0.3]} />
+          <meshBasicMaterial color="#4CAF50" wireframe />
+        </mesh>
+      </group>
     );
   }
 
-  if (!modelUrl) {
+  if (error || !modelUrl) {
     return (
-      <Text position={[0, 1, 0]} fontSize={0.2} color="red">
-        Failed to load home model
-      </Text>
+      <group position={[0, 1, 0]}>
+        <mesh>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshBasicMaterial color="#f44336" />
+        </mesh>
+      </group>
     );
   }
 
-  return <Gltf src={modelUrl} />;
+  return <HomeModelContent ref={groupRef} url={modelUrl} homeId={homeId} />;
 }
+
+const HomeModelContent = ({ url, homeId }: { url: string; homeId: string }) => {
+  const groupRef = useRef<THREE.Group>(null);
+  const { scene } = useGLTF(url);
+
+  useEffect(() => {
+    if (!groupRef.current) return;
+
+    // Clone the scene to avoid modifying cached version
+    const clonedScene = scene.clone();
+    
+    // Clear existing children
+    groupRef.current.clear();
+    
+    // Add cloned scene
+    groupRef.current.add(clonedScene);
+    
+    // Apply floor alignment using utility function
+    setTimeout(() => {
+      if (groupRef.current) {
+        const adjustment = alignToFloor(groupRef.current);
+        console.log('🏠 Home model aligned to floor:', {
+          homeId,
+          adjustment
+        });
+      }
+    }, 100);
+  }, [scene, homeId]);
+
+  return <group ref={groupRef} />;
+};

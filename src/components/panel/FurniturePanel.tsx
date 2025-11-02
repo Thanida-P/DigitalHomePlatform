@@ -146,7 +146,7 @@ export function VRFurniturePanel({
                   ) : (
                     <mesh>
                       <planeGeometry args={[0.48, 0.48]} />
-                      <meshStandardMaterial color="#d0d6ddff" />
+                      <meshStandardMaterial color="#d0d6dd" />
                       <Text 
                         fontSize={0.04} 
                         color="#7d8899" 
