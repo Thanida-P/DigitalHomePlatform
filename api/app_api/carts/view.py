@@ -45,6 +45,9 @@ def add_to_cart(request):
         if item_type == 'physical' and not product.physical_available:
             return JsonResponse({'error': 'Physical version of the product is not available'}, status=400)
         
+        if item_type == 'physical' and quantity > product.get_stock():
+            return JsonResponse({'error': 'Requested quantity exceeds available stock'}, status=400)
+        
         cart = customer.carts.first()
 
         if not cart:
