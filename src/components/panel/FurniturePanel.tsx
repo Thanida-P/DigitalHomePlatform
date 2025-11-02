@@ -1,6 +1,6 @@
 import * as React from "react"; 
 import { Text } from "@react-three/drei";
-import { Furniture } from "../../types/Furniture";
+import { Furniture } from "../types/Furniture";
 import { FurnitureImage } from "./FurnitureImage";
 
 export function VRFurniturePanel({ 
