@@ -22,6 +22,7 @@ export function VRControlPanel({
   const panelHeight = 1.0;
   const buttonWidth = 0.6;
   const buttonHeight = 0.15;
+  const buttonSpacing = 0.2;
 
   return (
     <group>
