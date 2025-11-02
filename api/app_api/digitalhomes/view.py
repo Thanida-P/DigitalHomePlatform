@@ -47,6 +47,12 @@ def list_available_items(request):
             except (KeyError, TypeError):
                 continue
         return JsonResponse({'available_items': available_items}, status=200)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
 
@@ -88,6 +94,12 @@ def get_specific_item(request):
             'image': item.get_image(),
         }
         return JsonResponse({'item': item_data}, status=200)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
         
@@ -126,6 +138,12 @@ def add_digital_home(request):
         customer.save()
         transaction.commit()
         return JsonResponse({'message': 'Digital home added successfully'}, status=201)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
         
@@ -167,6 +185,12 @@ def get_digital_homes(request):
             except (KeyError, TypeError):
                 continue
         return JsonResponse({'digital_homes': digital_homes}, status=200)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
         
@@ -208,6 +232,12 @@ def get_digital_home(request, id):
             return JsonResponse({'digital_home': home_data}, status=200)
         except (KeyError, TypeError):
             return JsonResponse({'error': 'Digital home not found'}, status=404)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
         
@@ -272,6 +302,12 @@ def delete_digital_home(request, id):
             return JsonResponse({'message': 'Digital home deleted successfully'}, status=200)
         except (KeyError, TypeError):
             return JsonResponse({'error': 'Digital home not found'}, status=404)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
         
@@ -291,6 +327,12 @@ def update_texture(request):
             return JsonResponse({'error': 'No texture file provided'}, status=400)
         update_Texture(root, home_id, texture_files)
         return JsonResponse({'message': 'Home texture updated successfully'}, status=200)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
         
@@ -364,6 +406,12 @@ def add_custom_item(request):
         customer.owned_digital_products.append({ 'id': categorizedItem.get_id(), 'is_container': categorizedItem.is_container})
         customer.save()
         return JsonResponse({'message': 'Custom item added successfully'}, status=201)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
         
@@ -397,6 +445,12 @@ def update_home_design(request):
         transaction.commit()
 
         return JsonResponse({'message': 'Home design updated successfully'}, status=200)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
 
@@ -443,6 +497,12 @@ def get_deployed_item_details(request, id):
                 'created_at': item.created_at.isoformat(),
             }})
         return JsonResponse({'deployed_items': deployed_items_details}, status=200)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
 
@@ -489,5 +549,11 @@ def get_deployed_item_detail(request, id):
             'created_at': item.created_at.isoformat(),
         }
         return JsonResponse({'item_detail': item_detail}, status=200)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()

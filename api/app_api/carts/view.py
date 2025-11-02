@@ -2,6 +2,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
+import transaction
 
 from app_api.products.objectModels import Product
 from zodb.zodb_management import *
@@ -63,6 +64,12 @@ def add_to_cart(request):
         cart.save()
 
         return JsonResponse({'message': 'Item added to cart successfully'}, status=201)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
 
@@ -98,6 +105,12 @@ def decrease_cart_item_quantity(request, cart_item_id):
         cart.save()
 
         return JsonResponse({'message': 'Cart item quantity decreased successfully'}, status=200)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
 
@@ -128,6 +141,12 @@ def remove_from_cart(request, cart_item_id):
         cart.save()
 
         return JsonResponse({'message': 'Item removed from cart successfully'}, status=200)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
 
@@ -165,6 +184,12 @@ def view_cart(request):
         }
 
         return JsonResponse(response_data, status=200)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
 
@@ -223,5 +248,11 @@ def get_cart_summary(request):
             'total': str(total)
         }
         return JsonResponse(response_data, status=200)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
