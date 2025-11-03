@@ -152,48 +152,44 @@ def add_digital_home(request):
 def get_digital_homes(request):
     connection, root = get_connection()
     try:
-        customer = request.user.customer
+        with transaction.manager:
+            customer = request.user.customer
 
-        if not customer:
-            return JsonResponse({'error': 'Only customers can view digital homes'}, status=403)
+            if not customer:
+                return JsonResponse({'error': 'Only customers can view digital homes'}, status=403)
 
-        digital_homes = []
-        for home_id in customer.digital_home:
-            try:
-                home = root.digitalHomes[home_id]
-                spatial_id = home.get_spatialData_id()
-                spatial_data = HomeSpatialData.objects.get(id=spatial_id)
-                position = get_position(spatial_id)
-                rotation = parse_coordinates(spatial_data.rotation)
-                scale = parse_coordinates(spatial_data.scale)
-                digital_homes.append({
-                    'id': home.get_id(),
-                    'name': home.get_name(),
-                    'home_id': home.get_home_id(),
-                    'deployedItems': home.get_deployedItems(),
-                    'spatialData': {
-                        'id': spatial_data.id,
-                        'positions': position,
-                        'rotation': rotation,
-                        'scale': scale,
-                        'boundary': spatial_data.boundary,
-                    },
-                    'texture_id': home.get_texture_id(),
-                    'created_at': home.get_created_at().isoformat(),
-                    'updated_at': home.get_updated_at().isoformat(),
-                })
-            except (KeyError, TypeError):
-                continue
-        return JsonResponse({'digital_homes': digital_homes}, status=200)
+            digital_homes = []
+            for home_id in customer.digital_home:
+                try:
+                    home = root.digitalHomes[home_id]
+                    spatial_id = home.get_spatialData_id()
+                    spatial_data = HomeSpatialData.objects.get(id=spatial_id)
+                    position = get_position(spatial_id)
+                    rotation = parse_coordinates(spatial_data.rotation)
+                    scale = parse_coordinates(spatial_data.scale)
+                    digital_homes.append({
+                        'id': home.get_id(),
+                        'name': home.get_name(),
+                        'home_id': home.get_home_id(),
+                        'deployedItems': home.get_deployedItems(),
+                        'spatialData': {
+                            'id': spatial_data.id,
+                            'positions': position,
+                            'rotation': rotation,
+                            'scale': scale,
+                            'boundary': spatial_data.boundary,
+                        },
+                        'texture_id': home.get_texture_id(),
+                        'created_at': home.get_created_at().isoformat(),
+                        'updated_at': home.get_updated_at().isoformat(),
+                    })
+                except (KeyError, TypeError):
+                    continue
+            return JsonResponse({'digital_homes': digital_homes}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
-        
 @login_required
 @require_http_methods(["GET"])
 def get_digital_home(request, id):

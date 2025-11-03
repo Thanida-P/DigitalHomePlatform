@@ -3,8 +3,7 @@ import httpx
 import os
 from typing import Optional
 from .rooms_data import rooms_data
-
-API_BASE_URL = os.getenv("API_URL", "http://localhost:8001")
+from .config import API_BASE_URL
 
 SCENE_CREATOR_URL = os.getenv("SCENE_CREATOR_URL", "http://localhost:5173")
 
@@ -68,7 +67,7 @@ class AuthState(rx.State):
                     
                     print(f"🍪 Saved cookies: {list(self.session_cookies.keys())}")
                     
-                    # Update auth state
+                    # Update auth state 
                     self.is_logged_in = True
                     self.username = data.get("username", identifier)
                     self.is_admin = data.get("is_admin", False)
@@ -162,7 +161,7 @@ class AuthState(rx.State):
             return rx.window_alert("Failed to generate authentication token. Please try logging in again.")
         
         # Build Scene Creator URL with token
-        self.scene_creator_url = f"{SCENE_CREATOR_URL}/login?token={token}"
+        self.scene_creator_url = f"{SCENE_CREATOR_URL}/#/login?token={token}"
         
         print(f"🚀 Opening Scene Creator: {self.scene_creator_url}")
         

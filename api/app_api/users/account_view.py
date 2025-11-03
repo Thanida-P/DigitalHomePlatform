@@ -61,7 +61,7 @@ def register(request):
         username, 
         max_age=60*60*24*30, 
         httponly=True, 
-        secure=True
+        secure=False
     )
     return response
 
@@ -153,7 +153,7 @@ def login_view(request):
             getattr(user, 'username'),
             max_age=60*60*24*30,
             httponly=True,
-            secure=True
+            secure=False
         )
         return response
     else:
@@ -194,22 +194,24 @@ def get_login_token(request):
 def scene_creator_login(request, user):
     auth_login(request, user)
     response = JsonResponse({
-        'message': 'Login successful',
-        'username': user.username,
-        'user_id': user.id,
-        'is_admin': getattr(user, 'is_admin', False),
-        'is_staff': getattr(user, 'is_staff', False)
-    }, status=200)
-    
+            'message': 'Login successful',
+            'username': user.username,
+            'user_id': user.id,
+            'is_admin': getattr(user, 'is_admin', False),
+            'is_staff': getattr(user, 'is_staff', False),
+            'session_key': request.session.session_key  # Return session key
+        }, status=200)
+        
     response.set_cookie(
         'sessionid',
         request.session.session_key,
         max_age=60*60*24*30,
         httponly=True,
-        secure=True,
-        samesite='None'  # Allow cross-site
+        secure=False,
+        samesite='Lax',
+        path='/'
     )
-    
+
     return response
 
 @csrf_exempt
