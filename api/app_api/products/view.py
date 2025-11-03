@@ -297,15 +297,18 @@ def get_all_categories(request):
     finally:
         connection.close()
         
-@require_http_methods(["GET"])
+@csrf_exempt
+@require_http_methods(["POST"])
 @login_required
 def get_all_product_types(request):
     connection, root = get_connection()
     try:
+        category = request.POST.get('category', None)
         product_types = set()
         for obj in root.objectItems.values():
             try:
-                product_types.add(obj.get_type())
+                if category is None or obj.get_category() == category:
+                    product_types.add(obj.get_type())
             except Exception:
                 continue
         return JsonResponse({'product_types': list(product_types)}, status=200)
