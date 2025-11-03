@@ -1,5 +1,3 @@
-const DIGITAL_HOME_PLATFORM_BASE_URL = import.meta.env.VITE_DIGITAL_HOME_PLATFORM_URL;
-
 export function NotAuthorized() {
   return (
     <div style={{
@@ -44,7 +42,7 @@ export function NotAuthorized() {
           Please sign in to continue.
         </p>
         <a
-          href={DIGITAL_HOME_PLATFORM_BASE_URL}
+          href="http://localhost:3000/"
           style={{
             display: 'inline-block',
             padding: '0.6rem 3rem',

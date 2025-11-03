@@ -14,8 +14,6 @@ import { PlacedFurniture, SpawnManager } from "./FurnitureController";
 import { Furniture, PlacedItem } from "../types/Furniture";
 import { makeAuthenticatedRequest, logout } from "../../utils/Auth";
 
-const DIGITAL_HOME_PLATFORM_BASE_URL = import.meta.env.VITE_DIGITAL_HOME_PLATFORM_URL;
-
 export function SceneContent({ homeId }: { homeId: string }) {
   const navigate = useNavigate();
   const [showSlider, setShowSlider] = React.useState(false);
@@ -258,7 +256,7 @@ export function SceneContent({ homeId }: { homeId: string }) {
   const handleLogout = async () => {
     console.log('👋 Logging out...');
     await logout();
-    window.location.href = DIGITAL_HOME_PLATFORM_BASE_URL;
+    window.location.href = 'http://localhost:3000';
   };
 
   const handleSelectFurniture = (f: Furniture) => {
