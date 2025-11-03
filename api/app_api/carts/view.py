@@ -116,6 +116,48 @@ def decrease_cart_item_quantity(request, cart_item_id):
         return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
+        
+@csrf_exempt
+@login_required
+@require_http_methods(["PUT"])
+def increase_cart_item_quantity(request, cart_item_id):
+    connection, root = get_connection()
+    try:
+        customer = request.user.customer
+
+        if not customer:
+            return JsonResponse({'error': 'Only customers can manage carts'}, status=403)
+
+        cart = customer.carts.first()
+
+        if not cart:
+            return JsonResponse({'error': 'Cart not found'}, status=404)
+
+        try:
+            cart_item = CartItem.objects.get(id=cart_item_id, cart=cart)
+        except CartItem.DoesNotExist:
+            return JsonResponse({'error': 'Cart item not found'}, status=404)
+
+        product = root.products[int(cart_item.product_id)]
+
+        if cart_item.type == 'physical' and (cart_item.quantity + 1) > product.get_stock():
+            return JsonResponse({'error': 'Requested quantity exceeds available stock'}, status=400)
+
+        cart_item.quantity += 1
+        cart_item.save()
+
+        cart.total_price = calculate_total_price(root, cart.cart_items.all())
+        cart.save()
+
+        return JsonResponse({'message': 'Cart item quantity increased successfully'}, status=200)
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        return JsonResponse({"error": str(e)}, status=500)
+    finally:
+        connection.close()
 
 @csrf_exempt
 @login_required
