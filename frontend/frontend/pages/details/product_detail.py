@@ -4,7 +4,8 @@ from reflex.components.component import NoSSRComponent
 from typing import Any, Dict, List 
 import urllib.parse 
 from ...state import ModelState, RoomSceneState, ModalState
-
+from ...config import API_BASE_URL
+from ...state import AuthState
 
 class ThreeFiberCanvas(NoSSRComponent):
     library = "@react-three/fiber" 
@@ -144,22 +145,33 @@ class ProductDetailState(rx.State):
     display_scene_urls: list[str] = []
     display_scenes_loaded: bool = False
 
+    is_loading: bool = False
+    has_loaded: bool = False
+
     async def on_load(self):
         """This runs when the page loads"""
-        # Get the product_Id from the URL parameter
-        self.product_id = self.router.page.params.get("product_Id", "")
-        
 
-        print(f"🔍 Product ID from URL: {self.product_id}")  # Debug log
+        if self.is_loading or self.has_loaded:
+            print("⏭️ Already loading or loaded, skipping...")
+            return
         
-        # Now you can use this ID to fetch product data
+        self.is_loading = True
+
+        self.product_id = self.router.page.params.get("product_Id", "")
+
+        print(f"🔍 Product ID from URL: {self.product_id}")  
+        
         if self.product_id:
             await self.fetch_product_data(self.product_id)
+
+        self.is_loading = False
+        self.has_loaded = True
 
     async def fetch_product_data(self, product_id: str):
         """Fetch product data using the ID"""
         import httpx
-        API_BASE_URL = "http://localhost:8001"
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies or {}
         
         try:
          
@@ -167,7 +179,7 @@ class ProductDetailState(rx.State):
             print(f"📡 Fetching from: {url}")  
             
             async with httpx.AsyncClient() as client:
-                response = await client.get(url)
+                response = await client.get(url, cookies=cookies_dict)
             
             print(f"📊 Response status: {response.status_code}")  
             
@@ -198,11 +210,15 @@ class ProductDetailState(rx.State):
         """Fetch 3D model and save it to assets"""
         import httpx
         import os
-        API_BASE_URL = "http://localhost:8001"
+        
+       
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies or {}
 
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.get(f"{API_BASE_URL}/products/get_3d_model/{model_id}/")
+                response = await client.get(f"{API_BASE_URL}/products/get_3d_model/{model_id}/",
+                                            cookies=cookies_dict )
 
             if response.status_code == 200:
                 self.model_file = response.content
@@ -211,7 +227,6 @@ class ProductDetailState(rx.State):
                     f"{model_id}.glb"
                 ).split("filename=")[-1].strip('"')
                 
-                # ✅ Save the file to assets/models/ folder
                 public_path = "assets/models"
                 os.makedirs(public_path, exist_ok=True)
                 
@@ -219,7 +234,6 @@ class ProductDetailState(rx.State):
                 with open(file_path, "wb") as f:
                     f.write(self.model_file)
                 
-                # ✅ Set the URL to the relative path
                 self.model_url = f"/models/{self.model_filename}"
                 
                 print(f"✅ Fetched 3D model: {self.model_filename}")
@@ -238,7 +252,6 @@ class ProductDetailState(rx.State):
     async def fetch_display_scenes(self, scene_ids: list):
         """Fetch all display scenes for the product"""
         import httpx
-        API_BASE_URL = "http://localhost:8001"
         
         self.display_scene_urls = []
         
@@ -647,14 +660,29 @@ def product_detail_content() -> rx.Component:
                 rx.vstack(
                     rx.text(ProductDetailState.product_data.get('name', 'Loading...'), font_size="24px", font_weight="bold", color="#22282c"),
 
-                    rx.text("Select Texture", font_size="16px", margin_top="10px", color="#22282c", font_weight="bold"),
+                    rx.text("Colors", font_size="16px", margin_top="10px", color="#22282c", font_weight="bold"),
                     rx.hstack(
-                        rx.image(src="images/room.jpg", width="50px", height="50px", border="1px solid #929FA7", border_radius="50%"),
-                        rx.image(src="images/room.jpg", width="50px", height="50px", border_radius="50%"),
-                        rx.image(src="images/room.jpg", width="50px", height="50px", border_radius="50%"),
-                    ),
-                    rx.text("Beige", font_size="14px", color="gray"),
-
+                            rx.hstack(
+                                rx.box(style={"width": "30px", "height": "30px", "border_radius": "50%", "background_color": "beige"}),
+                                rx.text("Beige", font_size="14px", color="gray"),
+                                spacing="2",
+                                align_items="center"
+                            ),
+                            rx.hstack(
+                                rx.box(style={"width": "30px", "height": "30px", "border_radius": "50%", "background_color": "wooden"}),
+                                rx.text("Dark Blue", font_size="14px", color="gray"),
+                                spacing="2",
+                                align_items="center"
+                            ),
+                            rx.hstack(
+                                rx.box(style={"width": "30px", "height": "30px", "border_radius": "50%", "background_color": "brown"}),
+                                rx.text("Brown", font_size="14px", color="gray"),
+                                spacing="2",
+                                align_items="center"
+                            ),
+                            spacing="4",  # spacing between color items
+                        ),
+                    
                     rx.text("Price", font_size="18px", font_weight="bold", margin_top="15px", color="#22282c"),
                     rx.hstack(
                         rx.text("Physical:", font_size="16px", color="#22282c"),

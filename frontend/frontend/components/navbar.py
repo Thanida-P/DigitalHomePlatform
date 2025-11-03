@@ -2,6 +2,7 @@ import reflex as rx
 import httpx
 import os
 from ..state import AuthState
+from ..config import API_BASE_URL
 
 
 class NavCartState(rx.State):
@@ -10,7 +11,6 @@ class NavCartState(rx.State):
     is_loading = True
     cart_quantity: int = 0
 
-    API_BASE_URL: str = "http://localhost:8001"
     async def load_cart_quantity(self):
         import httpx
         """Fetch only cart quantity from backend"""
@@ -21,7 +21,7 @@ class NavCartState(rx.State):
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{self.API_BASE_URL}/carts/view/",
+                    f"{API_BASE_URL}/carts/view/",
                     cookies=cookies_dict,
                 )
                 

@@ -305,7 +305,6 @@ import httpx
 import re
 from ..config import API_BASE_URL
 
-
 class SignupState(rx.State):
     first_name: str = ""
     last_name: str = ""

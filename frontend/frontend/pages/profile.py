@@ -4,7 +4,11 @@ from ..template import template
 from ..state import AuthState
 import httpx
 from typing import Optional, Callable, Any
+import json
+import random
+import string
 from ..config import API_BASE_URL
+import base64
 
 
 class Address(rx.Base):
@@ -1504,6 +1508,239 @@ class PaymentState(rx.State):
             print(f"Error setting default bank: {e}")
             return rx.toast.error("Error updating default bank account")
 
+class Review(rx.Base):
+    id: int = 0
+    product_id: int = 0
+    rating: int = 0
+    comment: str = ""
+    image: Optional[str] = None
+    created_at: str = ""
+    updated_at: str = ""
+
+
+class ReviewState(rx.State):
+    reviews: list[Review] = []
+    is_loading: bool = False
+    error_message: str = ""
+    success_message: str = ""
+    
+    # Form states
+    show_edit_form: bool = False
+    
+    # Form fields
+    product_id: str = ""
+    rating: str = "5"
+    comment: str = ""
+    review_image: Optional[str] = None
+    editing_review_id: int = 0
+    
+    # Image upload
+    is_uploading_image: bool = False
+    upload_image_error: str = ""
+
+    def set_rating(self, value: str):
+        self.rating = value
+
+    def set_comment(self, value: str):
+        self.comment = value
+
+    def open_edit_form(self, review: Review):
+        self.show_edit_form = True
+        self.editing_review_id = review.id
+        self.product_id = str(review.product_id)
+        self.rating = str(review.rating)
+        self.comment = review.comment
+        self.review_image = review.image
+
+    def close_form(self):
+        self.show_edit_form = False
+        self.clear_form()
+
+    def clear_form(self):
+        self.product_id = ""
+        self.rating = "5"
+        self.comment = ""
+        self.review_image = None
+        self.editing_review_id = 0
+        self.error_message = ""
+        self.success_message = ""
+        self.upload_image_error = ""
+
+    async def load_reviews(self):
+        """Fetch all reviews for the current customer."""
+        self.is_loading = True
+        self.error_message = ""
+        
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{API_BASE_URL}/reviews/get_customer_reviews/",
+                    cookies=cookies_dict,
+                    timeout=10.0
+                )
+
+            if response.status_code == 200:
+                data = response.json()
+                reviews_data = data.get("reviews", [])
+                self.reviews = [
+                    Review(
+                        id=review.get("id", 0),
+                        product_id=review.get("product_id", 0),
+                        rating=review.get("rating", 0),
+                        comment=review.get("comment", ""),
+                        image=review.get("image"),
+                        created_at=review.get("created_at", ""),
+                        updated_at=review.get("updated_at", "")
+                    )
+                    for review in reviews_data
+                ]
+                print(f"Loaded {len(self.reviews)} reviews")
+            elif response.status_code == 403:
+                self.error_message = "Only customers can view reviews"
+            else:
+                self.error_message = "Failed to load reviews"
+                
+        except Exception as e:
+            self.error_message = f"Error loading reviews: {str(e)}"
+            print(f"Error loading reviews: {e}")
+        finally:
+            self.is_loading = False
+
+    async def handle_image_upload(self, files):
+        """Handle image upload for review."""
+        if not files:
+            return
+
+        try:
+            self.is_uploading_image = True
+            self.upload_image_error = ""
+
+            upload_file = files[0] if isinstance(files, list) else files
+
+            if hasattr(upload_file, "read"):
+                file_content = await upload_file.read()
+                filename = getattr(upload_file, "filename", "review.png")
+                content_type = getattr(upload_file, "type", "image/png")
+            elif isinstance(upload_file, str):
+                with open(upload_file, "rb") as f:
+                    file_content = f.read()
+                filename = upload_file.split("/")[-1]
+                ext = filename.split(".")[-1].lower()
+                content_type = "image/jpeg" if ext in ["jpg", "jpeg"] else "image/png"
+            else:
+                self.upload_image_error = "Unsupported file format"
+                return
+
+            if content_type not in ["image/png", "image/jpeg", "image/jpg"]:
+                self.upload_image_error = "Only PNG and JPEG images are allowed"
+                return
+
+            if len(file_content) > 5 * 1024 * 1024:
+                self.upload_image_error = "Image size must be less than 5MB"
+                return
+
+            self.review_image = base64.b64encode(file_content).decode('utf-8')
+
+        except Exception as e:
+            self.upload_image_error = f"Error uploading image: {str(e)}"
+            print(f"Error in handle_image_upload: {e}")
+        finally:
+            self.is_uploading_image = False
+
+    def remove_image(self):
+        """Remove the uploaded image."""
+        self.review_image = None
+
+    async def edit_review(self):
+        """Edit an existing review."""
+        self.error_message = ""
+        self.success_message = ""
+
+        if not self.editing_review_id:
+            self.error_message = "Review ID is required"
+            return
+
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+
+        try:
+            
+            form_data = {
+                "review_id": str(self.editing_review_id),
+                "rating": self.rating,
+                "comment": self.comment
+            }
+
+            # Prepare files if image exists
+            files = None
+            if self.review_image:
+                # Decode base64 and prepare for upload
+                image_bytes = base64.b64decode(self.review_image)
+                files = {"image": ("review.jpg", image_bytes, "image/jpeg")}
+            else:
+                # Send empty image to remove it
+                form_data["image"] = ""
+
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{API_BASE_URL}/reviews/edit/",
+                    data=form_data,
+                    files=files,
+                    cookies=cookies_dict,
+                    timeout=10.0
+                )
+
+            if response.status_code == 200:
+                self.success_message = "Review updated successfully!"
+                await self.load_reviews()
+                self.close_form()
+                return rx.toast.success("Review updated successfully!")
+            elif response.status_code == 400:
+                data = response.json()
+                self.error_message = data.get("error", "Invalid request")
+            elif response.status_code == 403:
+                self.error_message = "Only customers can edit reviews"
+            elif response.status_code == 404:
+                self.error_message = "Review not found"
+            else:
+                self.error_message = f"Failed to update review: {response.status_code}"
+
+        except Exception as e:
+            self.error_message = f"Error updating review: {str(e)}"
+            print(f"Error updating review: {e}")
+
+    async def delete_review(self, review_id: int):
+        """Delete a review."""
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.delete(
+                    f"{API_BASE_URL}/reviews/delete/{review_id}/",
+                    cookies=cookies_dict,
+                    timeout=10.0
+                )
+
+            if response.status_code == 200:
+                await self.load_reviews()
+                return rx.toast.success("Review deleted successfully!")
+            elif response.status_code == 403:
+                return rx.toast.error("Only customers can delete reviews")
+            elif response.status_code == 404:
+                return rx.toast.error("Review not found")
+            else:
+                return rx.toast.error("Failed to delete review")
+
+        except Exception as e:
+            print(f"Error deleting review: {e}")
+            return rx.toast.error("Error deleting review")
+
+
+
 
 def profile_avatar_section() -> rx.Component:
     """Profile avatar with upload functionality"""
@@ -1600,7 +1837,7 @@ def profile_content() -> rx.Component:
                     nav_button("My Address", "address"),
                     nav_button("My Payment Medthods", "card"),
                     nav_button("Wishlist", "wishlist"),
-                    nav_button("My Orders", "orders"),
+                    #nav_button("My Orders", "orders"),
                     nav_button("My Reviews", "reviews"),
                     nav_button("Notification", "notification"),
                     rx.link("Logout", href="/logout", style=menu_item_style(False)),
@@ -1620,7 +1857,7 @@ def profile_content() -> rx.Component:
                 ("address", address_content()),
                 ("card", card_content() ),
                 ("wishlist", wishlist_content()),
-                ("orders", orders_content()),
+                #("orders", orders_content()),
                 ("reviews", reviews_content()),
                 ("notification", notification_content()),
                 profile_info_content(),
@@ -1968,217 +2205,6 @@ class Address(rx.Base):
     id: int
     address: str
     is_default: bool = False
-
-
-class AddressState(rx.State):
-    show_form: bool = False
-    addresses: list[Address] = []
-    new_address: str = ""
-    editing_address_id: int = 0
-    is_loading: bool = False
-    error_message: str = ""
-    success_message: str = ""
-
-    def start_edit_address(self, address_id: int, current_address: str):
-        self.editing_address_id = address_id
-        self.show_form = True  # reuse the form modal for editing
-        self.new_address = current_address  # pre-fill with existing address
-        print(f"Starting edit for address ID {address_id}: {current_address}")
-
-    def toggle_form(self):
-        """Toggle visibility of the address form."""
-        self.show_form = True
-        self.editing_address_id = 0  # Reset editing state
-        self.new_address = ""  # Clear input field
-        print("Opening address form.")
-
-    def close_form(self):
-        """Close the address form and clear input."""
-        self.show_form = False
-        self.new_address = ""
-        self.editing_address_id = 0  # Reset editing state
-
-    def set_new_address(self, value: str):
-        """Update the new_address field."""
-        self.new_address = value
-
-    async def save_address(self):
-        """Save address (add new or update existing)."""
-        if self.editing_address_id == 0:
-            # Adding new address
-            await self.add_address()
-        else:
-            # Editing existing address
-            await self.edit_address(self.editing_address_id, self.new_address)
-
-    async def add_address(self):
-        auth_state = await self.get_state(AuthState)
-        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
-
-        if not self.new_address.strip():
-            print("No address entered. Skipping.")
-            return
-
-        data = {"address": self.new_address.strip(), "is_default": False}
-        print("Sending new address to backend:", data)
-
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{API_BASE_URL}/users/address/add/",
-                    data=data,
-                    cookies=cookies_dict,
-                )
-            print("POST response status:", response.status_code)
-
-            if response.status_code == 201:
-                # Reload addresses
-                await self.load_addresses()
-                self.new_address = ""
-                self.show_form = False
-                self.editing_address_id = 0
-                print("Address added successfully.")
-            else:
-                print("Error adding address:", response.text)
-        except Exception as e:
-            print("Request failed:", e)
-
-    async def load_addresses(self):
-        """Fetch existing addresses from backend when the page loads."""
-        auth_state = await self.get_state(AuthState)
-        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
-
-        try:
-            async with httpx.AsyncClient() as client:
-                res = await client.get(
-                    f"{API_BASE_URL}/users/address/",
-                    cookies=cookies_dict,
-                )
-            if res.status_code == 200:
-                addresses_data = res.json()
-                addresses_list = addresses_data.get("addresses", [])
-                self.addresses = [
-                    Address(
-                        id=addr.get("id", 0),
-                        address=addr.get("address", ""),
-                        is_default=addr.get("is_default", False),
-                    )
-                    for addr in addresses_list
-                ]
-                print("Addresses loaded:", self.addresses)
-            else:
-                print("Failed to fetch addresses:", res.text)
-        except Exception as e:
-            print("Request failed:", e)
-
-    async def delete_address(self, address_id: int):
-        auth_state = await self.get_state(AuthState)
-        cookies_dict = auth_state.session_cookies or {}
-
-        # Make DELETE request
-        async with httpx.AsyncClient() as client:
-            response = await client.request(
-                "DELETE",
-                f"{API_BASE_URL}/users/address/delete/",
-                data=json.dumps({"address_id": address_id}),
-                headers={"Content-Type": "application/json"},
-                cookies=cookies_dict,
-            )
-
-        if response.status_code == 200:
-            # Update reactive list safely
-            new_addresses = [addr for addr in self.addresses if addr.id != address_id]
-            self.addresses = new_addresses
-        else:
-            print("Failed to delete address:", response.text)
-
-    async def edit_address(self, address_id: int, new_address: str):
-        auth_state = await self.get_state(AuthState)
-        cookies_dict = auth_state.session_cookies or {}
-
-        if not new_address.strip():
-            print("No address entered. Skipping.")
-            return
-
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.request(
-                    "PUT",
-                    f"{API_BASE_URL}/users/address/edit/",
-                    data=json.dumps(
-                        {"address_id": address_id, "address": new_address.strip()}
-                    ),
-                    headers={"Content-Type": "application/json"},
-                    cookies=cookies_dict,
-                )
-
-            if response.status_code == 200:
-                # Reload addresses from backend
-                await self.load_addresses()
-                self.new_address = ""
-                self.show_form = False
-                self.editing_address_id = 0
-                print("Address updated successfully.")
-            else:
-                print("Failed to edit address:", response.text)
-        except Exception as e:
-            print("Request failed:", e)
-
-    async def set_default_address(self, address_id: int):
-        """Set an address as the default address"""
-        self.is_loading = True
-        self.error_message = ""
-        self.success_message = ""
-        auth_state = await self.get_state(AuthState)
-        cookies_dict = auth_state.session_cookies or {}
-
-        try:
-            # Make PUT request to set default address
-            async with httpx.AsyncClient() as client:
-                response = await client.put(
-                    f"{API_BASE_URL}/users/address/set_default/",
-                    json={"address_id": address_id},
-                    headers={"Content-Type": "application/json"},
-                    cookies=cookies_dict,
-                    timeout=10.0,
-                )
-
-                if response.status_code == 200:
-                    self.success_message = "Default address updated successfully"
-
-                    updated_addresses = []
-                    for addr in self.addresses:
-                        addr_copy = addr.copy()
-                        if addr_copy["id"] == address_id:
-                            addr_copy["is_default"] = True
-                        else:
-                            addr_copy["is_default"] = False
-                        updated_addresses.append(addr_copy)
-
-                    # Assign the new list to trigger state update
-                    self.addresses = updated_addresses
-
-                elif response.status_code == 401:
-                    self.error_message = "Authentication required"
-                elif response.status_code == 403:
-                    self.error_message = "Only customers can manage addresses"
-                elif response.status_code == 404:
-                    self.error_message = "Address not found"
-                else:
-                    data = response.json()
-                    self.error_message = data.get(
-                        "error", "Failed to set default address"
-                    )
-
-        except httpx.TimeoutException:
-            self.error_message = "Request timed out. Please try again."
-        except httpx.RequestError as e:
-            self.error_message = f"Connection error: {str(e)}"
-        except Exception as e:
-            self.error_message = f"An error occurred: {str(e)}"
-        finally:
-            self.is_loading = False
-
 
 def new_address_modal() -> rx.Component:
     return rx.cond(
@@ -2915,21 +2941,386 @@ def orders_content() -> rx.Component:
     )
 
 
-def reviews_content() -> rx.Component:
-    return rx.vstack(
-        rx.center(
-            rx.text(
-                "My Reviews",
-                font_size="20px",
-                font_weight="bold",
-                margin_bottom="20px",
-                color="#22282c",
+
+def review_form_modal() -> rx.Component:
+    """Modal for editing reviews."""
+    return rx.cond(
+        ReviewState.show_edit_form,
+        rx.box(
+            rx.box(
+                rx.vstack(
+                    # Close button
+                    rx.box(
+                        rx.icon(
+                            tag="x",
+                            size=28,
+                            color="#6B7280",
+                            cursor="pointer",
+                            on_click=ReviewState.close_form,
+                            _hover={"color": "#22282C"},
+                        ),
+                        width="100%",
+                        display="flex",
+                        justify_content="flex-end",
+                    ),
+                    
+                    # Title
+                    rx.center(
+                        rx.text(
+                            "Edit Review",
+                            font_size="24px",
+                            font_weight="bold",
+                            color="#22282C",
+                        ),
+                        width="100%",
+                    ),
+                    
+                    # Product ID (read-only)
+                    rx.vstack(
+                        rx.text("Product ID", font_size="14px", font_weight="500", color="#22282c"),
+                        rx.input(
+                            value=ReviewState.product_id,
+                            width="100%",
+                            padding="5px",
+                            border="1px solid #D1D5DB",
+                            border_radius="12px",
+                            background_color="#F3F4F6",
+                            is_read_only=True,
+                        ),
+                        spacing="1",
+                        width="100%",
+                        align_items="start",
+                    ),
+                    
+                    # Rating
+                    rx.vstack(
+                        rx.text("Rating", font_size="14px", font_weight="500", color="#22282c"),
+                        rx.select(
+                            ["1", "2", "3", "4", "5"],
+                            value=ReviewState.rating,
+                            on_change=ReviewState.set_rating,
+                            width="100%",
+                        ),
+                        spacing="1",
+                        width="100%",
+                        align_items="start",
+                    ),
+                    
+                    # Comment
+                    rx.vstack(
+                        rx.text("Comment", font_size="14px", font_weight="500", color="#22282c"),
+                        rx.text_area(
+                            placeholder="Write your review...",
+                            value=ReviewState.comment,
+                            on_change=ReviewState.set_comment,
+                            width="100%",
+                            min_height="100px",
+                            padding="5px",
+                            border="1px solid #D1D5DB",
+                            border_radius="12px",
+                            background_color="#ffffff",
+                        ),
+                        spacing="1",
+                        width="100%",
+                        align_items="start",
+                    ),
+                    
+                    # Image Upload
+                    rx.vstack(
+                        rx.text("Image (Optional)", font_size="14px", font_weight="500", color="#22282c"),
+                        rx.cond(
+                            ReviewState.review_image,
+                            rx.vstack(
+                                rx.image(
+                                    src=f"data:image/jpeg;base64,{ReviewState.review_image}",
+                                    width="200px",
+                                    height="200px",
+                                    object_fit="cover",
+                                    border_radius="8px",
+                                ),
+                                rx.button(
+                                    "Remove Image",
+                                    on_click=ReviewState.remove_image,
+                                    variant="soft",
+                                    color_scheme="red",
+                                    size="2",
+                                ),
+                                spacing="2",
+                                align_items="center",
+                            ),
+                            rx.upload(
+                                rx.button(
+                                    rx.icon("image", size=16),
+                                    "Upload Image",
+                                    size="2",
+                                    variant="soft",
+                                    cursor="pointer",
+                                ),
+                                accept={
+                                    "image/png": [".png"],
+                                    "image/jpeg": [".jpg", ".jpeg"],
+                                },
+                                max_files=1,
+                                on_drop=ReviewState.handle_image_upload,
+                            ),
+                        ),
+                        rx.cond(
+                            ReviewState.upload_image_error != "",
+                            rx.text(
+                                ReviewState.upload_image_error,
+                                color="#EF4444",
+                                font_size="12px",
+                            ),
+                            rx.fragment(),
+                        ),
+                        spacing="2",
+                        width="100%",
+                        align_items="start",
+                    ),
+                    
+                    # Error Messages
+                    rx.cond(
+                        ReviewState.error_message != "",
+                        rx.text(
+                            ReviewState.error_message,
+                            color="#EF4444",
+                            font_size="14px",
+                        ),
+                        rx.fragment(),
+                    ),
+                    
+                    # Submit Button
+                    rx.button(
+                        "Update Review",
+                        on_click=ReviewState.edit_review,
+                        width="100%",
+                        bg="#2E6FF2",
+                        color="white",
+                        border_radius="12px",
+                        padding="15px",
+                        font_size="16px",
+                        font_weight="600",
+                        cursor="pointer",
+                        _hover={"opacity": "0.9"},
+                    ),
+                    
+                    spacing="4",
+                    width="100%",
+                ),
+                bg="white",
+                padding="20px 40px",
+                border_radius="20px",
+                width="600px",
+                max_width="90vw",
+                max_height="90vh",
+                overflow_y="auto",
+                box_shadow="0 20px 25px -5px rgba(0,0,0,0.1)",
+                position="relative",
             ),
-            width="100%",
+            position="fixed",
+            top="0",
+            left="0",
+            right="0",
+            bottom="0",
+            bg="rgba(0, 0, 0, 0.5)",
+            display="flex",
+            align_items="center",
+            justify_content="center",
+            z_index="1001",
         ),
-        rx.text("Your reviews will appear here...", color="#22282c"),
+    )
+
+
+def render_stars(rating):
+    return rx.hstack(
+        *[
+            rx.icon(
+                "star",
+                color=rx.cond(i < rating, "#FCD34D", "#D1D5DB"),
+                size=20,
+            )
+            for i in range(5)
+        ]
+    )
+
+
+def review_card(review: Review) -> rx.Component:
+    """Display a single review card."""
+    return rx.box(
+        rx.vstack(
+       
+            rx.hstack(
+                render_stars(review.rating),
+                rx.spacer(),
+                rx.hstack(
+                    rx.icon(
+                        "pencil",
+                        size=18,
+                        color="#2E6FF2",
+                        cursor="pointer",
+                        on_click=lambda: ReviewState.open_edit_form(review),
+                    ),
+                    rx.text(
+                        "Edit",
+                        font_weight="semibold",
+                        color="#2E6FF2",
+                        cursor="pointer",
+                        on_click=lambda: ReviewState.open_edit_form(review),
+                    ),
+                    rx.icon(
+                        "trash",
+                        size=18,
+                        color="#FF4D4D",
+                        cursor="pointer",
+                        on_click=lambda: ReviewState.delete_review(review.id),
+                    ),
+                    rx.text(
+                        "Delete",
+                        font_weight="semibold",
+                        color="#FF4D4D",
+                        cursor="pointer",
+                        on_click=lambda: ReviewState.delete_review(review.id),
+                    ),
+                    spacing="3",
+                    align="center",
+                ),
+                width="100%",
+                align_items="center",
+            ),
+            
+            rx.text(
+                f"Product ID: {review.product_id}",
+                font_size="14px",
+                color="#6B7280",
+            ),
+            
+            rx.cond(
+                review.comment != "",
+                rx.text(
+                    review.comment,
+                    font_size="14px",
+                    color="#22282C",
+                ),
+                rx.fragment(),
+            ),
+            
+            # Image if exists
+            rx.cond(
+                review.image,
+                rx.image(
+                    src=f"data:image/jpeg;base64,{review.image}",
+                    width="200px",
+                    height="200px",
+                    object_fit="cover",
+                    border_radius="8px",
+                ),
+                rx.fragment(),
+            ),
+            
+            # Dates
+            rx.hstack(
+                rx.text(
+                    f"Created: {review.created_at}",
+                    font_size="12px",
+                    color="#9CA3AF",
+                ),
+                rx.text(
+                    f"Updated: {review.updated_at}",
+                    font_size="12px",
+                    color="#9CA3AF",
+                ),
+                spacing="4",
+            ),
+            
+            spacing="3",
+            width="100%",
+            align_items="start",
+        ),
+        padding="20px",
+        border="1px solid #E5E7EB",
+        border_radius="12px",
+        bg="white",
+        width="100%",
+        _hover={
+            "box_shadow": "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+            "border_color": "#2E6FF2",
+        },
+        transition="all 0.2s ease",
+    )
+
+
+
+def reviews_content() -> rx.Component:
+    """Main reviews content component - Load, Edit, and Delete only."""
+    return rx.vstack(
+      
+        rx.center(
+            rx.heading("My Reviews", size="6", color="#22282c"),
+            width="100%",
+            margin_bottom="20px",
+        ),
+        
+        # Error message
+        rx.cond(
+            ReviewState.error_message != "",
+            rx.box(
+                rx.text(
+                    ReviewState.error_message,
+                    color="#EF4444",
+                    font_size="14px",
+                ),
+                padding="10px",
+                bg="#FEE2E2",
+                border_radius="8px",
+                width="100%",
+            ),
+            rx.fragment(),
+        ),
+        
+     
+        rx.cond(
+            ReviewState.is_loading,
+            rx.center(
+                rx.spinner(size="3"),
+                padding="40px",
+                width="100%",
+            ),
+            rx.cond(
+                ReviewState.reviews.length() > 0,
+                rx.vstack(
+                    rx.foreach(ReviewState.reviews, review_card),
+                    spacing="4",
+                    width="100%",
+                ),
+                rx.center(
+                    rx.vstack(
+                        rx.icon("message-square", size=48, color="#9CA3AF"),
+                        rx.text(
+                            "No reviews yet",
+                            font_size="18px",
+                            font_weight="600",
+                            color="#6B7280",
+                        ),
+                        rx.text(
+                            "Your reviews will appear here",
+                            font_size="14px",
+                            color="#9CA3AF",
+                        ),
+                        spacing="2",
+                        align_items="center",
+                    ),
+                    padding="60px 20px",
+                    width="100%",
+                ),
+            ),
+        ),
+        
+        # Form Modal
+        review_form_modal(),
+        
         spacing="5",
         width="100%",
+        padding="20px",
     )
 
 
@@ -3233,7 +3624,7 @@ def bank_account_item(account: BankAccount) -> rx.Component:
     )
 
 
-@rx.page(route="/profile", on_load=[PaymentState.load_payment_methods])
+@rx.page(route="/profile", on_load=[PaymentState.load_payment_methods,ReviewState.load_reviews])
 def profile_page() -> rx.Component:
 
     return rx.box(

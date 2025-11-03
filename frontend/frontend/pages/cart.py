@@ -2,6 +2,7 @@ import reflex as rx
 from typing import List, Optional
 from ..template import template
 from ..state import AuthState
+from ..config import API_BASE_URL
 
 
 class CreditCard(rx.Base):
@@ -62,7 +63,6 @@ class CartState(rx.State):
     bank_accounts: list[BankAccount] = []
     is_loading_payments: bool = False
 
-    API_BASE_URL: str = "http://localhost:8001"
 
     def select_payment(self, payment_id: str):
         """Select a payment method"""
@@ -85,7 +85,7 @@ class CartState(rx.State):
 
     async def load_user_data(self):
         import httpx
-        """Fetch user profile from backend"""
+    
         auth_state = await self.get_state(AuthState)
         
         if not auth_state.is_logged_in:
@@ -96,19 +96,13 @@ class CartState(rx.State):
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{self.API_BASE_URL}/users/profile/",
+                    f"{API_BASE_URL}/users/profile/",
                     cookies=cookies_dict,
                     timeout=5.0
                 )
             if response.status_code == 200:
                 data = response.json()
                 user = data.get("user_profile", {})
-                
-                # DEBUG: Print the entire user object
-                print("=== USER DATA ===")
-                print(f"Full user object: {user}")
-                print(f"Profile pic raw: {user.get('profilePic', 'NOT FOUND')}")
-                print(f"All keys: {user.keys()}")
           
                 self.username = user.get("username", "")
                 self.phone_number = user.get("phone_no", "")
@@ -118,13 +112,13 @@ class CartState(rx.State):
     
     async def load_addresses(self):
         import httpx
-        """Fetch existing addresses from backend."""
+       
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
         try:
             async with httpx.AsyncClient() as client:
                 res = await client.get(
-                    f"{self.API_BASE_URL}/users/address/",
+                    f"{API_BASE_URL}/users/address/",
                     cookies=cookies_dict,
                 )
             if res.status_code == 200:
@@ -133,8 +127,8 @@ class CartState(rx.State):
                 self.addresses = [
                     Address(
                         id=addr.get("id", 0),
-                        name=addr.get("name", ""),  # Add name field
-                        phone=addr.get("phone", ""),  # Add phone field
+                        name=addr.get("name", ""),  
+                        phone=addr.get("phone", ""),  
                         address=addr.get("address", ""),
                         is_default=addr.get("is_default", False)
                     )
@@ -157,92 +151,170 @@ class CartState(rx.State):
 
     async def load_cart(self):
         import httpx
-        """Fetch cart items from backend"""
+        
         self.is_loading = True
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies or {}
         
         try:
             async with httpx.AsyncClient() as client:
-               
+                # Get cart items
                 response = await client.get(
-                    f"{self.API_BASE_URL}/carts/view/",
+                    f"{API_BASE_URL}/carts/view/",
                     cookies=cookies_dict,
+                    timeout=10.0  # Add timeout
                 )
                 
                 if response.status_code == 200:
                     data = response.json()
+                    print(f"📦 Cart data: {data}")
+                    
                     self.cart_id = data.get('cart_id')
+                    print(f"🛒 Cart ID: {self.cart_id}")
                     
                     items = []
                     for item in data.get('items', []):
-                      
+                        print(f"\n🔍 Processing item: {item}")
+                        product_id = item.get('product_id')
+                        
                         try:
+                            
                             product_response = await client.get(
-                                f"{self.API_BASE_URL}/products/get_product_detail/{item['product_id']}",
+                                f"{API_BASE_URL}/products/get_product_detail/{product_id}/",
                                 cookies=cookies_dict,
+                                timeout=10.0
                             )
                             
+                            print(f"📡 Product response status: {product_response.status_code}")
+                            print(f"📡 Product response headers: {product_response.headers}")
+                            
                             if product_response.status_code == 200:
-                                product_data = product_response.json()
-                                print(f"📦 Full product data: {product_data}")
-                               
-                                if item['type'] == 'digital':
-                                    price = int(float(product_data.get('digital_price', 0)))
+                                response_data = product_response.json()
+                                print(f"✅ Full response for {product_id}: {response_data}")
+                                
+                                
+                                product_data = response_data.get('product', {})
+                                print(f"✅ Product data: {product_data}")
+                                
+                              
+                                item_type = item.get('type', 'physical')
+                                
+                                if item_type == 'digital':
+                                    price_value = product_data.get('digital_price', 0)
                                 else:
-                                    price = int(float(product_data.get('physical_price', 0)))
-                                    print(f"🔍 Calculated price: {price} for type: {item['type']}")
+                                    price_value = product_data.get('physical_price', 0)
+                                
+                                
+                                try:
+                                    price = int(float(price_value))
+                                except (ValueError, TypeError):
+                                    print(f"⚠️ Could not convert price '{price_value}' to int, using 0")
+                                    price = 0
+                                
+                                print(f"💰 Price for {item_type}: {price}")
+                                
+                           
+                                image_data = product_data.get('image', '')
+                                if image_data and not image_data.startswith(('http://', 'https://', 'data:', '/')):
+                                    
+                                    image_url = f"data:image/avif;base64,{image_data}"
+                                else:
+                                    
+                                    image_url = image_data or '/placeholder.png'
                                 
                                 cart_item = CartItem(
-                                    id=item['id'],
-                                    product_id=item['product_id'],
-                                    name=product_data.get('name', item['product_name']),
+                                    id=item.get('id'),
+                                    product_id=product_id,
+                                    name=product_data.get('name', item.get('product_name', 'Unknown Product')),
                                     price=price,
-                                    quantity=item['quantity'],
-                                    colors=["#C0C0C0", "#F5F5DC", "#D2B48C"], 
-                                    image=product_data.get('image', '/placeholder.jpg'),
-                                    item_type=item['type']
+                                    quantity=item.get('quantity', 1),
+                                    colors=["#C0C0C0", "#F5F5DC", "#D2B48C"],
+                                    image=image_url,
+                                    item_type=item_type
                                 )
                                 items.append(cart_item)
-                            else:
+                                print(f"✅ Added cart item: {cart_item}")
                                 
+                            else:
+                               
+                                print(f"❌ Failed to fetch product {product_id}")
+                                print(f"   Status: {product_response.status_code}")
+                                try:
+                                    error_data = product_response.json()
+                                    print(f"   Error data: {error_data}")
+                                except:
+                                    print(f"   Response text: {product_response.text}")
+                                
+                               
                                 cart_item = CartItem(
-                                    id=item['id'],
-                                    product_id=item['product_id'],
-                                    name=item['product_name'],
-                                    price=100,
-                                    quantity=item['quantity'],
+                                    id=item.get('id'),
+                                    product_id=product_id,
+                                    name=item.get('product_name', 'Product Not Found'),
+                                    price=0,
+                                    quantity=item.get('quantity', 1),
                                     colors=["#C0C0C0", "#F5F5DC", "#D2B48C"],
                                     image="/placeholder.jpg",
-                                    item_type=item['type']
+                                    item_type=item.get('type', 'physical')
                                 )
                                 items.append(cart_item)
-                        except Exception as e:
-                            print(f"Error fetching product {item['product_id']}: {e}")
-                          
+                                
+                        except httpx.TimeoutException:
+                            print(f"⏱️ Timeout fetching product {product_id}")
                             cart_item = CartItem(
-                                id=item['id'],
-                                product_id=item['product_id'],
-                                name=item['product_name'],
-                                price=100,
-                                quantity=item['quantity'],
+                                id=item.get('id'),
+                                product_id=product_id,
+                                name=item.get('product_name', 'Product Unavailable'),
+                                price=0,
+                                quantity=item.get('quantity', 1),
                                 colors=["#C0C0C0", "#F5F5DC", "#D2B48C"],
                                 image="/placeholder.jpg",
-                                item_type=item['type']
+                                item_type=item.get('type', 'physical')
+                            )
+                            items.append(cart_item)
+                            
+                        except Exception as e:
+                            print(f"❌ Error fetching product {product_id}: {type(e).__name__}: {str(e)}")
+                            import traceback
+                            traceback.print_exc()
+                            
+                        
+                            cart_item = CartItem(
+                                id=item.get('id'),
+                                product_id=product_id,
+                                name=item.get('product_name', 'Error Loading Product'),
+                                price=0,
+                                quantity=item.get('quantity', 1),
+                                colors=["#C0C0C0", "#F5F5DC", "#D2B48C"],
+                                image="/placeholder.jpg",
+                                item_type=item.get('type', 'physical')
                             )
                             items.append(cart_item)
                     
                     self.cart_items = items
+                    print(f"✅ Total items loaded: {len(items)}")
+                    
                 elif response.status_code == 404:
                     self.cart_items = []
+                    print("ℹ️ Cart is empty (404)")
                     rx.toast.info("Your cart is empty")
                 else:
-                    error = response.json().get('error', 'Failed to load cart')
+                    error_text = response.text
+                    print(f"❌ Failed to load cart: {response.status_code}")
+                    print(f"   Response: {error_text}")
+                    try:
+                        error = response.json().get('error', 'Failed to load cart')
+                    except:
+                        error = 'Failed to load cart'
                     rx.toast.error(f"Error: {error}")
                     
+        except httpx.TimeoutException:
+            print("⏱️ Timeout loading cart")
+            rx.toast.error("Request timeout. Please try again.")
         except Exception as e:
-            rx.toast.error(f"Network error: {e}")
-            print(f"Exception in load_cart: {e}")
+            print(f"❌ Exception in load_cart: {type(e).__name__}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            rx.toast.error(f"Network error: {str(e)}")
         finally:
             self.is_loading = False
 
@@ -255,7 +327,7 @@ class CartState(rx.State):
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.delete(
-                    f"{self.API_BASE_URL}/carts/remove_item/{item_id}/",
+                    f"{API_BASE_URL}/carts/remove_item/{item_id}/",
                     cookies=cookies_dict,
                 )
                 
@@ -286,12 +358,12 @@ class CartState(rx.State):
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.delete(
-                    f"{self.API_BASE_URL}/carts/clear_cart/",
+                    f"{API_BASE_URL}/carts/clear_cart/",
                     cookies=cookies_dict,
                 )
                 
                 if response.status_code == 200:
-                    # Clear local state
+                
                     self.cart_items = []
                     rx.toast.success("Cart cleared successfully")
                 elif response.status_code == 404:
@@ -325,15 +397,14 @@ class CartState(rx.State):
         try:
             async with httpx.AsyncClient() as client:
                 res = await client.get(
-                    f"{self.API_BASE_URL}/users/payment_methods/",  # ✅ Correct endpoint
+                    f"{API_BASE_URL}/users/payment_methods/",  
                     cookies=cookies_dict,
                     timeout=10.0
                 )
             
             if res.status_code == 200:
                 data = res.json()
-                cards_data = data.get("payment_methods", [])  # ✅ Changed from "credit_cards" to "payment_methods"
-                # Convert to typed objects
+                cards_data = data.get("payment_methods", [])  
                 self.credit_cards = [
                     CreditCard(
                         id=card.get("id", 0),
@@ -365,7 +436,7 @@ class CartState(rx.State):
         try:
             async with httpx.AsyncClient() as client:
                 res = await client.get(
-                    f"{self.API_BASE_URL}/users/payment_methods/list_bank_accounts/",
+                    f"{API_BASE_URL}/users/payment_methods/list_bank_accounts/",
                     cookies=cookies_dict,
                     timeout=10.0
                 )
@@ -373,7 +444,7 @@ class CartState(rx.State):
             if res.status_code == 200:
                 data = res.json()
                 accounts_data = data.get("bank_accounts", [])
-                # Convert to typed objects
+                
                 self.bank_accounts = [
                     BankAccount(
                         id=account.get("id", 0),
@@ -398,7 +469,7 @@ class CartState(rx.State):
     
     promo_code: str = ""
     delivery_fee: int = 50
-    discount: int = 50
+    discount: int = 100
     selected_payment: str = ""
     
     @rx.var
@@ -426,17 +497,54 @@ class CartState(rx.State):
                 break
     
     
-    def apply_promo(self):
-       
-        pass
-    
-    def place_order(self):
-     
-        pass
+    async def place_order(self):
+        """Submit order via checkout API"""
+        import httpx
+        
+        if not self.selected_payment:
+            rx.toast.error("Please select a payment method")
+            return
+        
+        if not self.cart_items:
+            rx.toast.error("Cart is empty")
+            return
+        
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies or {}
+        
+        # Parse payment type and method_id
+        payment_parts = self.selected_payment.split("_")
+        payment_type = "credit_card" if payment_parts[0] == "card" else "bank_account"
+        method_id = payment_parts[1]
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{API_BASE_URL}/orders/checkout/",
+                    data={
+                        "payment_type": payment_type,
+                        "method_id": method_id
+                    },
+                    cookies=cookies_dict,
+                )
+                
+                if response.status_code == 201:
+                    data = response.json()
+                    order_id = data.get('order_id')
+                    rx.toast.success("Order created successfully!")
+                    print("order successfully added,", order_id)
+                    # Redirect to orders list page
+                    return rx.redirect("/orders")
+                else:
+                    error = response.json().get('error', 'Failed to place order')
+                    rx.toast.error(f"Error: {error}")
+                    
+        except Exception as e:
+            rx.toast.error(f"Network error: {e}")
 
 
 def cart_item(item: CartItem) -> rx.Component:
-  
+    print(f"🎨 Rendering cart item with image: {item.image}") 
     return rx.box(
         rx.hstack(
           
@@ -569,35 +677,6 @@ def order_summary() -> rx.Component:
                 width="100%",
             ),
             
-          
-            rx.hstack(
-                rx.text("Promo Code", font_size="18px",color="#22282c",),
-                rx.spacer(),
-                rx.input(
-                    placeholder="",
-                    value=CartState.promo_code,
-                    on_change=CartState.set_promo_code,
-                    width="200px",
-                    border_radius="8px",
-                ),
-                rx.button(
-                    "Apply",
-                    on_click=CartState.apply_promo,
-                    bg="#22282c",
-                    font_weight = "bold",
-                    cursor = "pointer",
-                    color="white",
-                    border_radius="8px",
-                    padding="8px 24px",
-                     _hover={
-                    "color": "#22282c",
-                    "border": "1px solid #22282c",
-                    "background_color": "white"
-                }
-                ),
-                width="100%",
-                spacing="2",
-            ),
             
             rx.divider(margin_y="20px"),
             
@@ -641,10 +720,7 @@ def order_summary() -> rx.Component:
 
 
 def shipping_address() -> rx.Component:
-    """
-    Display current shipping address with option to change it.
-    Opens a modal to select from all available addresses.
-    """
+ 
     return rx.box(
         rx.vstack(
             rx.heading("Shipping Address", size="6", margin_bottom="20px", color="#22282c"),
@@ -694,7 +770,6 @@ def shipping_address() -> rx.Component:
                 ),
             ),
             
-            # Button to open address selection dialog
             rx.button(
                 "See all Delivery Addresses",
                 on_click=CartState.open_address_dialog,
@@ -719,13 +794,11 @@ def shipping_address() -> rx.Component:
 
 
 def address_selection_dialog() -> rx.Component:
-    """
-    Modal dialog for selecting a delivery address.
-    """
+ 
     return rx.dialog.root(
         rx.dialog.content(
             rx.box(
-                # Top bar with title and close (X) button
+    
                 rx.hstack(
                     rx.dialog.title(
                         "Select Delivery Address",
@@ -755,7 +828,6 @@ def address_selection_dialog() -> rx.Component:
                     font_size="14px",
                 ),
 
-                # Scrollable list of addresses
                 rx.box(
                     rx.cond(
                         CartState.addresses,
@@ -783,8 +855,6 @@ def address_selection_dialog() -> rx.Component:
                     box_shadow="inset 0 0 4px rgba(0,0,0,0.05)",
                     margin_bottom="20px",
                 ),
-
-                # Bottom action buttons
                 rx.hstack(
                     rx.dialog.close(
                         rx.button(
@@ -868,13 +938,13 @@ def address_card(addr: Address) -> rx.Component:
         border="2px solid",
         border_color=rx.cond(
             CartState.selected_address.id == addr.id,
-            "#3b82f6",  # Blue border if selected
-            "#e2e8f0",  # Gray border otherwise
+            "#3b82f6",  
+            "#e2e8f0", 
         ),
         border_radius="8px",
         bg=rx.cond(
             CartState.selected_address.id == addr.id,
-            "#eff6ff",  # Light blue background if selected
+            "#eff6ff", 
             "white",
         ),
         cursor="pointer",
@@ -888,7 +958,7 @@ def payment_method() -> rx.Component:
     """Payment method selection with credit cards and bank accounts"""
     return rx.box(
         rx.vstack(
-            # Header
+         
             rx.vstack(
                 rx.heading(
                     "Payment Method",
@@ -907,9 +977,9 @@ def payment_method() -> rx.Component:
                 margin_bottom="24px"
             ),
 
-            # Two column layout
+        
             rx.hstack(
-                # Credit Cards Column
+            
                 rx.vstack(
                     rx.hstack(
                         rx.icon("credit-card", size=20, color="#2E6FF2"),
@@ -924,7 +994,6 @@ def payment_method() -> rx.Component:
                         margin_bottom="16px"
                     ),
 
-                    # Scrollable cards container
                     rx.box(
                         rx.cond(
                             CartState.credit_cards.length() > 0,
@@ -952,7 +1021,6 @@ def payment_method() -> rx.Component:
                         width="100%"
                     ),
 
-                    # Add new card button
                     rx.link(
                         rx.button(
                             "+ Add New Card",
@@ -978,7 +1046,6 @@ def payment_method() -> rx.Component:
                     flex="1"
                 ),
 
-                # Bank Accounts Column
                 rx.vstack(
                     rx.hstack(
                         rx.icon("landmark", size=20, color="#10B981"),
@@ -993,7 +1060,6 @@ def payment_method() -> rx.Component:
                         margin_bottom="16px"
                     ),
 
-                    # Scrollable banks container
                     rx.box(
                         rx.cond(
                             CartState.bank_accounts.length() > 0,
@@ -1021,7 +1087,6 @@ def payment_method() -> rx.Component:
                         width="100%"
                     ),
 
-                    # Add new bank button
                     rx.link(
                         rx.button(
                             "+ Add New Bank Account",
@@ -1052,7 +1117,6 @@ def payment_method() -> rx.Component:
                 align="start"
             ),
 
-            # Selected payment summary
             rx.cond(
                 CartState.selected_payment != "",
                 rx.box(
@@ -1095,7 +1159,7 @@ def credit_card_payment_item(card: CreditCard) -> rx.Component:
     
     return rx.box(
         rx.hstack(
-            # Card icon and details
+    
             rx.hstack(
                 rx.box(
                     rx.icon(
@@ -1145,7 +1209,6 @@ def credit_card_payment_item(card: CreditCard) -> rx.Component:
                 flex="1"
             ),
 
-            # Selection indicator
             rx.cond(
                 is_selected,
                 rx.box(
@@ -1187,7 +1250,7 @@ def bank_account_payment_item(account: BankAccount) -> rx.Component:
     
     return rx.box(
         rx.hstack(
-            # Bank icon and details
+    
             rx.hstack(
                 rx.box(
                     rx.icon(
@@ -1237,7 +1300,6 @@ def bank_account_payment_item(account: BankAccount) -> rx.Component:
                 flex="1"
             ),
 
-            # Selection indicator
             rx.cond(
                 is_selected,
                 rx.box(
@@ -1297,7 +1359,7 @@ def cart_content() -> rx.Component:
                                 spacing="4",
                                 width="100%",
                             ),
-                            max_height="700px",  # Approximately height for 5 items
+                            max_height="700px",  
                             overflow_y="auto",
                             padding_right="10px",
                             width="100%",
@@ -1357,3 +1419,4 @@ def cart_content() -> rx.Component:
 @rx.page(route="/cart", on_load=[CartState.load_cart, CartState.load_user_data, CartState.load_payment_methods])
 def cart_page() -> rx.Component:
     return template(cart_content)
+

@@ -61,7 +61,7 @@ class AdminDashboardState(rx.State):
         
         file = files[0]
         upload_data = await file.read()
-        filename = f"product_img_{uuid.uuid4().hex[:8]}_{file.filename}"
+        filename = f"product_img_{uuid.uuid4().hex[:8]}_{file.name}"
         
         # Save file locally (adjust path as needed)
         outfile = rx.get_upload_dir() / filename
@@ -69,7 +69,7 @@ class AdminDashboardState(rx.State):
             f.write(upload_data)
         
         self.product_image = filename
-        self.upload_status = f"Product image uploaded: {file.filename}"
+        self.upload_status = f"Product image uploaded: {file.name}"
 
     async def handle_texture_upload(self, files: List[rx.UploadFile]):
         """Handle texture file upload"""
@@ -78,14 +78,14 @@ class AdminDashboardState(rx.State):
         
         file = files[0]
         upload_data = await file.read()
-        filename = f"texture_{uuid.uuid4().hex[:8]}_{file.filename}"
+        filename = f"texture_{uuid.uuid4().hex[:8]}_{file.name}"
         
         outfile = rx.get_upload_dir() / filename
         with outfile.open("wb") as f:
             f.write(upload_data)
         
         self.texture_file = filename
-        self.upload_status = f"Texture uploaded: {file.filename}"
+        self.upload_status = f"Texture uploaded: {file.name}"
 
     async def handle_model_upload(self, files: List[rx.UploadFile]):
         """Handle 3D model file upload"""
@@ -94,14 +94,14 @@ class AdminDashboardState(rx.State):
         
         file = files[0]
         upload_data = await file.read()
-        filename = f"model_{uuid.uuid4().hex[:8]}_{file.filename}"
+        filename = f"model_{uuid.uuid4().hex[:8]}_{file.name}"
         
         outfile = rx.get_upload_dir() / filename
         with outfile.open("wb") as f:
             f.write(upload_data)
         
         self.model_file = filename
-        self.upload_status = f"3D model uploaded: {file.filename}"
+        self.upload_status = f"3D model uploaded: {file.name}"
 
     async def handle_scene_upload(self, files: List[rx.UploadFile]):
         """Handle scene model file upload"""
@@ -110,14 +110,14 @@ class AdminDashboardState(rx.State):
         
         file = files[0]
         upload_data = await file.read()
-        filename = f"scene_{uuid.uuid4().hex[:8]}_{file.filename}"
+        filename = f"scene_{uuid.uuid4().hex[:8]}_{file.name}"
         
         outfile = rx.get_upload_dir() / filename
         with outfile.open("wb") as f:
             f.write(upload_data)
         
         self.scene_file = filename
-        self.upload_status = f"Scene model uploaded: {file.filename}"
+        self.upload_status = f"Scene model uploaded: {file.name}"
 
     def toggle_digital_available(self, value: bool):
         self.digital_available = value

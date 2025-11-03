@@ -8,6 +8,7 @@ import urllib.parse
 import httpx
 from ..state import AuthState
 from ..components.navbar import NavCartState
+from ..config import API_BASE_URL
 
 
 
@@ -48,7 +49,6 @@ from ..components.navbar import NavCartState
 
 class ShopState(rx.State):
 
-    API_BASE_URL = "http://localhost:8001"
 
     products: List[Dict] = []
     search_query: str = ""
@@ -79,6 +79,10 @@ class ShopState(rx.State):
         self.sort_by = value
 
     async def load_products(self):
+
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies or {}
+    
         
         sort_mapping = {
             "Most Popular": "popularity",
@@ -113,8 +117,9 @@ class ShopState(rx.State):
             async with httpx.AsyncClient() as client:
         
                 response = await client.post(
-                    f"{self.API_BASE_URL}/products/list/", 
-                    data=form_data  
+                    f"{API_BASE_URL}/products/list/", 
+                    data=form_data,
+                    cookies=cookies_dict,
                 )
             
             if response.status_code != 200:
@@ -153,7 +158,7 @@ class ShopState(rx.State):
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{self.API_BASE_URL}/carts/add_item/",
+                    f"{API_BASE_URL}/carts/add_item/",
                     data={
                         "product_id": product_id,
                         "type": item_type,
@@ -185,7 +190,6 @@ class ShopState(rx.State):
     product_detail: dict = {}
     async def fetch_product_detail(self, product_id:int):
 
-        API_BASE_URL = "http://localhost:8001"
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(f"{API_BASE_URL}/products/get_product_detail/{product_id}/")
@@ -208,16 +212,15 @@ class ShopState(rx.State):
        
        
     async def fetch_3d_model(self, model_id: str):
-        API_BASE_URL = "http://localhost:8001"
 
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(f"{API_BASE_URL}/products/get_3d_model/{model_id}/")
 
             if response.status_code == 200:
-                # Store the file bytes and filename
+               
                 self.model_file = response.content
-                # Extract filename from headers or use a default
+              
                 self.model_filename = response.headers.get("Content-Disposition", f"{model_id}.glb").split("filename=")[-1]
                 print(f"✅ Fetched 3D model: {self.model_filename}")
             elif response.status_code == 404:
@@ -235,7 +238,6 @@ class ShopState(rx.State):
             self.model_filename = ""
 
     async def fetch_display_scene(self, scene_id: str):
-        API_BASE_URL = "http://localhost:8001"
 
         try:
             async with httpx.AsyncClient() as client:

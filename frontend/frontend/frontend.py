@@ -1,41 +1,3 @@
-'''"""Welcome to Reflex! This file outlines the steps to create a basic app."""
-
-import reflex as rx
-
-from rxconfig import config
-
-
-class State(rx.State):
-    """The app state."""
-
-
-def index() -> rx.Component:
-    # Welcome Page (Index)
-    return rx.container(
-        rx.color_mode.button(position="top-right"),
-        rx.vstack(
-            rx.heading("Welcome to Reflex!", size="9"),
-            rx.text(
-                "Get started by editing ",
-                rx.code(f"{config.app_name}/{config.app_name}.py"),
-                size="5",
-            ),
-            rx.link(
-                rx.button("Check out our docs!"),
-                href="https://reflex.dev/docs/getting-started/introduction/",
-                is_external=True,
-            ),
-            spacing="5",
-            justify="center",
-            min_height="85vh",
-        ),
-    )
-
-
-app = rx.App()
-app.add_page(index)
-'''
-
 import reflex as rx
 from .pages.home import home_page
 
@@ -51,6 +13,7 @@ from .pages.rooms.room import room_page
 from .pages.signup_admin import adminsignup_page
 from .state import DynamicState
 from .pages.details.product_detail import product_detail_page
+from .pages.orders import orders_page
 
 app = rx.App()
 
@@ -77,7 +40,7 @@ app.add_page(admin_dashboard, route="/admin_dashboard")
 app.add_page(adminsignup_page, route="/signup_admin")
 # app.add_page(my_digital_home_page,route="/my_home")
 app.add_page(room_page, route="/room")
-
+app.add_page(orders_page,route="/orders")
 
 if __name__ == "__main__":
     app.run()
