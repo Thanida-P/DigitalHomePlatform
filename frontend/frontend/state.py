@@ -164,7 +164,7 @@ class AuthState(rx.State):
         self.scene_creator_url = f"{SCENE_CREATOR_URL}/#/login?token={token}"
         
         print(f"🚀 Opening Scene Creator: {self.scene_creator_url}")
-        
+
         return rx.call_script(f"window.open('{self.scene_creator_url}', '_blank')")
         
 
