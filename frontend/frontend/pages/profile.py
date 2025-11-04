@@ -3,12 +3,12 @@ import reflex as rx
 from ..template import template
 from ..state import AuthState
 import httpx
-from typing import Optional, Callable, Any
+from typing import Optional, Callable, Any,List
 import json
 import random
 import string
 from ..config import API_BASE_URL
-import base64
+import base64,uuid
 
 
 class Address(rx.Base):
@@ -34,23 +34,23 @@ class AddressState(rx.State):
 
     def start_edit_address(self, address_id: int, current_address: str):
         self.editing_address_id = address_id
-        self.show_form = True  # reuse the form modal for editing
-        self.new_address = current_address  # pre-fill with existing address
+        self.show_form = True  
+        self.new_address = current_address  
         print(f"Starting edit for address ID {address_id}: {current_address}")
 
 
     def toggle_form(self):
         """Toggle visibility of the address form."""
         self.show_form = True
-        self.editing_address_id = 0  # Reset editing state
-        self.new_address = ""  # Clear input field
+        self.editing_address_id = 0  
+        self.new_address = "" 
         print("Opening address form.")
 
     def close_form(self):
         """Close the address form and clear input."""
         self.show_form = False
         self.new_address = ""
-        self.editing_address_id = 0  # Reset editing state
+        self.editing_address_id = 0  
 
     def set_new_address(self, value: str):
         """Update the new_address field."""
@@ -59,10 +59,8 @@ class AddressState(rx.State):
     async def save_address(self):
         """Save address (add new or update existing)."""
         if self.editing_address_id == 0:
-            # Adding new address
             await self.add_address()
         else:
-            # Editing existing address
             await self.edit_address(self.editing_address_id, self.new_address)
 
     async def add_address(self):
@@ -86,7 +84,7 @@ class AddressState(rx.State):
             print("POST response status:", response.status_code)
 
             if response.status_code == 201:
-                # Reload addresses
+        
                 await self.load_addresses()
                 self.new_address = ""
                 self.show_form = False
@@ -133,7 +131,6 @@ class AddressState(rx.State):
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies or {}
 
-        # Make DELETE request
         async with httpx.AsyncClient() as client:
             response = await client.request(
                 "DELETE",
@@ -144,7 +141,7 @@ class AddressState(rx.State):
             )
 
         if response.status_code == 200:
-            # Update reactive list safely
+            
             new_addresses = [addr for addr in self.addresses if addr.id != address_id]
             self.addresses = new_addresses
         else:
@@ -170,7 +167,7 @@ class AddressState(rx.State):
                 )
 
             if response.status_code == 200:
-                # Reload addresses from backend
+            
                 await self.load_addresses()
                 self.new_address = ""
                 self.show_form = False
@@ -236,7 +233,6 @@ class AddressState(rx.State):
             self.is_loading = False
 
 
-
 class CreditCard(rx.Base):
     id: int = 0
     card_brand: str = ""
@@ -260,23 +256,23 @@ class BankAccount(rx.Base):
 
     def start_edit_address(self, address_id: int, current_address: str):
         self.editing_address_id = address_id
-        self.show_form = True  # reuse the form modal for editing
-        self.new_address = current_address  # pre-fill with existing address
+        self.show_form = True  
+        self.new_address = current_address  
         print(f"Starting edit for address ID {address_id}: {current_address}")
 
 
     def toggle_form(self):
         """Toggle visibility of the address form."""
         self.show_form = True
-        self.editing_address_id = 0  # Reset editing state
-        self.new_address = ""  # Clear input field
+        self.editing_address_id = 0  
+        self.new_address = ""  
         print("Opening address form.")
 
     def close_form(self):
         """Close the address form and clear input."""
         self.show_form = False
         self.new_address = ""
-        self.editing_address_id = 0  # Reset editing state
+        self.editing_address_id = 0  
 
     def set_new_address(self, value: str):
         """Update the new_address field."""
@@ -285,10 +281,10 @@ class BankAccount(rx.Base):
     async def save_address(self):
         """Save address (add new or update existing)."""
         if self.editing_address_id == 0:
-            # Adding new address
+           
             await self.add_address()
         else:
-            # Editing existing address
+            
             await self.edit_address(self.editing_address_id, self.new_address)
 
     async def add_address(self):
@@ -312,7 +308,7 @@ class BankAccount(rx.Base):
             print("POST response status:", response.status_code)
 
             if response.status_code == 201:
-                # Reload addresses
+               
                 await self.load_addresses()
                 self.new_address = ""
                 self.show_form = False
@@ -359,7 +355,6 @@ class BankAccount(rx.Base):
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies or {}
 
-        # Make DELETE request
         async with httpx.AsyncClient() as client:
             response = await client.request(
                 "DELETE",
@@ -370,7 +365,7 @@ class BankAccount(rx.Base):
             )
 
         if response.status_code == 200:
-            # Update reactive list safely
+           
             new_addresses = [addr for addr in self.addresses if addr.id != address_id]
             self.addresses = new_addresses
         else:
@@ -396,7 +391,7 @@ class BankAccount(rx.Base):
                 )
 
             if response.status_code == 200:
-                # Reload addresses from backend
+               
                 await self.load_addresses()
                 self.new_address = ""
                 self.show_form = False
@@ -474,7 +469,6 @@ class ProfileState(rx.State):
     is_uploading: bool = False
     upload_error: str = ""
 
-    # Personal info
     first_name: str = ""
     last_name: str = ""
     username: str = ""
@@ -485,7 +479,6 @@ class ProfileState(rx.State):
     province: str = ""
     street_address: str = ""
 
-    # Password fields
     current_password: str = ""
     new_password: str = ""
     confirm_password: str = ""
@@ -497,13 +490,45 @@ class ProfileState(rx.State):
     password_error: str = ""
     password_success: str = ""
 
-    # Address management
     addresses: list[Address] = []
-    editing_address_id: int = 0  # 0 means new address, >0 means editing
+    editing_address_id: int = 0  
     form_username: str = ""
     form_phone_number: str = ""
     form_province: str = ""
     form_street_address: str = ""
+    profile_image: str = ""
+    upload_status: str = ""
+
+    is_processing: bool = False
+    show_profile_modal: bool = False
+    profile_data: dict = {}
+
+
+    async def handle_profile_image_upload(self, files: List[rx.UploadFile]):
+        """Handle product image upload"""
+        if not files:
+            return
+        
+        file = files[0]
+        upload_data = await file.read()
+        filename = f"profile_img_{uuid.uuid4().hex[:8]}_{file.name}"
+        
+      
+        outfile = rx.get_upload_dir() / filename
+        with outfile.open("wb") as f:
+            f.write(upload_data)
+        
+        self.profile_image = filename
+        self.upload_status = f"Product image uploaded: {file.name}"
+
+    def open_profile_modal(self):
+        """Open review modal for a specific product"""
+        self.profile_image = ""
+        self.show_profile_modal = True
+    
+    def close_profile_modal(self):
+        self.show_profile_modal = False
+        self.profile_image = ""
 
     def set_form_username(self, value: str):
         self.form_username = value
@@ -547,14 +572,12 @@ class ProfileState(rx.State):
     def set_confirm_password(self, value: str):
         self.confirm_password = value
 
-    # Sections / menu handling
     def set_section(self, section: str):
         self.active_section = section
 
     def set_menu(self, menu: str):
         self.selected_menu = menu
 
-    # Password form
     def open_password_form(self):
         self.show_password_form = True
 
@@ -573,7 +596,6 @@ class ProfileState(rx.State):
     def toggle_confirm_password(self):
         self.show_confirm_password = not self.show_confirm_password
 
-    # Your existing methods...
     def close_password_form(self):
         self.show_password_form = False
 
@@ -586,16 +608,15 @@ class ProfileState(rx.State):
         self.password_success = ""
         self.show_current_password = False
         self.show_new_password = False
-        self.show_confirm_password = False
+        
 
+    
     async def submit_password_change(self):
         """Submit password change request to backend"""
         print("=== PASSWORD CHANGE STARTED ===")
 
-        # Set loading state
         self.is_submitting = True
 
-        # Clear previous messages
         self.password_error = ""
         self.password_success = ""
 
@@ -603,7 +624,6 @@ class ProfileState(rx.State):
         print(f"New password length: {len(self.new_password)}")
         print(f"Confirm password length: {len(self.confirm_password)}")
 
-        # Validate inputs
         if not self.current_password:
             self.password_error = "Please enter your current password"
             self.is_submitting = False
@@ -642,14 +662,12 @@ class ProfileState(rx.State):
 
         print("Validation passed, getting auth state...")
 
-        # Get auth state
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
 
         print(f"Cookies available: {bool(cookies_dict)}")
         print(f"API URL: {API_BASE_URL}/users/change_password/")
 
-        # Make API request
         try:
             async with httpx.AsyncClient() as client:
                 print("Sending request to backend...")
@@ -675,7 +693,6 @@ class ProfileState(rx.State):
                     self.show_password_form = False
                     self.is_submitting = False
 
-                    # Redirect to login page
                     return rx.redirect("/login")
 
                 elif response.status_code == 403:
@@ -717,11 +734,10 @@ class ProfileState(rx.State):
         print(f"Final success message: {self.password_success}")
 
     async def save_profile(self):
-        # Access AuthState instance to get the actual cookie value
+
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
 
-        # Prepare payload
         payload = {
             "first_name": self.first_name,
             "last_name": self.last_name,
@@ -744,7 +760,7 @@ class ProfileState(rx.State):
             if response.status_code == 200:
                 data = response.json()
                 print(f"Profile updated: {data}")
-                # Reload user data
+            
                 await self.load_user_data()
             else:
                 print(f"Failed to update profile: {response.text}")
@@ -770,7 +786,7 @@ class ProfileState(rx.State):
                 data = response.json()
                 user = data.get("user_profile", {})
 
-                # DEBUG: Print the entire user object
+               
                 print("=== USER DATA ===")
                 print(f"Full user object: {user}")
                 print(f"Profile pic raw: {user.get('profilePic', 'NOT FOUND')}")
@@ -786,14 +802,14 @@ class ProfileState(rx.State):
 
                 profile_pic = user.get("profilePic", "")
                 if profile_pic:
-                    # Check if it already has the data URI prefix
+                   
                     if profile_pic.startswith("data:image"):
                         self.profile_picture = profile_pic
                     else:
                         self.profile_picture = f"data:image/png;base64,{profile_pic}"
                     print(
                         f"Profile picture set to: {self.profile_picture[:100]}..."
-                    )  # Print first 100 chars
+                    ) 
                 else:
                     self.profile_picture = ""
                     print("Profile picture is empty")
@@ -801,125 +817,98 @@ class ProfileState(rx.State):
         except Exception as e:
             print(f"Error loading user data: {str(e)}")
 
-    async def handle_upload(self, files: Any):
-        """Handle file upload from Reflex upload component"""
-        print(f"=== UPLOAD DEBUG ===")
-        print(f"Files received: {files}")
-        print(f"Files type: {type(files)}")
+    image_mime_type: str = "image/jpeg"  # Default, will be updated from backend
 
-        if not files:
-            self.upload_error = "No file selected"
-            return
-
-        try:
-            self.is_uploading = True
-            self.upload_error = ""
-
-            # Get the first file
-            upload_file = files[0] if isinstance(files, list) else files
-
-            print(f"Upload file: {upload_file}")
-            print(f"Upload file type: {type(upload_file)}")
-            print(f"Upload file dir: {dir(upload_file)}")
-
-            # Check various possible formats
-            if hasattr(upload_file, "read"):
-                # It's an UploadFile object with read method
-                print("Has read method - treating as UploadFile")
-                file_content = await upload_file.read()
-                filename = getattr(upload_file, "filename", "profile.png")
-                content_type = getattr(upload_file, "type", "image/png")
-            elif isinstance(upload_file, str):
-                # It's a file path string
-                print(f"File path received: {upload_file}")
-                with open(upload_file, "rb") as f:
-                    file_content = f.read()
-                filename = os.path.basename(upload_file)
-                ext = filename.split(".")[-1].lower()
-                content_type = "image/jpeg" if ext in ["jpg", "jpeg"] else "image/png"
-            elif isinstance(upload_file, bytes):
-                # It's raw bytes
-                print("Raw bytes received")
-                file_content = upload_file
-                filename = "profile.png"
-                content_type = "image/png"
-            else:
-                # Unknown format
-                print(f"Unknown format: {type(upload_file)}")
-                self.upload_error = f"Unexpected file format: {type(upload_file)}"
-                self.is_uploading = False
-                return
-
-            # Validate file type
-            if content_type not in ["image/png", "image/jpeg", "image/jpg"]:
-                self.upload_error = "Invalid file type. Only PNG and JPEG are allowed."
-                self.is_uploading = False
-                return
-
-            # Validate file size (5MB limit)
-            if len(file_content) > 5 * 1024 * 1024:
-                self.upload_error = "Profile picture exceeds size limit of 5MB"
-                self.is_uploading = False
-                return
-
-            # Upload to backend
-            await self.upload_profile_picture_with_content(
-                file_content, filename, content_type
-            )
-
-        except Exception as e:
-            self.upload_error = f"Error handling upload: {str(e)}"
-            print(f"Error in handle_upload: {str(e)}")
-            import traceback
-
-            traceback.print_exc()
-            self.is_uploading = False
-
-    async def upload_profile_picture_with_content(
-        self, file_content: bytes, filename: str, content_type: str
-    ):
-        """Upload profile picture to backend with file content"""
+    async def load_user_profile(self):
+        """Fetch user profile from backend"""
         auth_state = await self.get_state(AuthState)
-        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
-
+        cookies_dict = auth_state.session_cookies or {}
+        
         try:
-            # Create form data with the file content
-            files_data = {"profile_picture": (filename, file_content, content_type)}
-
             async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{API_BASE_URL}/users/profile/",
+                    cookies=cookies_dict,
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    self.profile_data = data.get('user_profile', {})
+                    # Extract the base64 image from profile
+
+                    if self.profile_data.get('profile_pic'):
+                        self.profile_image = self.profile_data['profile_pic']
+                        self.profile_picture = f"data:image/png;base64,{self.profile_image}"
+                      
+                    else:
+                        print("No profile_pic found in response")
+                else:
+                    print(f"Failed to load profile: {response.status_code}")
+        except Exception as e:
+            print(f"Error loading profile: {e}")
+
+
+    async def submit_profile(self):
+     
+        import httpx
+        self.is_processing = True
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies or {}
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                
+                files = {}
+                upload_dir = rx.get_upload_dir()
+
+                if self.profile_image:
+                    file_path = upload_dir / self.profile_image
+                    if file_path.exists():
+                       
+                        files['profile_picture'] = open(file_path, 'rb')
+                    else:
+                        print(f"Profile image not found: {file_path}")
+                        rx.toast.error("Profile image file not found")
+                        self.is_processing = False
+                        return
+                else:
+                    rx.toast.error("Please select a profile image")
+                    self.is_processing = False
+                    return
+                
                 response = await client.post(
                     f"{API_BASE_URL}/users/profile/upload_profile_picture/",
-                    files=files_data,
+                    files=files,
                     cookies=cookies_dict,
-                    timeout=10.0,
                 )
-
-            if response.status_code == 200:
-                print("Profile picture uploaded successfully")
-                # Reload user data to get new profile picture
-                await self.load_user_data()
-                self.upload_error = ""
-            else:
-                error_msg = (
-                    response.json().get("error", "Unknown error")
-                    if response.text
-                    else "Unknown error"
-                )
-                self.upload_error = f"Failed to upload: {error_msg}"
-                print(f"Upload failed: {response.text}")
-
+                
+                if response.status_code == 200:  # FIXED: Changed from 201 to 200 (backend returns 200)
+                    rx.toast.success("Profile submitted successfully!")
+                    print("Profile success")
+                    await self.load_user_profile()
+                    self.close_profile_modal()
+                else:
+                    error_data = response.json()
+                    error = error_data.get('error', 'Failed to upload profile picture')
+                    rx.toast.error(f"Error: {error}")
+                    
         except Exception as e:
-            self.upload_error = f"Error uploading profile picture: {str(e)}"
-            print(f"Error uploading profile picture: {str(e)}")
+            rx.toast.error(f"Error: {e}")
+            print(f"Error details: {e}")  # Added for debugging
         finally:
-            self.is_uploading = False
+            self.is_processing = False
+            for file in files.values():
+                try:
+                    file.close()
+                except:
+                    pass
 
+    
 
 class PaymentState(rx.State):
     show_card_form: bool = False
     show_bank_form: bool = False
 
-    # User input fields for credit card (what user enters)
     card_number: str = ""
     card_holder_name: str = ""
     cvv: str = ""
@@ -927,13 +916,11 @@ class PaymentState(rx.State):
     exp_year: str = ""
     is_default: bool = False
 
-    # For backend (processed data)
     provider: str = "stripe"
     provider_token: str = ""
     card_brand: str = ""
     last4: str = ""
 
-    # Form fields for bank account
     bank_provider: str = "scb"
     bank_name: str = ""
     account_holder: str = ""
@@ -941,12 +928,11 @@ class PaymentState(rx.State):
     bank_provider_token: str = ""
     bank_is_default: bool = False
     
-    # UI state
     error_message: str = ""
     success_message: str = ""
     credit_cards: list = []
 
-    # Setters for card form
+   
     def set_card_number(self, value: str):
         self.card_number = value
     
@@ -1442,7 +1428,7 @@ class PaymentState(rx.State):
                     f"{API_BASE_URL}/users/payment_methods/remove_bank_account/{account_id}/",  # ✅ Add trailing slash
                     cookies=cookies_dict,
                     timeout=10.0
-                    # ✅ REMOVE json={"account_id": account_id} - not needed since ID is in URL
+                    
                 )
             
             if res.status_code == 200:
@@ -1451,13 +1437,13 @@ class PaymentState(rx.State):
                 return rx.toast.success("Bank account deleted successfully!")
             else:
                 print(f"Failed to delete bank account: {res.status_code}")
-                print(f"Response: {res.text}")  # ✅ Add this for debugging
+                print(f"Response: {res.text}")  
                 return rx.toast.error("Failed to delete bank account")
                 
         except Exception as e:
             print(f"Error deleting bank account: {e}")
             import traceback
-            traceback.print_exc()  # ✅ Add full traceback
+            traceback.print_exc() 
             return rx.toast.error("Error deleting bank account")
     
     async def set_default_card(self, card_id: int):
@@ -1524,17 +1510,16 @@ class ReviewState(rx.State):
     error_message: str = ""
     success_message: str = ""
     
-    # Form states
     show_edit_form: bool = False
     
-    # Form fields
+ 
     product_id: str = ""
     rating: str = "5"
     comment: str = ""
     review_image: Optional[str] = None
     editing_review_id: int = 0
     
-    # Image upload
+
     is_uploading_image: bool = False
     upload_image_error: str = ""
 
@@ -1740,90 +1725,263 @@ class ReviewState(rx.State):
             return rx.toast.error("Error deleting review")
 
 
-
+def profile_content() -> rx.Component:
+    return rx.hstack(
+        rx.box(
+            rx.vstack(
+                profile_avatar_section(),
+                profile_upload_modal(),
+                #rx.button("Upload Profile Picture",on_click=ProfileState.open_profile_modal),
+                rx.vstack(
+                    nav_button("Personal Information", "profile"),
+                    nav_button("My Address", "address"),
+                    nav_button("My Payment Medthods", "card"),
+                    nav_button("Wishlist", "wishlist"),
+                    #nav_button("My Orders", "orders"),
+                    nav_button("My Reviews", "reviews"),
+                    #nav_button("Notification", "notification"),
+                    #rx.link("Logout", href="/logout", style=menu_item_style(False)),
+                    spacing="3",
+                    
+                ),
+            ),
+            width="280px",
+            height="100%",
+            background= "#E4EEF6",
+            justify="between",
+            on_mount=ProfileState.load_user_data,
+           
+        ),
+  
+        rx.box(
+            rx.match(
+                ProfileState.active_section,
+                ("profile", profile_info_content()),
+                ("address", address_content()),
+                ("card", card_content() ),
+                ("wishlist", wishlist_content()),
+                #("orders", orders_content()),
+                ("reviews", reviews_content()),
+                ("notification", notification_content()),
+                profile_info_content(),
+            ),
+            flex="1",
+            padding="40px",
+            bg="white",
+        ),
+        # Password Change Modal
+        password_change_modal(),
+        width="100%",
+        height="100%",
+    )
 
 def profile_avatar_section() -> rx.Component:
-    """Profile avatar with upload functionality"""
-    return rx.vstack(
-        rx.center(
-            rx.cond(
-                ProfileState.profile_picture != "",
-                rx.image(
-                    src=ProfileState.profile_picture,
-                    width="120px",
-                    height="120px",
-                    border_radius="full",
-                    object_fit="cover",
-                    border="4px solid #E5E7EB",
-                ),
-                rx.avatar(
-                    fallback=rx.cond(
-                        ProfileState.username != "",
-                        ProfileState.username[0:2].upper(),
-                        "U",
+    """Display the uploaded profile picture with styled upload button"""
+    return rx.box(
+        rx.vstack(
+           
+            rx.box(
+                rx.cond(
+                    ProfileState.profile_picture != "",
+                    rx.image(
+                        src=ProfileState.profile_picture,
+                        width="150px",
+                        height="150px",
+                        border_radius="50%",
+                        object_fit="cover",
+                        alt="Profile Picture",
                     ),
-                    size="8",
-                    radius="full",
-                    color_scheme="blue",
+                    rx.box(
+                        rx.text("👤", font_size="60px"),
+                        width="150px",
+                        height="150px",
+                        display="flex",
+                        align_items="center",
+                        justify_content="center",
+                    ),
                 ),
+           
+                rx.box(
+                    rx.icon_button(
+                        rx.icon("camera", size=18),
+                        on_click=ProfileState.open_profile_modal,
+                        bg="black",
+                        color="white",
+                        border_radius="50%",
+                        width="35px",
+                        height="35px",
+                        padding="0px",
+                        opacity = "40%",
+                        _hover={
+                            "bg": "gray",
+                            "transform": "scale(1.05)",
+                            "box_shadow": "0 4px 12px rgba(46, 111, 242, 0.4)",
+                        },
+                        cursor="pointer",
+                        transition="all 0.2s ease",
+                    ),
+                    position="absolute",
+                    bottom="8px",
+                    right="8px",
+                    border_radius="50%",
+                    box_shadow="0 2px 8px rgba(0, 0, 0, 0.15)",
+                ),
+                position="relative",
+                display="flex",
+                align_items="center",
+                justify_content="center",
+
             ),
+            
+    
+            rx.text(
+                rx.cond(
+                    ProfileState.username != "",
+                    ProfileState.username,
+                    "Your Profile"
+                ),
+                font_size="16px",
+                font_weight="600",
+                color="#22282C",
+                margin_top="12px",
+            ),
+            
+            spacing="0",
+            align_items="center",
             width="100%",
-            padding="20px 0px",
+         
         ),
-     
-        rx.upload(
-            rx.button(
-                rx.icon("camera", size=16),
-                "Change Photo",
-                size="1",
-                variant="soft",
-                cursor="pointer",
+        text_align="center",
+        margin_bottom="20px",
+    )
+
+    
+
+def profile_upload_modal() -> rx.Component:
+    """Modal for writing product reviews"""
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.vstack(
+                rx.dialog.title(
+                    f"Upload Profile Picture",
+                    font_size="24px",
+                    font_weight="700",
+                    color="#22282c",
+                    margin_bottom="8px"
+                ),
+                
+                file_upload_section(
+                        "Product Image",
+                        "Upload product display image",
+                        "Accepted: PNG files only",
+                        ProfileState.handle_profile_image_upload,
+                        ProfileState.profile_image,
+                        "image"
+                    ),
+                
+                # Action Buttons
+                rx.hstack(
+                    rx.dialog.close(
+                        rx.button(
+                            "Cancel",
+                            variant="soft",
+                            color_scheme="gray",
+                            cursor="pointer",
+                            on_click=ProfileState.close_profile_modal
+                        )
+                    ),
+                    rx.button(
+                        "Upload Picture",
+                        bg="#2E6FF2",
+                        color="white",
+                        cursor="pointer",
+                        loading=ProfileState.is_processing,
+                        on_click=ProfileState.submit_profile,
+                        _hover={"bg": "#1E5FE2"}
+                    ),
+                    spacing="3",
+                    justify="end",
+                    width="100%"
+                ),
+                
+                spacing="4",
+                width="100%"
             ),
-            id="profile_picture_upload",
-            accept={
-                "image/png": [".png"],
-                "image/jpeg": [".jpg", ".jpeg"],
-            },
-            max_files=1,
-            on_drop=ProfileState.handle_upload,
+            max_width="500px",
+            padding="30px"
+        ),
+        open=ProfileState.show_profile_modal
+    )
+
+def file_upload_section(
+    title: str,
+    description: str,
+    accepted_types: str,
+    upload_handler,
+    current_file: str,
+    icon: str = "upload"
+) -> rx.Component:
+    """Reusable file upload component"""
+    return rx.vstack(
+        rx.hstack(
+            rx.icon(icon, size=20, color="#6366F1"),
+            rx.text(title, size="2", weight="bold"),
+            spacing="2",
+            align="center",
+        ),
+        rx.text(description, size="1", color="#64748B"),
+        
+        rx.upload(
+            rx.vstack(
+                rx.button(
+                    rx.icon("upload", size=16),
+                    "Select File",
+                    variant="soft",
+                    size="2",
+                ),
+                rx.text(
+                    accepted_types,
+                    size="1",
+                    color="#64748B",
+                ),
+                spacing="2",
+                align="center",
+            ),
+            id=f"upload_{title.lower().replace(' ', '_')}",
+            border=f"1px dashed #CBD5E1",
+            padding="16px",
+            border_radius="8px",
+            width="100%",
         ),
         
-        rx.center(
-            rx.text(
-                rx.cond(ProfileState.username != "", ProfileState.username, "User"),
-                font_size="18px",
-                font_weight="bold",
-                color="#22282C",
-            ),
-            width="100%",
-        ),
-     
-        rx.cond(
-            ProfileState.is_uploading,
-            rx.center(
-                rx.spinner(size="2"),
-                rx.text("Uploading...", font_size="12px", color="#6B7280"),
-                spacing="2",
-                width="100%",
-            ),
-            rx.fragment(),
-        ),
-        rx.cond(
-            ProfileState.upload_error != "",
-            rx.center(
-                rx.text(
-                    ProfileState.upload_error,
-                    font_size="12px",
-                    color="#EF4444",
-                    text_align="center",
+        rx.hstack(
+            rx.button(
+                "Upload",
+                size="1",
+                on_click=upload_handler(
+                    rx.upload_files(
+                        upload_id=f"upload_{title.lower().replace(' ', '_')}"
+                    )
                 ),
-                width="100%",
-                padding="0 10px",
             ),
-            rx.fragment(),
+            rx.cond(
+                current_file != "",
+                rx.hstack(
+                    rx.icon("check-circle", size=16, color="#10B981"),
+                    rx.text(current_file, size="1", color="#10B981"),
+                    spacing="1",
+                ),
+                rx.text("No file uploaded", size="1", color="#64748B"),
+            ),
+            spacing="2",
+            align="center",
         ),
-        spacing="3",
+        
+        spacing="2",
         width="100%",
+        padding="12px",
+        background_color="#F8FAFC",
+        border_radius="8px",
     )
 
 
@@ -3624,7 +3782,7 @@ def bank_account_item(account: BankAccount) -> rx.Component:
     )
 
 
-@rx.page(route="/profile", on_load=[PaymentState.load_payment_methods,ReviewState.load_reviews])
+@rx.page(route="/profile", on_load=[PaymentState.load_payment_methods,ReviewState.load_reviews,ProfileState.load_user_profile])
 def profile_page() -> rx.Component:
 
     return rx.box(
