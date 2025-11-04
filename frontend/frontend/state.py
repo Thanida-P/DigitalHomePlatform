@@ -217,7 +217,7 @@ class ModelState(rx.State):
 
 class RoomSceneState(rx.State):
     selected_room_model: str = "/models/gamingRoom.glb"  
-    
+
     def select_room(self, room_url: str):
         self.selected_room_model = room_url
         print(f"🏠 Room changed to: {room_url}")
@@ -236,21 +236,62 @@ class ModalState(rx.State):
         
         self.demo_modal_open = False
 
+
+
 class DynamicState(rx.State):
-    current_room: str = ""
-    room_title: str = "Unknown Room"
-    room_image: str = "/images/notfound.jpg"
-    room_categories: list = []
+    room_image: str = ""
+    room_title: str = ""
+    room_categories: list[str] = []
     room_products: list[dict] = []
+    is_loading: bool = False
+    current_room: str = ""
     
-    def on_load(self):
+    # Category images mapping
+    category_images = {
+        "bedroom": "/images/bedroom.jpg",
+        "living-room": "/images/livingroom.jpg",
+        "office-room": "/images/officeroom.jpg",
+        "kitchen": "/images/kitchenroom.jpg",
+    }
+    
+    async def on_load(self):
+  
+        self.is_loading = True
+        
         self.current_room = self.router.page.params.get("room", "")
-        room = rooms_data.get(self.current_room)
-        if room:
-            self.room_title = room["title"]
-            self.room_image = room["image"]
-            self.room_categories = room.get("categories", [])
-            self.room_products = room["products"]
+        
+        display_name = self.current_room.replace("-", " ").title()
+        self.room_title = display_name
+        
+        try:
+            API_BASE_URL = "http://localhost:8001"
+            
+            async with httpx.AsyncClient() as client:
+                # Use the display name for the API call
+                response = await client.get(
+                    f"{API_BASE_URL}/products/",
+                    params={"category": display_name}
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    self.room_products = data.get("products", [])
+                    print(f"✅ Fetched {len(self.room_products)} products for category: {display_name}")
+                else:
+                    print(f"❌ Failed to fetch products: {response.status_code}")
+                    self.room_products = []
+                
+                # Set room image based on category
+                self.room_image = self.category_images.get(
+                    self.current_room, 
+                    "/images/default-room.jpg"
+                )
+                    
+        except Exception as e:
+            print(f"❌ Error loading room data: {e}")
+            self.room_products = []
+        finally:
+            self.is_loading = False
 
 class ProfileState(rx.State):
     selected_menu: str = "personal_info"  
