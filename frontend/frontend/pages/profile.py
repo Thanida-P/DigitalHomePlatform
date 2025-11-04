@@ -1985,52 +1985,6 @@ def file_upload_section(
     )
 
 
-def profile_content() -> rx.Component:
-    return rx.hstack(
-        rx.box(
-            rx.vstack(
-                profile_avatar_section(),
-                rx.vstack(
-                    nav_button("Personal Information", "profile"),
-                    nav_button("My Address", "address"),
-                    nav_button("My Payment Medthods", "card"),
-                    nav_button("Wishlist", "wishlist"),
-                    #nav_button("My Orders", "orders"),
-                    nav_button("My Reviews", "reviews"),
-                    nav_button("Notification", "notification"),
-                    rx.link("Logout", href="/logout", style=menu_item_style(False)),
-                    spacing="3",
-                    
-                ),
-            ),
-            width="280px",
-            height="100%",
-            background= "#E4EEF6"
-           
-        ),
-        rx.box(
-            rx.match(
-                ProfileState.active_section,
-                ("profile", profile_info_content()),
-                ("address", address_content()),
-                ("card", card_content() ),
-                ("wishlist", wishlist_content()),
-                #("orders", orders_content()),
-                ("reviews", reviews_content()),
-                ("notification", notification_content()),
-                profile_info_content(),
-            ),
-            flex="1",
-            padding="40px",
-            bg="white",
-        ),
-        # Password Change Modal
-        password_change_modal(),
-        width="100%",
-        height="100%",
-    )
-
-
 def nav_button(text: str, section: str) -> rx.Component:
     return rx.button(
         text,
@@ -2043,7 +1997,6 @@ def nav_button(text: str, section: str) -> rx.Component:
         color="#22282c",
         background = "#E4EEF6"
     )
-
 
 def profile_info_content() -> rx.Component:
     return rx.vstack(

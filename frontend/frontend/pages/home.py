@@ -8,7 +8,8 @@ from typing import Optional
 from reflex.event import Event
 from ..rooms_data import rooms_data
 from ..components.product_card import product_list
-from ..state import DynamicState 
+from ..state import DynamicState, AuthState
+from ..config import API_BASE_URL
 
 category_images = {
     "Bedroom": "/images/bedroom.jpg",
@@ -19,19 +20,88 @@ category_images = {
 
 class CategoryState(rx.State):
     categories: list[str] = []
- 
+    product_types: dict[str, list[str]] = {}  # stores product types for each category
+    selected_category: str = ""  # tracks currently selected category
+    is_loading: bool = False
+    error_message: str = ""
 
     async def load_categories(self):
+        """Fetch all available categories"""
         import httpx
-        API_BASE_URL = "http://localhost:8001"
-        
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"{API_BASE_URL}/products/categories/")
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies or {}
+        self.is_loading = True
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{API_BASE_URL}/products/categories/",
+                    cookies=cookies_dict,
+                )
 
-            if response.status_code == 200:
-                data = response.json()
-                self.categories = data.get("categories", [])
-                print(f"✅ Fetched categories detail: {self.categories}")
+                if response.status_code == 200:
+                    data = response.json()
+                    raw_categories = data.get("categories", [])
+
+                    # 🧹 Clean spaces and remove duplicates while keeping order
+                    cleaned = []
+                    for cat in raw_categories:
+                        name = cat.strip()
+                        if name not in cleaned:
+                            cleaned.append(name)
+
+                    self.categories = cleaned
+                    print(f"✅ Cleaned categories: {self.categories}")
+                else:
+                    self.error_message = "Failed to load categories"
+                    print(f"❌ Error loading categories: {response.status_code}")
+
+        except Exception as e:
+            self.error_message = f"Error: {str(e)}"
+            print(f"❌ Exception loading categories: {str(e)}")
+
+        finally:
+            self.is_loading = False
+
+
+    async def load_product_types(self, category: str):
+        """Fetch product types for a specific category"""
+        import httpx
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies or {} 
+        if not category:
+            return
+            
+        self.is_loading = True
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{API_BASE_URL}/products/types/",
+                    data={"category": category},
+                    cookies=cookies_dict,
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    product_types_list = data.get("product_types", [])
+                    print(product_types_list)
+                    # Store in dictionary with category as key
+                    self.product_types[category] = product_types_list
+                    self.selected_category = category
+                    
+                    print(f"✅ Fetched product types for {category}: {product_types_list}")
+                else:
+                    self.error_message = f"Failed to load product types for {category}"
+                    print(f"❌ Error loading product types: {response.status_code}")
+        except Exception as e:
+            self.error_message = f"Error: {str(e)}"
+            print(f"❌ Exception loading product types: {str(e)}")
+        finally:
+            self.is_loading = False
+
+    async def load_product_types_for_all_categories(self):
+        """Fetch product types for all categories"""
+        for category in self.categories:
+            await self.load_product_types(category)
 
 
 def hover_photo(name: str, img: str, link: str) -> rx.Component:
@@ -85,7 +155,6 @@ def hover_photo(name: str, img: str, link: str) -> rx.Component:
     )
 
 
-
 def product_spot(x: str, y: str, name: str, price: str, url: str) -> rx.Component:
    
     return rx.box(
@@ -122,6 +191,7 @@ def product_spot(x: str, y: str, name: str, price: str, url: str) -> rx.Componen
         left=x,
     )
 
+
 def testimonials_section():
     card_style = {
         "border_radius": "10px",
@@ -133,9 +203,9 @@ def testimonials_section():
     }
 
     reviews = [
-        {"name": "Cyntra", "rating": 5, "text": "I absolutely love my new sofa! The color matches perfectly with my living room, and it’s even more comfortable than I expected. Delivery was quick and hassle-free", "bg": "#e0e5e8","color":"black"},
-        {"name": "Pop", "rating": 5, "text": "I absolutely love my new sofa! The color matches perfectly with my living room, and it’s even more comfortable than I expected. Delivery was quick and hassle-free", "bg": "#212529", "color": "white"},
-        {"name": "Mai", "rating": 5, "text": "I absolutely love my new sofa! The color matches perfectly with my living room, and it’s even more comfortable than I expected. Delivery was quick and hassle-free", "bg": "#e0e5e8","color":"black"},
+        {"name": "Cyntra", "rating": 5, "text": "I absolutely love my new sofa! The color matches perfectly with my living room, and it's even more comfortable than I expected. Delivery was quick and hassle-free", "bg": "#e0e5e8","color":"black"},
+        {"name": "Pop", "rating": 5, "text": "I absolutely love my new sofa! The color matches perfectly with my living room, and it's even more comfortable than I expected. Delivery was quick and hassle-free", "bg": "#212529", "color": "white"},
+        {"name": "Mai", "rating": 5, "text": "I absolutely love my new sofa! The color matches perfectly with my living room, and it's even more comfortable than I expected. Delivery was quick and hassle-free", "bg": "#e0e5e8","color":"black"},
     ]
 
     review_cards = []
@@ -156,6 +226,7 @@ def testimonials_section():
         )
 
     return review_cards
+
 
 def ikea_showcase_layout() -> rx.Component:
     """IKEA-style product showcase matching the reference image"""
@@ -305,90 +376,109 @@ def ikea_showcase_layout() -> rx.Component:
     )
 
 
-'''
-rx.box(
-        
-       rx.hstack(
-
-        rx.box(
-            rx.image(
-                src="/images/room.jpg",
-                width="100%",
-                height="610px",
-            ),
-            product_spot("14%", "40%", "Wardrobe", "299 THB", "/cart"),
-            product_spot("70%", "60%", "Bedside Table", "1,290 THB", "/cart"),
-            product_spot("88%", "30%", "Shelf", "1,290 THB", "/products/cart"),
-            product_spot("50%", "70%", "Bed", "1,290 THB", "/products/cart"),
-            product_spot("90%", "60%", "Modern Chair", "1,290 THB", "/cart"),
-            position="relative",
-            width="85%",    
-        ),
-
-        rx.vstack(
-            rx.image(src="/images/room.jpg", width="100%", height="auto",max_height="200px",object_fit="cover"),
-            rx.image(src="/images/room.jpg", width="100%", height="auto",max_height="200px",object_fit="cover"),
-            rx.image(src="/images/room.jpg", width="100%", height="auto",max_height="200px",object_fit="cover"),
-            width="30%",    
-            spacing="1",
-            align_items = "stretch",
-        ),
-
-        width="100%",
-        align_items="start",
-        spacing="2",
-        margin_bottom="50px",
-        
-    )'''
-
-
 def home_content() -> rx.Component:
 
     return rx.box(
     
     ikea_showcase_layout(), 
 
-
     rx.center(
         rx.text("Design your Space",font_size = "2rem", font_weight="bold",color="#22282c",font_family="Racing Sans One",text_align="center"),
     ),
     rx.center(
-         rx.text("Whether it’s your living room, bedroom, or office, we’ve got the perfect pieces to match your style.",font_size = "16px", color="#22282c",margin_bottom="50px"),
+         rx.text("Whether it's your living room, bedroom, or office, we've got the perfect pieces to match your style.",font_size = "16px", color="#22282c",margin_bottom="50px"),
     ),
 
-        
-        rx.hstack(
-            rx.foreach(
-                CategoryState.categories,
-                lambda category: rx.link(
-                    rx.vstack(
-                        rx.image(
-                            src=category_images.get(category.strip(), "/images/default.jpg"),
-                            width="200px",
-                            height="150px",
-                            object_fit="cover",
-                            border_radius="10px",
-                        ),
-                        rx.text(
-                            category,
-                            font_size="16px",
-                            font_weight="bold",
-                            text_align="center",
-                            margin_top="8px"
-                        ),
-                        spacing="2",
-                        align="center",
-
-                    ),
-                    href=f"/rooms/{category.strip().lower().replace(' ', '-')}",
-                    style={"textDecoration": "none","color":"#22282c"}  # remove underline
-                )
-            ),
-            justify="center",
-            wrap="wrap",
-            spacing="4",
+    # Loading indicator
+    rx.cond(
+        CategoryState.is_loading,
+        rx.center(
+            rx.spinner(size="3"),
+            margin_bottom="2rem"
         ),
+        rx.box()
+    ),
 
+    # Categories section
+    rx.hstack(
+        rx.foreach(
+            CategoryState.categories,
+            lambda category: rx.link(
+                rx.vstack(
+                    rx.image(
+                        src=category_images.get(category.strip(), "/images/default.jpg"),
+                        width="200px",
+                        height="150px",
+                        object_fit="cover",
+                        border_radius="10px",
+                        _hover={
+                            "cursor": "pointer",
+                            "opacity": "0.8",
+                            "transition": "opacity 0.3s"
+                        }
+                    ),
+                    rx.text(
+                        category,
+                        font_size="16px",
+                        font_weight="bold",
+                        text_align="center",
+                        margin_top="8px"
+                    ),
+                    spacing="2",
+                    align="center",
+                    on_click=CategoryState.load_product_types(category),
+                ),
+                href=f"/rooms/{category.strip().lower().replace(' ', '-')}",
+                style={"textDecoration": "none","color":"#22282c"}
+            )
+        ),
+        justify="center",
+        wrap="wrap",
+        spacing="4",
+        margin_bottom="3rem"
+    ),
+
+    # Product types display for selected category
+    rx.cond(
+        CategoryState.selected_category != "",
+        rx.vstack(
+            rx.text(
+                f"Product Types in {CategoryState.selected_category}",
+                font_size="1.5rem",
+                font_weight="bold",
+                color="#22282c"
+            ),
+            rx.hstack(
+                rx.foreach(
+                    CategoryState.product_types.get(CategoryState.selected_category, []),
+                    lambda product_type: rx.box(
+                        rx.text(
+                            product_type,
+                            font_size="14px",
+                            color="white",
+                            padding="8px 16px",
+                            border_radius="20px",
+                            background_color="#22282C",
+                            cursor="pointer",
+                        ),
+                        _hover={
+                            "background_color": "#929FA7",
+                            "transition": "background_color 0.3s"
+                        }
+                    )
+                ),
+                spacing="2",
+                wrap="wrap",
+            ),
+            width="100%",
+            spacing="2",
+            margin_bottom="3rem",
+            padding="2rem",
+            background_color="#f5f5f5",
+            border_radius="10px"
+        ),
+        rx.box()
+    ),
 
     rx.vstack(
         
@@ -568,26 +658,26 @@ def home_content() -> rx.Component:
     ),
 
     
+    rx.hstack(
+        rx.button("←", bg="#212529", color="white", border_radius="50%",width="40px",height="40px"),
         rx.hstack(
-            rx.button("←", bg="#212529", color="white", border_radius="50%",width="40px",height="40px"),
-            rx.hstack(
-                *testimonials_section(),   
-                align="center",
-                justify="center"
-            ),
-            rx.button("→", bg="#212529", color="white", border_radius="50%",width="40px",height="40px"),
-            width="100%",
-            justify="center",
-            align = "center",
-            padding="40px",
-),
+            *testimonials_section(),   
+            align="center",
+            justify="center"
+        ),
+        rx.button("→", bg="#212529", color="white", border_radius="50%",width="40px",height="40px"),
+        width="100%",
+        justify="center",
+        align = "center",
+        padding="40px",
+    ),
     
     height="100%",
     on_mount=CategoryState.load_categories,
   
 )
 
-
+@rx.page(route="/home", on_load=CategoryState.load_categories)
 def home_page() -> rx.Component:
     return template(home_content)
 
