@@ -162,7 +162,7 @@ class CartState(rx.State):
                 response = await client.get(
                     f"{API_BASE_URL}/carts/view/",
                     cookies=cookies_dict,
-                    timeout=10.0  # Add timeout
+                    timeout=10.0  # 
                 )
                 
                 if response.status_code == 200:
@@ -185,17 +185,12 @@ class CartState(rx.State):
                                 timeout=10.0
                             )
                             
-                            print(f"📡 Product response status: {product_response.status_code}")
-                            print(f"📡 Product response headers: {product_response.headers}")
                             
                             if product_response.status_code == 200:
                                 response_data = product_response.json()
-                                print(f"✅ Full response for {product_id}: {response_data}")
                                 
                                 
-                                product_data = response_data.get('product', {})
-                                print(f"✅ Product data: {product_data}")
-                                
+                                product_data = response_data.get('product', {})   
                               
                                 item_type = item.get('type', 'physical')
                                 
@@ -204,23 +199,12 @@ class CartState(rx.State):
                                 else:
                                     price_value = product_data.get('physical_price', 0)
                                 
-                                
                                 try:
                                     price = int(float(price_value))
                                 except (ValueError, TypeError):
                                     print(f"⚠️ Could not convert price '{price_value}' to int, using 0")
                                     price = 0
                                 
-                                print(f"💰 Price for {item_type}: {price}")
-                                
-                           
-                                image_data = product_data.get('image', '')
-                                if image_data and not image_data.startswith(('http://', 'https://', 'data:', '/')):
-                                    
-                                    image_url = f"data:image/avif;base64,{image_data}"
-                                else:
-                                    
-                                    image_url = image_data or '/placeholder.png'
                                 
                                 cart_item = CartItem(
                                     id=item.get('id'),
@@ -229,11 +213,12 @@ class CartState(rx.State):
                                     price=price,
                                     quantity=item.get('quantity', 1),
                                     colors=["#C0C0C0", "#F5F5DC", "#D2B48C"],
-                                    image=image_url,
+                                    image=f"data:image/png;base64,{product_data.get('image')}",
                                     item_type=item_type
                                 )
+                                
                                 items.append(cart_item)
-                                print(f"✅ Added cart item: {cart_item}")
+                                
                                 
                             else:
                                
@@ -590,7 +575,7 @@ def cart_item(item: CartItem) -> rx.Component:
                     spacing="2",
                 ),
                 rx.text(
-                    f"Price: ${item.price} / pre item",
+                    f"Price: ${item.price} / per item",
                     color="#22282c",
                     font_size="14px",
                 ),

@@ -473,10 +473,11 @@ def file_upload_section(
             rx.cond(
                 current_file != "",
                 rx.hstack(
-                    rx.icon("check-circle", size=16, color="#10B981"),
+                   
                     rx.text(current_file, size="1", color="#10B981"),
                     spacing="1",
                 ),
+
                 rx.text("No file uploaded", size="1", color="#64748B"),
             ),
             spacing="2",

@@ -2,12 +2,11 @@ import reflex as rx
 from typing import List, Dict
 from ..state import AuthState
 import uuid
+from ..config import API_BASE_URL
 
 class AdminDashboardState(rx.State):
     # Product list
     UPLOAD_DIR = "uploading_models"
-
-    API_BASE_URL = "http://localhost:8001"
 
     products: List[Dict] = []
     filtered_products: List[Dict] = []
@@ -371,6 +370,7 @@ class AdminDashboardState(rx.State):
                 print(f"Sending request to: {API_BASE_URL}/products/add/")
                 print(f"Data: {data}")
                 print(f"Files: {list(files.keys())}")
+                
                 timeout = httpx.Timeout(connect=30.0, read=120.0, write=120.0, pool=60.0) 
 
 
@@ -390,6 +390,7 @@ class AdminDashboardState(rx.State):
                 
                 if response.status_code == 201:
                     self.upload_status = "Product saved successfully!"
+                    print("product_data" , data)
                     self.close_add_modal()
                     await self.load_products()
                 elif response.status_code == 400:
@@ -509,6 +510,7 @@ class AdminDashboardState(rx.State):
                     "application/octet-stream",
                 )
 
+
             # Multiple texture files
             for i, f in enumerate(product_data.get("texture_files", [])):
                 files[f"texture_files[{i}]"] = (
@@ -619,7 +621,6 @@ def file_upload_section(
             rx.cond(
                 current_file != "",
                 rx.hstack(
-                    rx.icon("check-circle", size=16, color="#10B981"),
                     rx.text(current_file, size="1", color="#10B981"),
                     spacing="1",
                 ),
@@ -747,13 +748,11 @@ def product_form_modal(is_edit: bool = False) -> rx.Component:
                         width="100%",
                     ),
                     
-                    # Divider
                     rx.divider(),
                     
-                    # File Uploads Section
                     rx.heading("File Uploads", size="4", weight="bold", margin_bottom="8px"),
                     
-                    # Product Image Upload
+        
                     file_upload_section(
                         "Product Image",
                         "Upload product display image",
@@ -762,8 +761,7 @@ def product_form_modal(is_edit: bool = False) -> rx.Component:
                         AdminDashboardState.product_image,
                         "image"
                     ),
-                    
-                    # Texture File Upload
+                
                     file_upload_section(
                         "Texture File",
                         "Upload texture file for 3D model",
@@ -773,7 +771,6 @@ def product_form_modal(is_edit: bool = False) -> rx.Component:
                         "palette"
                     ),
                     
-                    # 3D Model Upload
                     file_upload_section(
                         "3D Model",
                         "Upload 3D product model",
@@ -783,7 +780,6 @@ def product_form_modal(is_edit: bool = False) -> rx.Component:
                         "box"
                     ),
                     
-                    # Scene Model Upload
                     file_upload_section(
                         "Scene Model",
                         "Upload 3D room scene model",

@@ -1,7 +1,7 @@
 import reflex as rx
 import httpx
 import os
-from typing import Optional
+from typing import Optional, List, Dict
 from .rooms_data import rooms_data
 from .config import API_BASE_URL
 
@@ -246,7 +246,6 @@ class DynamicState(rx.State):
     is_loading: bool = False
     current_room: str = ""
     
-    # Category images mapping
     category_images = {
         "bedroom": "/images/bedroom.jpg",
         "living-room": "/images/livingroom.jpg",
@@ -255,7 +254,7 @@ class DynamicState(rx.State):
     }
     
     async def on_load(self):
-  
+       
         self.is_loading = True
         
         self.current_room = self.router.page.params.get("room", "")
@@ -264,24 +263,21 @@ class DynamicState(rx.State):
         self.room_title = display_name
         
         try:
-            API_BASE_URL = "http://localhost:8001"
-            
             async with httpx.AsyncClient() as client:
-                # Use the display name for the API call
-                response = await client.get(
-                    f"{API_BASE_URL}/products/",
-                    params={"category": display_name}
+                response = await client.post(
+                    f"{API_BASE_URL}/products/list/",
+                    data={"category": display_name}  
                 )
                 
                 if response.status_code == 200:
                     data = response.json()
                     self.room_products = data.get("products", [])
                     print(f"✅ Fetched {len(self.room_products)} products for category: {display_name}")
+                    print(self.room_products)
                 else:
                     print(f"❌ Failed to fetch products: {response.status_code}")
                     self.room_products = []
-                
-                # Set room image based on category
+               
                 self.room_image = self.category_images.get(
                     self.current_room, 
                     "/images/default-room.jpg"
@@ -292,6 +288,7 @@ class DynamicState(rx.State):
             self.room_products = []
         finally:
             self.is_loading = False
+    
 
 class ProfileState(rx.State):
     selected_menu: str = "personal_info"  

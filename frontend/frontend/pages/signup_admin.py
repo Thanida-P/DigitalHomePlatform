@@ -81,7 +81,7 @@ def adminsignup_page() -> rx.Component:
     return rx.center(
         rx.card(
             rx.vstack(
-                # Error / Success messages
+            
                 rx.cond(
                     AdminSignupState.error_message != "",
                     rx.callout(
@@ -92,17 +92,8 @@ def adminsignup_page() -> rx.Component:
                         width="100%",
                     ),
                 ),
-                rx.cond(
-                    AdminSignupState.success_message != "",
-                    rx.callout(
-                        AdminSignupState.success_message,
-                        icon="check",
-                        color_scheme="green",
-                        size="2",
-                        width="100%",
-                    ),
-                ),
-                # Header
+                
+             
                 rx.flex(
                     rx.heading(
                         "Create an Admin Account",
@@ -129,7 +120,7 @@ def adminsignup_page() -> rx.Component:
                     width="100%",
                     margin_bottom="-1rem",
                 ),
-                # Name fields
+           
                 rx.hstack(
                     form_field(
                         "First Name",
@@ -148,7 +139,7 @@ def adminsignup_page() -> rx.Component:
                     spacing="4",
                     width="100%",
                 ),
-                # Username
+              
                 form_field(
                     "Username",
                     "user",
@@ -156,7 +147,7 @@ def adminsignup_page() -> rx.Component:
                     AdminSignupState.username,
                     AdminSignupState.set_username,
                 ),
-                # Password
+          
                 form_field(
                     "Password",
                     "lock",
@@ -165,7 +156,7 @@ def adminsignup_page() -> rx.Component:
                     AdminSignupState.set_password,
                     "password",
                 ),
-                # Register Button
+             
                 rx.button(
                     rx.cond(
                         AdminSignupState.is_loading,

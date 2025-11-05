@@ -11,16 +11,13 @@ from ..config import API_BASE_URL
 import base64,uuid
 
 
-class Address(rx.Base):
-    id: int
-    address: str
-    is_default: bool
 
 
 class Address(rx.Base):
     id: int
     address: str
     is_default: bool = False
+    
 
 class AddressState(rx.State):
     show_form: bool = False
@@ -30,7 +27,11 @@ class AddressState(rx.State):
     is_loading: bool = False
     error_message: str = ""
     success_message: str = ""
+    is_default: bool = False
 
+
+    def set_is_default(self, checked: bool):
+        self.is_default = checked
 
     def start_edit_address(self, address_id: int, current_address: str):
         self.editing_address_id = address_id
@@ -1726,54 +1727,93 @@ class ReviewState(rx.State):
 
 
 def profile_content() -> rx.Component:
-    return rx.hstack(
-        rx.box(
-            rx.vstack(
-                profile_avatar_section(),
-                profile_upload_modal(),
-                #rx.button("Upload Profile Picture",on_click=ProfileState.open_profile_modal),
+    return rx.center(
+        rx.hstack(
+        
+            rx.box(
                 rx.vstack(
-                    nav_button("Personal Information", "profile"),
-                    nav_button("My Address", "address"),
-                    nav_button("My Payment Medthods", "card"),
-                    nav_button("Wishlist", "wishlist"),
-                    #nav_button("My Orders", "orders"),
-                    nav_button("My Reviews", "reviews"),
-                    #nav_button("Notification", "notification"),
-                    #rx.link("Logout", href="/logout", style=menu_item_style(False)),
-                    spacing="3",
-                    
-                ),
-            ),
-            width="280px",
-            height="100%",
-            background= "#E4EEF6",
-            justify="between",
-            on_mount=ProfileState.load_user_data,
+                   
+                    rx.box(
+                        rx.vstack(
+                            profile_avatar_section(),
+                            profile_upload_modal(),
+                            spacing="3",
+                            align="center",
+                            padding_y="4",
+                            background="white",
+                            border_radius="2xl",
+                            box_shadow="md",
+                            width="100%",
+                            margin_top="40px",
+                            justify="between"
+                        ),
+                        justify="center",
+                        width="100%",
+                        display="flex",
+                    ),
+
            
-        ),
-  
-        rx.box(
-            rx.match(
-                ProfileState.active_section,
-                ("profile", profile_info_content()),
-                ("address", address_content()),
-                ("card", card_content() ),
-                ("wishlist", wishlist_content()),
-                #("orders", orders_content()),
-                ("reviews", reviews_content()),
-                ("notification", notification_content()),
-                profile_info_content(),
+                    rx.box(
+                        rx.vstack(
+                            nav_button("👤 Personal Information", "profile", active=ProfileState.active_section == "profile"),
+                            nav_button("🏠 My Address", "address", active=ProfileState.active_section == "address"),
+                            nav_button("💳 My Payment Methods", "card", active=ProfileState.active_section == "card"),
+                            nav_button("⭐ My Reviews", "reviews", active=ProfileState.active_section == "reviews"),
+                            spacing="2",
+                            width="100%",
+                            justify="between"
+                        ),
+                        background="white",
+                        width="100%",
+                        align="center",
+                        display="flex",
+                        justify="center",
+                        
+                    ),
+                ),
+                width="350px",
+                min_height="100vh",
+                align_items="center",
+                on_mount=ProfileState.load_user_data,
+                box_shadow= "0 3px 6px rgba(0, 120, 212, 0.2)"
+
+           
             ),
-            flex="1",
-            padding="40px",
-            bg="white",
+
+        
+            rx.box(
+                rx.match(
+                    ProfileState.active_section,
+                    ("profile", profile_info_content()),
+                    ("address", address_content()),
+                    ("card", card_content()),
+                    ("wishlist", wishlist_content()),
+                    ("reviews", reviews_content()),
+                    ("notification", notification_content()),
+                    profile_info_content(),
+                ),
+                flex="1",
+                padding="40px",
+                bg="white",
+                border_radius="2xl",
+                box_shadow="sm",
+                margin="4",
+                min_height="85vh",
+                width="100%",
+            ),
+
+ 
+            password_change_modal(),
+            width="100%",
+            height="100%",
+            justify="center",
         ),
-        # Password Change Modal
-        password_change_modal(),
         width="100%",
-        height="100%",
+        padding_y="6",
+        
+      
     )
+
 
 def profile_avatar_section() -> rx.Component:
     """Display the uploaded profile picture with styled upload button"""
@@ -1846,16 +1886,16 @@ def profile_avatar_section() -> rx.Component:
                 margin_top="12px",
             ),
             
-            spacing="0",
             align_items="center",
             width="100%",
          
         ),
         text_align="center",
         margin_bottom="20px",
+        width="100%"
+       
     )
 
-    
 
 def profile_upload_modal() -> rx.Component:
     """Modal for writing product reviews"""
@@ -1908,7 +1948,8 @@ def profile_upload_modal() -> rx.Component:
                 width="100%"
             ),
             max_width="500px",
-            padding="30px"
+            padding="30px",
+
         ),
         open=ProfileState.show_profile_modal
     )
@@ -1967,7 +2008,6 @@ def file_upload_section(
             rx.cond(
                 current_file != "",
                 rx.hstack(
-                    rx.icon("check-circle", size=16, color="#10B981"),
                     rx.text(current_file, size="1", color="#10B981"),
                     spacing="1",
                 ),
@@ -1985,18 +2025,38 @@ def file_upload_section(
     )
 
 
-def nav_button(text: str, section: str) -> rx.Component:
+def nav_button(text: str, section: str, active: bool = False) -> rx.Component:
     return rx.button(
         text,
         on_click=lambda: ProfileState.set_section(section),
         style=rx.cond(
-            ProfileState.active_section == section,
-            menu_item_style(True),
-            menu_item_style(False),
+            active,
+            {
+                "background": "#22282c",
+                "color": "white",
+                "font_weight": "600",
+                "width": "100%",
+                "padding": "30px 16px",
+                "transition": "all 0.25s ease-in-out",
+                "cursor": "pointer",
+            },
+            {
+                "background": "white",
+                "color": "#22282C",
+                "font_weight": "500",
+                "width": "100%",
+                "padding": "30px 16px",
+                "transition": "all 0.25s ease-in-out",
+                "cursor": "pointer",
+                "_hover": {
+                    "background": "#D6E3EF",
+                    "color": "#0078D4",
+                },
+            },
         ),
-        color="#22282c",
-        background = "#E4EEF6"
+     
     )
+
 
 def profile_info_content() -> rx.Component:
     return rx.vstack(
@@ -2036,16 +2096,17 @@ def profile_info_content() -> rx.Component:
             on_change=ProfileState.set_phone_number,
         ),
         rx.hstack(
-            select_with_label(
-                "Gender (Optional)",
-                ["Male", "Female", "Other"],
-                value=ProfileState.gender,
-                on_change=ProfileState.set_gender,
-            ),
+           
             input_with_label_date(
                 "Birthday (Optional)",
                 ProfileState.birthday,
                 on_change=ProfileState.set_birthday,
+            ),
+             select_with_label(
+                "Gender (Optional)",
+                ["Male", "Female", "Other"],
+                value=ProfileState.gender,
+                on_change=ProfileState.set_gender,
             ),
             spacing="4",
             width="100%",
@@ -2056,7 +2117,7 @@ def profile_info_content() -> rx.Component:
             bg="#22282C",
             color="white",
             border_radius="8px",
-            padding="20px",
+            padding="20px 10px",
             cursor="pointer",
             on_click=ProfileState.save_profile,
         ),
@@ -2069,7 +2130,8 @@ def profile_info_content() -> rx.Component:
             margin_top="12px",
             padding="30px",
             color="#22282c",
-            border="0.5px solid #929FA7",
+            border="1px solid #E5E7EB",
+            box_shadow="0 2px 8px rgba(0, 0, 0, 0.15)",
         ),
         spacing="5",
         width="100%",
@@ -2309,13 +2371,6 @@ def password_change_modal() -> rx.Component:
     )
 
 
-import json
-
-
-class Address(rx.Base):
-    id: int
-    address: str
-    is_default: bool = False
 
 def new_address_modal() -> rx.Component:
     return rx.cond(
@@ -2371,6 +2426,7 @@ def new_address_modal() -> rx.Component:
                     ),
                     # Address Input Field
                     rx.vstack(
+
                         rx.input(
                             placeholder="Enter your address...",
                             value=AddressState.new_address,
@@ -2386,6 +2442,15 @@ def new_address_modal() -> rx.Component:
                         spacing="2",
                         width="100%",
                         align_items="flex-start",
+                    ),
+                    # Set as default
+                    rx.hstack(
+                        rx.checkbox(
+                            checked=AddressState.is_default,
+                            on_change=AddressState.set_is_default,
+                        ),
+                        rx.text("Set as default payment method", font_size="14px", color="#22282c"),
+                        align_items="center",
                     ),
                     # Submit Button (text changes based on mode)
                     rx.button(
@@ -2430,127 +2495,131 @@ def new_address_modal() -> rx.Component:
         ),
     )
 
-def address_card(address: dict):
+def address_card(address: dict) -> rx.Component:
+    """Display a single address card with edit/delete actions and set default."""
     return rx.box(
-        rx.vstack(
-            # Row 1: Name + Edit/Delete buttons
+        rx.hstack(
+            # Left side - Address info
             rx.hstack(
-                rx.text(
-                    f"{ProfileState.first_name} {ProfileState.last_name}",
-                    font_weight="bold",
-                    color="#22282C",
-                ),
-                rx.spacer(),
-                rx.hstack(
+                rx.box(
                     rx.icon(
-                        "pencil",
-                        size=18,
+                        "map-pin",
+                        size=32,
                         color="#2E6FF2",
-                        cursor="pointer",
-                        on_click=lambda: AddressState.start_edit_address(
-                            address["id"], address["address"]
+                    ),
+                    padding="10px",
+                    border_radius="8px",
+                    bg="#EFF6FF",
+                ),
+                rx.vstack(
+                    rx.hstack(
+                        rx.text(
+                            f"{ProfileState.first_name} {ProfileState.last_name}",
+                            font_size="16px",
+                            font_weight="600",
+                            color="#22282C",
                         ),
+                        rx.cond(
+                            address["is_default"],
+                            rx.badge(
+                                "Default",
+                                color_scheme="green",
+                                variant="soft",
+                            ),
+                            rx.fragment(),
+                        ),
+                        spacing="2",
+                        align_items="center",
                     ),
                     rx.text(
-                        "Edit",
-                        font_weight="semibold",
-                        color="#2E6FF2",
-                        cursor="pointer",
-                        on_click=lambda: AddressState.start_edit_address(
-                            address["id"], address["address"]
-                        ),
-                    ),
-                    rx.icon(
-                        "trash",
-                        size=18,
-                        color="#FF4D4D",
-                        cursor="pointer",
-                        on_click=lambda: AddressState.delete_address(address["id"]),
+                        ProfileState.phone_number,
+                        font_size="14px",
+                        color="#6B7280",
                     ),
                     rx.text(
-                        "Delete",
-                        font_weight="semibold",
-                        color="#FF4D4D",
-                        cursor="pointer",
-                        on_click=lambda: AddressState.delete_address(address["id"]),
+                        address["address"],
+                        font_size="12px",
+                        color="#9CA3AF",
                     ),
-                    spacing="3",
-                    align="center",
+                    spacing="1",
+                    align_items="start",
                 ),
-                align="center",
-                width="100%",
+                spacing="3",
+                align_items="center",
             ),
-
-  
-            # Row 2: Phone number
-            rx.text(ProfileState.phone_number, color="#555", mt="5px"),
-
+            
+            rx.spacer(),
+            
+            # Right side - Actions
             rx.hstack(
-              
-                rx.hstack(
-                    rx.icon("map-pin", color="#2E6FF2"),
-                    rx.text(address["address"], font_weight="medium", color="#22282C"),
-                    align="center",
-                    spacing="2",
-                ),
-
-        
-                # Right side: default indicator or button
                 rx.cond(
-                    address["is_default"],
-                    rx.text("Default Address", font_weight="bold", color="green"),
+                    ~address["is_default"],
                     rx.button(
-                        "Set as Default",
-                        font_weight="bold",
-                        color="white",
-                        bg="#2E6FF2",
-                        border_radius="5px",
-                        padding="6px 12px",
-                        cursor="pointer",
-                        _hover={"opacity": "0.9"},
-                        on_click=lambda: AddressState.set_default_address(
-                            address["id"]
-                        ),
-                    ),
-                ),
-                justify="between",  # Spread items left/right
-                       
+                        "Set Default",
+                        size="2",
+                        variant="soft",
+                        color_scheme="blue",
                         on_click=lambda: AddressState.set_default_address(address["id"]),
                     ),
+                    rx.fragment(),
                 ),
-
-                justify="between",  
-                align="center",
-                width="100%",
-                mt="5px",
+                rx.icon_button(
+                    rx.icon("pencil", size=18),
+                    size="2",
+                    variant="soft",
+                    color_scheme="blue",
+                    on_click=lambda: AddressState.start_edit_address(
+                        address["id"], address["address"]
+                    ),
+                    cursor="pointer",
+                ),
+                rx.icon_button(
+                    rx.icon("trash-2", size=18),
+                    size="2",
+                    variant="soft",
+                    color_scheme="red",
+                    on_click=lambda: AddressState.delete_address(address["id"]),
+                    cursor="pointer",
+                ),
+                spacing="2",
             ),
+            
+            width="100%",
+            align_items="center",
+        ),
+        padding="20px",
+        border="1px solid #E5E7EB",
+        border_radius="12px",
+        bg="white",
+        width="100%",
+        _hover={
+            "box_shadow": "0 4px 12px rgba(46, 111, 242, 0.15)",
+            "border_color": "#2E6FF2",
+        },
+        transition="all 0.2s ease",
+    )
    
-
 def address_content() -> rx.Component:
     return rx.vstack(
-        rx.center(
-            rx.text(
-                "My Address",
-                font_size="20px",
-                font_weight="bold",
-                margin_bottom="20px",
-                color="#22282c",
+
+        rx.hstack(
+            rx.heading("My Address", size="6", color="#22282c"),
+            rx.spacer(),
+            rx.hstack(
+                rx.button(
+                    rx.icon("map-pin", size=18),
+                    "Add New Address",
+                    on_click=AddressState.toggle_form,
+                    color_scheme="blue",
+                    variant="soft",
+                ),
             ),
             width="100%",
-        ),
-      
-        rx.button(
-            "Add New Address",
-            on_click=AddressState.toggle_form,
-            background_color="#2E6FF2",
-            color="white",
-            border_radius="5px",
-            padding="20px 10px",
+            align_items="center",
             margin_bottom="20px",
-            align_self="flex-end",
-            font_weight="bold",
-            cursor="pointer",
+            margin_top = "20px"
         ),
+        
       
         new_address_modal(),
 
@@ -2580,7 +2649,7 @@ def card_content() -> rx.Component:
                     rx.icon("landmark", size=18),
                     "Add Bank",
                     on_click=PaymentState.toggle_bank_form,
-                    color_scheme="green",
+                    color_scheme="grass",
                     variant="soft",
                 ),
                 spacing="3",
@@ -2590,6 +2659,7 @@ def card_content() -> rx.Component:
             margin_bottom="20px",
         ),
         
+
         # Loading state
         rx.cond(
             PaymentState.is_loading_payments,
@@ -3086,23 +3156,6 @@ def review_form_modal() -> rx.Component:
                         width="100%",
                     ),
                     
-                    # Product ID (read-only)
-                    rx.vstack(
-                        rx.text("Product ID", font_size="14px", font_weight="500", color="#22282c"),
-                        rx.input(
-                            value=ReviewState.product_id,
-                            width="100%",
-                            padding="5px",
-                            border="1px solid #D1D5DB",
-                            border_radius="12px",
-                            background_color="#F3F4F6",
-                            is_read_only=True,
-                        ),
-                        spacing="1",
-                        width="100%",
-                        align_items="start",
-                    ),
-                    
                     # Rating
                     rx.vstack(
                         rx.text("Rating", font_size="14px", font_weight="500", color="#22282c"),
@@ -3130,6 +3183,7 @@ def review_form_modal() -> rx.Component:
                             border="1px solid #D1D5DB",
                             border_radius="12px",
                             background_color="#ffffff",
+                            color="#22282c"
                         ),
                         spacing="1",
                         width="100%",
@@ -3264,32 +3318,20 @@ def review_card(review: Review) -> rx.Component:
                 render_stars(review.rating),
                 rx.spacer(),
                 rx.hstack(
-                    rx.icon(
-                        "pencil",
-                        size=18,
-                        color="#2E6FF2",
-                        cursor="pointer",
+                
+                    rx.icon_button(
+                        rx.icon("pencil", size=18),
+                        size="2",
+                        variant="soft",
+                        color_scheme="sky",
                         on_click=lambda: ReviewState.open_edit_form(review),
                     ),
-                    rx.text(
-                        "Edit",
-                        font_weight="semibold",
-                        color="#2E6FF2",
-                        cursor="pointer",
-                        on_click=lambda: ReviewState.open_edit_form(review),
-                    ),
-                    rx.icon(
-                        "trash",
-                        size=18,
-                        color="#FF4D4D",
-                        cursor="pointer",
-                        on_click=lambda: ReviewState.delete_review(review.id),
-                    ),
-                    rx.text(
-                        "Delete",
-                        font_weight="semibold",
-                        color="#FF4D4D",
-                        cursor="pointer",
+            
+                    rx.icon_button(
+                        rx.icon("trash-2", size=18),
+                        size="2",
+                        variant="soft",
+                        color_scheme="red",
                         on_click=lambda: ReviewState.delete_review(review.id),
                     ),
                     spacing="3",
@@ -3459,16 +3501,19 @@ def input_with_label(
     return rx.vstack(
         rx.text(label, font_size="14px", font_weight="500", margin_bottom="4px"),
         rx.input(
-            value=value,  # reactive binding
+            value=value, 
             placeholder=label,
             width="100%",
             style=input_style,
-            on_change=on_change,  # update state on user input
+            on_change=on_change,  
+            border="1px solid #E5E7EB",
+            padding= "0px 12px"
         ),
         spacing="1",
         width="100%",
         color="#22282c",
     )
+
 
 
 def input_with_label_date(
@@ -3478,11 +3523,12 @@ def input_with_label_date(
         rx.text(label, font_size="14px", font_weight="500", margin_bottom="4px"),
         rx.input(
             type="date",
-            value=value,  # use `value` instead of default_value
+            value=value, 
             placeholder=label,
             width="100%",
             style=input_style,
-            on_change=on_change,  # reactive binding
+            on_change=on_change, 
+            border="1px solid #E5E7EB",
         ),
         spacing="1",
         width="100%",
@@ -3499,11 +3545,13 @@ def select_with_label(
     return rx.vstack(
         rx.text(label, font_size="14px", font_weight="500", margin_bottom="4px"),
         rx.select(
-            options, value=value, placeholder=label, width="100%", on_change=on_change
+            options, value=value, placeholder=label, width="100%", on_change=on_change, variant="surface", color_scheme="cyan"
         ),
         spacing="1",
         width="100%",
         color="#22282c",
+    
+        
     )
 
 
@@ -3551,11 +3599,11 @@ def credit_card_item(card: CreditCard) -> rx.Component:
     """Display a single credit card."""
     return rx.box(
         rx.hstack(
-            # Left side - Card info
+           
             rx.hstack(
                 rx.box(
                     rx.icon(
-                        "credit-card",  # Simplified - just use one icon
+                        "credit-card",  
                         size=32,
                         color="#2E6FF2",
                     ),
@@ -3602,7 +3650,7 @@ def credit_card_item(card: CreditCard) -> rx.Component:
             
             rx.spacer(),
             
-            # Right side - Actions
+        
             rx.hstack(
                 rx.cond(
                     ~card.is_default,
@@ -3740,5 +3788,4 @@ def profile_page() -> rx.Component:
 
     return rx.box(
         template(profile_content),
-        on_mount=ProfileState.load_user_data  
     )
