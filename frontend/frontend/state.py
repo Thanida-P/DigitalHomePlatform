@@ -216,7 +216,7 @@ class ModelState(rx.State):
    
 
 class RoomSceneState(rx.State):
-    selected_room_model: str = "/models/gamingRoom.glb"  
+    selected_room_model: str = ""  
 
     def select_room(self, room_url: str):
         self.selected_room_model = room_url
