@@ -12,9 +12,13 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 import sys
+from dotenv import load_dotenv
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+load_dotenv(os.path.join(BASE_DIR.parent, 'local.env'))
 
 
 # Quick-start development settings - unsuitable for production
@@ -61,8 +65,7 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
-    os.environ.get("DIGITAL_HOME_PLATFORM_URL", ""),
-    os.environ.get("SCENE_CREATOR_URL", ""),
+    os.environ.get("BASE_URL", ""),
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -105,7 +108,7 @@ DATABASES = {
         "HOST": os.environ.get("DATABASE_HOST", "postgres"),
         "PORT": os.environ.get("DATABASE_PORT", "5432"),
     }
-}
+} 
 
 # ZODB settings and GDAL library path
 if sys.platform == "win32":

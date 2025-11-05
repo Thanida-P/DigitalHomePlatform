@@ -1,10 +1,11 @@
 import reflex as rx 
-from ..template import template 
+from ...template import template 
 from reflex.components.component import NoSSRComponent 
 from typing import Any, Dict, List 
 import urllib.parse 
-from ..state import ModelState, RoomSceneState, ModalState
-
+from ...state import ModelState, RoomSceneState, ModalState
+from ...config import API_BASE_URL
+from ...state import AuthState
 
 class ThreeFiberCanvas(NoSSRComponent):
     library = "@react-three/fiber" 
@@ -131,6 +132,146 @@ class CameraControls(rx.Component):
             """
         ]
 
+class ProductDetailState(rx.State):
+    model_file: bytes = ""
+    model_filename: str = ""       
+    scene_file: bytes = b""      
+    scene_filename: str = ""
+
+    product_id: str = ""
+    product_data: dict = {}
+    model_url: str = ""
+
+    display_scene_urls: list[str] = []
+    display_scenes_loaded: bool = False
+
+    is_loading: bool = False
+    has_loaded: bool = False
+
+    async def on_load(self):
+        """This runs when the page loads"""
+
+        if self.is_loading or self.has_loaded:
+            print("⏭️ Already loading or loaded, skipping...")
+            return
+        
+        self.is_loading = True
+
+        self.product_id = self.router.page.params.get("product_Id", "")
+
+        print(f"🔍 Product ID from URL: {self.product_id}")  
+        
+        if self.product_id:
+            await self.fetch_product_data(self.product_id)
+
+        self.is_loading = False
+        self.has_loaded = True
+
+    async def fetch_product_data(self, product_id: str):
+        """Fetch product data using the ID"""
+        import httpx
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies or {}
+        
+        try:
+         
+            url = f"{API_BASE_URL}/products/get_product_detail/{product_id}/"
+            print(f"📡 Fetching from: {url}")  
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, cookies=cookies_dict)
+            
+            print(f"📊 Response status: {response.status_code}")  
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.product_data = data.get('product', {})
+                print(f"✅ Fetched product: {self.product_data.get('name', 'N/A')}")
+
+                model_id = self.product_data.get('model_id')
+                if model_id:
+                    await self.fetch_3d_model(model_id)
+
+                display_scenes_ids = self.product_data.get('display_scenes_ids', [])
+                if display_scenes_ids:
+                    await self.fetch_display_scenes(display_scenes_ids)
+
+                
+            else:
+                print(f"❌ Product not found: {response.status_code}")
+                print(f"❌ Response: {response.text}")
+        except Exception as e:
+            print(f"❌ Error: {e}")
+            import traceback
+            traceback.print_exc()
+
+    
+    async def fetch_3d_model(self, model_id: int):
+        """Fetch 3D model and save it to assets"""
+        import httpx
+        import os
+        
+       
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies or {}
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(f"{API_BASE_URL}/products/get_3d_model/{model_id}/",
+                                            cookies=cookies_dict )
+
+            if response.status_code == 200:
+                self.model_file = response.content
+                self.model_filename = response.headers.get(
+                    "Content-Disposition", 
+                    f"{model_id}.glb"
+                ).split("filename=")[-1].strip('"')
+                
+                public_path = "assets/models"
+                os.makedirs(public_path, exist_ok=True)
+                
+                file_path = os.path.join(public_path, self.model_filename)
+                with open(file_path, "wb") as f:
+                    f.write(self.model_file)
+                
+                self.model_url = f"/models/{self.model_filename}"
+                
+                print(f"✅ Fetched 3D model: {self.model_filename}")
+                print(f"✅ Saved to: {file_path}")
+                print(f"✅ Model URL: {self.model_url}")
+            else:
+                print(f"❌ Model not found: {response.status_code}")
+                self.model_url = ""
+        except Exception as e:
+            print(f"❌ Error fetching 3D model: {e}")
+            import traceback
+            traceback.print_exc()
+            self.model_url = ""
+
+            
+    async def fetch_display_scenes(self, scene_ids: list):
+        """Fetch all display scenes for the product"""
+        import httpx
+        
+        self.display_scene_urls = []
+        
+        try:
+            print(f"🎬 Fetching {len(scene_ids)} display scenes...")
+            
+            for scene_id in scene_ids:
+                # Build the URL for each scene
+                scene_url = f"{API_BASE_URL}/products/get_display_scene/{scene_id}/"
+                self.display_scene_urls.append(scene_url)
+                print(f"✅ Added scene URL: {scene_url}")
+            
+            self.display_scenes_loaded = True
+            print(f"✅ Total scenes loaded: {len(self.display_scene_urls)}")
+            
+        except Exception as e:
+            print(f"❌ Error fetching display scenes: {e}")
+            import traceback
+            traceback.print_exc()
+            self.display_scene_urls = []
 
 def model_detail_modal() -> rx.Component:
    
@@ -232,7 +373,6 @@ def model_detail_modal() -> rx.Component:
                             margin_bottom="15px"
                         ),
 
-
                   
                         rx.vstack(
                             rx.text("Price", font_size="28px", font_weight="bold", color="#22282c"),
@@ -310,7 +450,7 @@ def simple_3d_viewer() -> rx.Component:
                     position=[0,0,0]
                 ),
                 ModelViewer3D.create(
-                    url="/models/gaming_chair_pink.glb",
+                    url=ProductDetailState.model_url,
                     scale=ModelState.model_scale,
                     position=[ModelState.model_x, ModelState.model_y, ModelState.model_z],
                     rotation=[0, ModelState.model_rotation_y, 0]  
@@ -472,7 +612,7 @@ def vertical_3d_scenes(model_urls: list[str], scene_height: int = 200) -> rx.Com
                         "height": f"{scene_height}px"
                     }
                 ),
-                on_click=RoomSceneState.select_room(url),  
+                on_click=lambda u=url: RoomSceneState.select_room(url),  
                 cursor="pointer",  
                 border_radius="12px",
                 border=rx.cond(
@@ -518,20 +658,35 @@ def product_detail_content() -> rx.Component:
 
             rx.box(
                 rx.vstack(
-                    rx.text("Modern Stylish Sofa", font_size="24px", font_weight="bold", color="#22282c"),
+                    rx.text(ProductDetailState.product_data.get('name', 'Loading...'), font_size="24px", font_weight="bold", color="#22282c"),
 
-                    rx.text("Select Texture", font_size="16px", margin_top="10px", color="#22282c", font_weight="bold"),
+                    rx.text("Colors", font_size="16px", margin_top="10px", color="#22282c", font_weight="bold"),
                     rx.hstack(
-                        rx.image(src="images/room.jpg", width="50px", height="50px", border="1px solid #929FA7", border_radius="50%"),
-                        rx.image(src="images/room.jpg", width="50px", height="50px", border_radius="50%"),
-                        rx.image(src="images/room.jpg", width="50px", height="50px", border_radius="50%"),
-                    ),
-                    rx.text("Beige", font_size="14px", color="gray"),
-
+                            rx.hstack(
+                                rx.box(style={"width": "30px", "height": "30px", "border_radius": "50%", "background_color": "beige"}),
+                                rx.text("Beige", font_size="14px", color="gray"),
+                                spacing="2",
+                                align_items="center"
+                            ),
+                            rx.hstack(
+                                rx.box(style={"width": "30px", "height": "30px", "border_radius": "50%", "background_color": "wooden"}),
+                                rx.text("Dark Blue", font_size="14px", color="gray"),
+                                spacing="2",
+                                align_items="center"
+                            ),
+                            rx.hstack(
+                                rx.box(style={"width": "30px", "height": "30px", "border_radius": "50%", "background_color": "brown"}),
+                                rx.text("Brown", font_size="14px", color="gray"),
+                                spacing="2",
+                                align_items="center"
+                            ),
+                            spacing="4",  # spacing between color items
+                        ),
+                    
                     rx.text("Price", font_size="18px", font_weight="bold", margin_top="15px", color="#22282c"),
                     rx.hstack(
                         rx.text("Physical:", font_size="16px", color="#22282c"),
-                        rx.text("$1299", font_size="18px", color="#22282c", font_weight="bold"),
+                        rx.text(f"${ProductDetailState.product_data.get('physical_price', '0')}", font_size="18px", color="#22282c", font_weight="bold"),
                         rx.divider(),
                         rx.button(rx.icon("shopping-cart"), "Add", style=cart_button),
                         rx.button("Buy Now", bg="black", color="white"),
@@ -539,14 +694,14 @@ def product_detail_content() -> rx.Component:
                     ),
                     rx.hstack(
                         rx.text("Digital:", font_size="16px", color="#22282c"),
-                        rx.text("$99", font_size="18px", color="#22282c", font_weight="bold"),
+                        rx.text(f"${ProductDetailState.product_data.get('digital_price', '0')}", font_size="18px", color="#22282c", font_weight="bold"),
                         rx.divider(),
                         rx.button(rx.icon("zap"), "Add", style=cart_button),
                         rx.button("Buy Now", bg="black", color="white"),
                         width="100%",
                     ),
 
-                    rx.button("Browse More Products", margin_top="20px", border="1px solid #929FA7", background_color="white", style=button_style,
+                    rx.button("Browse More Products", margin_top="20px", border="1px solid #929FA7", background_color="white", style=button_style, on_click=lambda: ProductDetailState.fetch_3d_model(3),
                      _hover={
                             "background_color": "#22282c",
                             "border": "1px solid #22282C",
@@ -577,7 +732,7 @@ def product_detail_content() -> rx.Component:
         position="relative"
     )
 
-
+@rx.page(route="/details/[product_Id]",on_load=ProductDetailState.on_load )
 def product_detail_page() -> rx.Component:
     return template(product_detail_content)
 

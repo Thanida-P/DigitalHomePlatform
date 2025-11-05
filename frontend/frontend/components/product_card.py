@@ -121,10 +121,7 @@ def product_card(product: Dict) -> rx.Component:
 
 def product_list(products: list[dict]) -> rx.Component:
     return rx.hstack(
-        rx.foreach(
-            products,
-            lambda p: product_card(p)
-        ),
+        [product_card(p) for p in products],
         spacing="6",
         justify="center",
         wrap="wrap",  # Changed from "nowrap" to "wrap" for better responsiveness
