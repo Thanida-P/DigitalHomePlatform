@@ -164,7 +164,7 @@ class AuthState(rx.State):
         self.scene_creator_url = f"{SCENE_CREATOR_URL}/#/login?token={token}"
         
         print(f"🚀 Opening Scene Creator: {self.scene_creator_url}")
-        
+
         return rx.call_script(f"window.open('{self.scene_creator_url}', '_blank')")
         
 
@@ -216,7 +216,7 @@ class ModelState(rx.State):
    
 
 class RoomSceneState(rx.State):
-    selected_room_model: str = "/models/gamingRoom.glb"  
+    selected_room_model: str = ""  
 
     def select_room(self, room_url: str):
         self.selected_room_model = room_url

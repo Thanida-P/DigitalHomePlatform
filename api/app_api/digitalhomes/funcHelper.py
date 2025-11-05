@@ -7,6 +7,9 @@ from ZODB.blob import Blob
 from app_api.digitalhomes.homeObject import Home3D
 from app_api.digitalhomes.models import SRID_3D
 from app_api.products.product_func import create_Texture, delete_texture, fetch_3d_model
+from trimesh.collision import CollisionManager
+from django.core.files.uploadedfile import SimpleUploadedFile
+import numpy as np
 import trimesh
 import transaction
 import json
@@ -276,4 +279,67 @@ def update_deployed_item(root, item_id, id, item_data):
         if item_data.get('texture_id') not in model.get_textures():
             raise ValueError("Texture does not belong to the item's 3D model")
         item.set_texture_id(item_data.get('texture_id'))
+        
+def apply_transform_simple(mesh, pos, rot, scale):
+    # Apply scale
+    if isinstance(scale, (int, float)):
+        scale = (scale, scale, scale)
+    mesh.apply_scale(scale)
     
+    # Apply rotation
+    rx, ry, rz = np.deg2rad(rot)
+    rot_matrix = trimesh.transformations.euler_matrix(rx, ry, rz, axes='szyx')
+    mesh.apply_transform(rot_matrix)
+
+    # Apply translation
+    mesh.apply_translation(np.array(pos[:3]))
+        
+def check_models_overlap(file1, file2, pos1, pos2, rot1, rot2, scale1, scale2):
+    try:
+        if pos1[3] != pos2[3]:
+            return {
+                'status': 'no_overlap',
+                'reason': 'Different time (m values not equal)',
+                'time1': pos1[3],
+                'time2': pos2[3]
+            }
+
+        mesh1 = load_mesh(file1)
+        mesh2 = load_mesh(file2)
+
+        # Apply transformations
+        apply_transform_simple(mesh1, pos1, rot1, scale1)
+        apply_transform_simple(mesh2, pos2, rot2, scale2)
+
+        # Collision detection
+        cm = CollisionManager()
+        cm.add_object("mesh1", mesh1)
+        cm.add_object("mesh2", mesh2)
+
+        if cm.in_collision_internal():
+            return True
+        else:
+            return False
+
+    except Exception as e:
+        return {'status': 'error', 'message': f'Failed to check overlap: {str(e)}'}
+    
+def get_file_content(file_obj):
+    if isinstance(file_obj, Blob):
+        with file_obj.open('r') as f:
+            content = f.read()
+            return SimpleUploadedFile('file', content)
+
+    if hasattr(file_obj, 'path'):
+        with open(file_obj.path, 'rb') as f:
+            return SimpleUploadedFile(file_obj.path, f.read())
+
+    if hasattr(file_obj, 'download_as_bytes'):
+        content = file_obj.download_as_bytes()
+        return SimpleUploadedFile('file', content)
+
+    if hasattr(file_obj, 'read'):
+        content = file_obj.read()
+        return SimpleUploadedFile('file', content)
+
+    raise ValueError(f"Cannot read file object of type {type(file_obj)}")

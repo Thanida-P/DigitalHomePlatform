@@ -2,10 +2,13 @@ import reflex as rx
 from ...template import template 
 from reflex.components.component import NoSSRComponent 
 from typing import Any, Dict, List 
-import urllib.parse 
 from ...state import ModelState, RoomSceneState, ModalState
 from ...config import API_BASE_URL
 from ...state import AuthState
+import urllib.parse
+import httpx
+import os
+import traceback
 
 class ThreeFiberCanvas(NoSSRComponent):
     library = "@react-three/fiber" 
@@ -45,7 +48,6 @@ class ModelViewer3D(rx.Component):
                             url,
                             (gltf) => {
                                 if (!cancelled) {
-                                    // Traverse only the chair meshes
                                     gltf.scene.traverse((child) => {
                                         if (child.isMesh && child.name.toLowerCase().includes("chair")) {
                                             child.material.color.set(color);
@@ -55,7 +57,21 @@ class ModelViewer3D(rx.Component):
                                 }
                             },
                             undefined,
-                            (err) => console.error("Error loading model:", err)
+                            async (err) => {
+                                console.error("Error loading model:", err);
+                                console.log("Model URL:", url);
+                                
+                                // Check what's actually at that URL
+                                try {
+                                    const response = await fetch(url);
+                                    const contentType = response.headers.get('content-type');
+                                    const text = await response.text();
+                                    console.log("Content-Type:", contentType);
+                                    console.log("First 500 chars:", text.substring(0, 500));
+                                } catch (e) {
+                                    console.error("Fetch error:", e);
+                                }
+                            }
                         );
                     })();
 
@@ -149,12 +165,6 @@ class ProductDetailState(rx.State):
     has_loaded: bool = False
 
     async def on_load(self):
-        """This runs when the page loads"""
-
-        if self.is_loading or self.has_loaded:
-            print("⏭️ Already loading or loaded, skipping...")
-            return
-        
         self.is_loading = True
 
         self.product_id = self.router.page.params.get("product_Id", "")
@@ -169,7 +179,6 @@ class ProductDetailState(rx.State):
 
     async def fetch_product_data(self, product_id: str):
         """Fetch product data using the ID"""
-        import httpx
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies or {}
         
@@ -202,76 +211,92 @@ class ProductDetailState(rx.State):
                 print(f"❌ Response: {response.text}")
         except Exception as e:
             print(f"❌ Error: {e}")
-            import traceback
             traceback.print_exc()
 
     
     async def fetch_3d_model(self, model_id: int):
-        """Fetch 3D model and save it to assets"""
-        import httpx
-        import os
-        
-       
+        """Fetch 3D model and convert to data URL"""
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies or {}
 
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.get(f"{API_BASE_URL}/products/get_3d_model/{model_id}/",
-                                            cookies=cookies_dict )
+                response = await client.get(
+                    f"{API_BASE_URL}/products/get_3d_model/{model_id}/",
+                    cookies=cookies_dict
+                )
 
             if response.status_code == 200:
+                import base64
+                
                 self.model_file = response.content
                 self.model_filename = response.headers.get(
                     "Content-Disposition", 
-                    f"{model_id}.glb"
+                    f"model_{model_id}.glb"
                 ).split("filename=")[-1].strip('"')
-                
-                public_path = "assets/models"
-                os.makedirs(public_path, exist_ok=True)
-                
-                file_path = os.path.join(public_path, self.model_filename)
-                with open(file_path, "wb") as f:
-                    f.write(self.model_file)
-                
-                self.model_url = f"/models/{self.model_filename}"
-                
-                print(f"✅ Fetched 3D model: {self.model_filename}")
-                print(f"✅ Saved to: {file_path}")
-                print(f"✅ Model URL: {self.model_url}")
+
+                base64_data = base64.b64encode(self.model_file).decode('utf-8')
+                self.model_url = f"data:model/gltf-binary;base64,{base64_data}"
             else:
                 print(f"❌ Model not found: {response.status_code}")
                 self.model_url = ""
         except Exception as e:
             print(f"❌ Error fetching 3D model: {e}")
-            import traceback
             traceback.print_exc()
             self.model_url = ""
 
             
     async def fetch_display_scenes(self, scene_ids: list):
-        """Fetch all display scenes for the product"""
-        import httpx
-        
+        """Fetch display scenes and convert to data URLs"""
         self.display_scene_urls = []
-        
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies or {}
+
         try:
-            print(f"🎬 Fetching {len(scene_ids)} display scenes...")
-            
-            for scene_id in scene_ids:
-                # Build the URL for each scene
-                scene_url = f"{API_BASE_URL}/products/get_display_scene/{scene_id}/"
-                self.display_scene_urls.append(scene_url)
-                print(f"✅ Added scene URL: {scene_url}")
-            
-            self.display_scenes_loaded = True
-            print(f"✅ Total scenes loaded: {len(self.display_scene_urls)}")
-            
+            async with httpx.AsyncClient() as client:
+                for scene_id in scene_ids:
+                    try:
+                        # Request each display scene from backend
+                        response = await client.get(
+                            f"{API_BASE_URL}/products/get_display_scene/{scene_id}/",
+                            cookies=cookies_dict
+                        )
+
+                        if response.status_code == 200:
+                            import base64
+                            
+                            scene_file = response.content
+                            filename = response.headers.get(
+                                "Content-Disposition",
+                                f"scene_{scene_id}.glb"
+                            ).split("filename=")[-1].strip('"')
+
+                            # Convert to base64 data URL
+                            base64_data = base64.b64encode(scene_file).decode('utf-8')
+                            scene_url = f"data:model/gltf-binary;base64,{base64_data}"
+                            
+                            self.display_scene_urls.append(scene_url)
+                        else:
+                            print(f"❌ Failed to fetch scene {scene_id}: {response.status_code}")
+
+                    except Exception as inner_e:
+                        print(f"⚠️ Error fetching scene {scene_id}: {inner_e}")
+                        traceback.print_exc()
+                            
+                # Set the first scene as selected if available
+                if self.display_scene_urls:
+                    RoomSceneState.selected_room_model = self.display_scene_urls[0]
+                else:
+                    RoomSceneState.selected_room_model = ""
+                
+                self.display_scenes_loaded = True
+                print(f"✅ Total scenes loaded: {len(self.display_scene_urls)}")
+
         except Exception as e:
             print(f"❌ Error fetching display scenes: {e}")
-            import traceback
             traceback.print_exc()
             self.display_scene_urls = []
+
 
 def model_detail_modal() -> rx.Component:
    
@@ -445,7 +470,7 @@ def simple_3d_viewer() -> rx.Component:
         ThreeFiberCanvas.create(
             SceneWithLighting.create(
                 ModelViewer3D.create(
-                    url=RoomSceneState.selected_room_model,
+                    url=ProductDetailState.display_scene_urls[0],
                     scale=3.0,
                     position=[0,0,0]
                 ),
@@ -591,44 +616,57 @@ def simple_3d_viewer() -> rx.Component:
     )
 
 
-def vertical_3d_scenes(model_urls: list[str], scene_height: int = 200) -> rx.Component:
-    scenes = []
-    for i, url in enumerate(model_urls):
-        scenes.append(
-            rx.box(
-                ThreeFiberCanvas.create(
-                    SceneWithLighting.create(
-                        ModelViewer3D.create(
-                            url=url,
-                            scale=3.0,
-                            position=[0, 0, 0]
+def vertical_3d_scenes(model_urls, scene_height: int = 200) -> rx.Component:
+    """Render vertical list of 3D scene thumbnails"""
+
+    return rx.cond(
+        (model_urls == []) | (model_urls == None),
+        # Loading placeholder
+        rx.box(
+            rx.text("Loading scenes...", font_size="12px", color="gray"),
+            padding="10px"
+        ),
+        # Otherwise show list of scenes
+        rx.vstack(
+            rx.foreach(
+                model_urls,
+                lambda url: rx.box(
+                    ThreeFiberCanvas.create(
+                        SceneWithLighting.create(
+                            ModelViewer3D.create(
+                                url=url,
+                                scale=3.0,
+                                position=[0, 0, 0]
+                            ),
+                            CameraControls.create()
                         ),
-                        CameraControls.create()
+                        camera={"position": [3, 3, 3], "fov": 50},
+                        style={
+                            "background": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                            "border_radius": "10px",
+                            "height": f"{scene_height}px"
+                        }
                     ),
-                    camera={"position": [3, 3, 3], "fov": 50},
-                    style={
-                        "background": "black",
-                        "border_radius": "10px",
-                        "height": f"{scene_height}px"
-                    }
-                ),
-                on_click=lambda u=url: RoomSceneState.select_room(url),  
-                cursor="pointer",  
-                border_radius="12px",
-                border=rx.cond(
-                    RoomSceneState.selected_room_model == url,
-                    "3px solid teal",
-                    "3px solid transparent"
-                ),
-                _hover={
-                  
-                    "opacity": "0.8",
-        
-                },
-                margin_bottom="10px"  
-            )
+                    on_click=RoomSceneState.set_selected_room_model(url),
+                    cursor="pointer",
+                    border_radius="12px",
+                    border=rx.cond(
+                        RoomSceneState.selected_room_model == url,
+                        "3px solid teal",
+                        "3px solid transparent"
+                    ),
+                    _hover={
+                        "opacity": "0.8",
+                        "border": "3px solid teal"
+                    },
+                    margin_bottom="10px",
+                    width="150px"
+                )
+            ),
+            spacing="2",
+            align="start"
         )
-    return rx.vstack(*scenes)
+    )
 
 
 @rx.event 
@@ -642,11 +680,7 @@ def product_detail_content() -> rx.Component:
             rx.box(
                 rx.hstack(
                     rx.box(
-                        vertical_3d_scenes([
-                            "/models/gamingRoom.glb",
-                            "/models/livingroom_scene.glb",
-                            "/models/livingroom_scene2.glb"
-                        ]),
+                        vertical_3d_scenes(ProductDetailState.display_scene_urls, scene_height=100),
                     ),
                     simple_3d_viewer(),
                     align="start",

@@ -1,8 +1,10 @@
 import reflex as rx
 from typing import List, Dict
 from ..state import AuthState
-import uuid
 from ..config import API_BASE_URL
+import httpx
+import uuid
+import traceback
 
 class AdminDashboardState(rx.State):
     # Product list
@@ -32,9 +34,9 @@ class AdminDashboardState(rx.State):
     
     # File uploads - storing file paths/names
     product_image: str = ""
-    texture_file: str = ""
+    texture_file: list[str] = []
     model_file: str = ""
-    scene_file: str = ""
+    scene_file: list[str] = []
     
     # Upload files (for handling the actual upload)
     uploaded_files: list[rx.UploadFile] = []
@@ -75,16 +77,16 @@ class AdminDashboardState(rx.State):
         if not files:
             return
         
-        file = files[0]
-        upload_data = await file.read()
-        filename = f"texture_{uuid.uuid4().hex[:8]}_{file.name}"
+        for file in files:
+            upload_data = await file.read()
+            filename = f"texture_{uuid.uuid4().hex[:8]}_{file.name}"
         
-        outfile = rx.get_upload_dir() / filename
-        with outfile.open("wb") as f:
-            f.write(upload_data)
-        
-        self.texture_file = filename
-        self.upload_status = f"Texture uploaded: {file.name}"
+            outfile = rx.get_upload_dir() / filename
+            with outfile.open("wb") as f:
+                f.write(upload_data)
+
+            self.texture_file.append(filename)
+        self.upload_status = f"Textures uploaded"
 
     async def handle_model_upload(self, files: List[rx.UploadFile]):
         """Handle 3D model file upload"""
@@ -107,16 +109,16 @@ class AdminDashboardState(rx.State):
         if not files:
             return
         
-        file = files[0]
-        upload_data = await file.read()
-        filename = f"scene_{uuid.uuid4().hex[:8]}_{file.name}"
+        for file in files:
+            upload_data = await file.read()
+            filename = f"scene_{uuid.uuid4().hex[:8]}_{file.name}"
         
-        outfile = rx.get_upload_dir() / filename
-        with outfile.open("wb") as f:
-            f.write(upload_data)
-        
-        self.scene_file = filename
-        self.upload_status = f"Scene model uploaded: {file.name}"
+            outfile = rx.get_upload_dir() / filename
+            with outfile.open("wb") as f:
+                f.write(upload_data)
+
+            self.scene_file.append(filename)
+        self.upload_status = f"Scene models uploaded"
 
     def toggle_digital_available(self, value: bool):
         self.digital_available = value
@@ -134,8 +136,6 @@ class AdminDashboardState(rx.State):
     
     
     async def load_products(self):
-        import httpx
-        API_BASE_URL = "http://localhost:8001"
         try:
             timeout = httpx.Timeout(connect=30.0, read=120.0, write=120.0, pool=60.0)
             auth_state = await self.get_state(AuthState)
@@ -151,6 +151,7 @@ class AdminDashboardState(rx.State):
                     json=filter_body,               
                     cookies=cookies_dict,
                 )
+                
 
             if response.status_code != 200:
                 print(f"❌ Backend error: {response.status_code} {response.text}")
@@ -185,8 +186,6 @@ class AdminDashboardState(rx.State):
             self.filtered_products = normalized
             self.total_products = len(normalized)
             self.apply_filters()
-
-            print(f"✅ Loaded {self.total_products} products from backend")
 
         except Exception as e:
             print(f"❌ Error loading products: {e}")
@@ -246,10 +245,10 @@ class AdminDashboardState(rx.State):
         self.stock = str(product.get("stock", "0"))
         
         # ✅ File fields (for edit)
-        self.product_image = product.get("product_image" or "")
-        self.texture_file = product.get("texture_file" or "")
-        self.model_file = product.get("model_file" or "" )
-        self.scene_file = product.get("scene_file" or "")
+        self.product_image = product.get("product_image", "")
+        self.texture_file = product.get("texture_file", [])
+        self.model_file = product.get("model_file", "")
+        self.scene_file = product.get("scene_file", [])
 
         # ✅ Toggle fields
         self.digital_available = product.get("digital_available", False)
@@ -271,9 +270,9 @@ class AdminDashboardState(rx.State):
         self.stock = ""
         self.editing_product_id = ""
         self.product_image = ""
-        self.texture_file = ""
+        self.texture_file = []
         self.model_file = ""
-        self.scene_file = ""
+        self.scene_file = []
         self.digital_available = True
         self.physical_available = True
         self.is_container = False
@@ -302,11 +301,6 @@ class AdminDashboardState(rx.State):
         self.stock = value
 
     async def save_product(self):
-        """Save new product - call backend API"""
-        import httpx
-        import traceback
-        API_BASE_URL = "http://localhost:8001"
-        
         self.is_uploading = True
         self.upload_status = ""
         
@@ -344,11 +338,12 @@ class AdminDashboardState(rx.State):
                         print(f"Product image not found: {file_path}")
                 
                 if self.texture_file:
-                    file_path = upload_dir / self.texture_file
-                    if file_path.exists():
-                        files['texture_files'] = open(file_path, 'rb')
-                    else:
-                        print(f"Texture file not found: {file_path}")
+                    texture_files = []
+                    for texture in self.texture_file:
+                        file_path = upload_dir / texture
+                        if file_path.exists():
+                            texture_files.append((file_path.name, open(file_path, "rb"), "application/octet-stream"))
+                    files["texture_files"] = texture_files
                 
                 if self.model_file:
                     file_path = upload_dir / self.model_file
@@ -358,18 +353,12 @@ class AdminDashboardState(rx.State):
                         print(f"Model file not found: {file_path}")
                 
                 if self.scene_file:
-                    file_path = upload_dir / self.scene_file
-                    if file_path.exists():
-                        files['scene_files'] = open(file_path, 'rb')
-                    else:
-                        print(f"Scene file not found: {file_path}")
-                
-                # Make API call using httpx
-                
-                
-                print(f"Sending request to: {API_BASE_URL}/products/add/")
-                print(f"Data: {data}")
-                print(f"Files: {list(files.keys())}")
+                    scene_files = []
+                    for scene in self.scene_file:
+                        file_path = upload_dir / scene
+                        if file_path.exists():
+                            scene_files.append((file_path.name, open(file_path, "rb"), "application/octet-stream"))
+                    files["scene_files"] = scene_files
                 
                 timeout = httpx.Timeout(connect=30.0, read=120.0, write=120.0, pool=60.0) 
 
@@ -378,15 +367,19 @@ class AdminDashboardState(rx.State):
                 async with httpx.AsyncClient(timeout=timeout) as client:
 
                     cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+                    flattened_files = []
+                    for key, value in files.items():
+                        if isinstance(value, list):
+                            for item in value:
+                                flattened_files.append((key, item))
+                        else:
+                            flattened_files.append((key, value))
                     response = await client.post(
                         f"{API_BASE_URL}/products/add/",
                         data=data,
-                        files=files,
+                        files=flattened_files,
                         cookies=cookies_dict,
                     )
-                
-                print(f"Response status: {response.status_code}")
-                print(f"Response body: {response.text}")
                 
                 if response.status_code == 201:
                     self.upload_status = "Product saved successfully!"
@@ -432,9 +425,6 @@ class AdminDashboardState(rx.State):
     
     
     async def delete_product(self, product_id: int):
-        import httpx
-        """Delete a product by ID"""
-        API_BASE_URL = "http://localhost:8001"
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies or {}
         try:
@@ -448,7 +438,6 @@ class AdminDashboardState(rx.State):
             if response.status_code == 200:
                 # Remove product from the list
                 self.products = [p for p in self.products if p["id"] != product_id]
-                print(f"✅ Product {product_id} deleted successfully")
                 await self.load_products()
                 return rx.toast.success(f"Product deleted successfully!")
             else:
@@ -460,85 +449,119 @@ class AdminDashboardState(rx.State):
             return rx.toast.error(f"Error: {str(e)}")
         
         
-    async def update_product(self, product_data):
-        import httpx
+    async def update_product(self, **kwargs):
         """Update an existing product"""
-        print(product_data)
+        self.is_uploading = True
+        self.upload_status = ""
 
-        API_BASE_URL = "http://localhost:8001"
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies or {}
+        _ = kwargs
 
         try:
-            
             data = {
-                "product_id": product_data["id"],
-                "name": product_data["name"],
-                "description": product_data["description"],
-                "digital_price": str(product_data["digital_price"]),
-                "physical_price": str(product_data["physical_price"]),
-                "category": product_data["category"],
-                "product_type": product_data["product_type"],
-                "stock": str(product_data["stock"]),
-                "digital_available": str(product_data["digital_available"]).lower(),
-                "physical_available": str(product_data["physical_available"]).lower(),
-                "is_container": str(product_data["is_container"]).lower(),
+                "product_id": str(self.editing_product_id),
+                "name": str(self.product_name),
+                "description": str(self.description),
+                "digital_price": str(self.digital_price),
+                "physical_price": str(self.physical_price),
+                "category": str(self.category),
+                "product_type": str(self.product_type),
+                "stock": str(self.stock),
+                "digital_available": str(self.digital_available).lower(),
+                "physical_available": str(self.physical_available).lower(),
+                "is_container": str(self.is_container).lower(),
             }
 
-         
             files = {}
+            upload_dir = rx.get_upload_dir()
 
-            if "image" in product_data and product_data["image"]:
-                files["image"] = (
-                    getattr(product_data["image"], "name", "image.png"),
-                    product_data["image"],
-                    "image/png",
-                )
+            try:
+                if self.product_image:
+                    file_path = upload_dir / self.product_image
+                    if file_path.exists():
+                        files["image"] = open(file_path, "rb")
+                    else:
+                        print(f"Product image not found: {file_path}")
 
-            if "model_file" in product_data and product_data["model_file"]:
-                files["model_file"] = (
-                    getattr(product_data["model_file"], "name", "model.glb"),
-                    product_data["model_file"],
-                    "application/octet-stream",
-                )
+                if self.model_file:
+                    file_path = upload_dir / self.model_file
+                    if file_path.exists():
+                        files["model_file"] = open(file_path, "rb")
+                    else:
+                        print(f"Model file not found: {file_path}")
 
-            # Multiple scene files
-            for i, f in enumerate(product_data.get("scene_files", [])):
-                files[f"scene_files[{i}]"] = (
-                    getattr(f, "name", f"scene_{i}.glb"),
-                    f,
-                    "application/octet-stream",
-                )
+                if self.scene_file:
+                    scene_files = []
+                    for scene in self.scene_file:
+                        file_path = upload_dir / scene
+                        if file_path.exists():
+                            scene_files.append((file_path.name, open(file_path, "rb"), "application/octet-stream"))
+                    if scene_files:
+                        files["scene_files"] = scene_files
 
+                if self.texture_file:
+                    texture_files = []
+                    for texture in self.texture_file:
+                        file_path = upload_dir / texture
+                        if file_path.exists():
+                            texture_files.append((file_path.name, open(file_path, "rb"), "application/octet-stream"))
+                    if texture_files:
+                        files["texture_files"] = texture_files
 
-            # Multiple texture files
-            for i, f in enumerate(product_data.get("texture_files", [])):
-                files[f"texture_files[{i}]"] = (
-                    getattr(f, "name", f"texture_{i}.png"),
-                    f,
-                    "image/png",
-                )
+                timeout = httpx.Timeout(connect=30.0, read=120.0, write=120.0, pool=60.0)
 
-            # Send POST request
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{API_BASE_URL}/products/update/",
-                    data=data,
-                    files=files,
-                    cookies=cookies_dict,
-                )
+                async with httpx.AsyncClient(timeout=timeout) as client:
+                    flattened_files = []
+                    for key, value in files.items():
+                        if isinstance(value, list):
+                            for item in value:
+                                flattened_files.append((key, item))
+                        else:
+                            flattened_files.append((key, value))
 
-            if response.status_code == 200:
-                print("✅ Product updated successfully")
-                await self.load_products()
-                return rx.toast.success("Product updated successfully!")
-            else:
-                print(f"❌ Failed to update product: {response.status_code} {response.text}")
-                return rx.toast.error("Failed to update product")
+                    response = await client.post(
+                        f"{API_BASE_URL}/products/update/",
+                        data=data,
+                        files=flattened_files,
+                        cookies=cookies_dict,
+                    )
+
+                if response.status_code == 200:
+                    await self.load_products()
+                    self.upload_status = "Product updated successfully!"
+                    return rx.toast.success("Product updated successfully!")
+                elif response.status_code == 400:
+                    try:
+                        error_data = response.json()
+                        self.upload_status = f"Validation error: {error_data.get('error', 'Invalid data')}"
+                    except:
+                        self.upload_status = f"Validation error: {response.text}"
+                    return rx.toast.error(self.upload_status)
+                else:
+                    print(f"❌ Failed to update product: {response.status_code} {response.text}")
+                    self.upload_status = f"Error: {response.text}"
+                    return rx.toast.error("Failed to update product")
+
+            finally:
+                for f in files.values():
+                    try:
+                        if isinstance(f, list):
+                            for inner_f in f:
+                                if hasattr(inner_f[1], "close"):
+                                    inner_f[1].close()
+                        elif hasattr(f, "close"):
+                            f.close()
+                    except Exception as e:
+                        print(f"Error closing file: {e}")
 
         except Exception as e:
             print(f"❌ Error updating product: {e}")
+            self.upload_status = f"Error: {e}"
             return rx.toast.error(f"Error: {str(e)}")
+        finally:
+            self.is_uploading = False
+
 
 
 
