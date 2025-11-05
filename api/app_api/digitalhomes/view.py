@@ -588,6 +588,7 @@ def check_overlap(request):
         main_model_scale = main_model_data.get('scale', [1.0,1.0,1.0])
 
         results = []
+        contain_overlap = False
         for model_id, details in model_details_list.items():
             model = fetch_3d_model(model_id)
             if not model:
@@ -618,8 +619,11 @@ def check_overlap(request):
                 overlap_result = {'status': 'error', 'message': f'Failed to check overlap: {str(e)}'}
 
             results.append({'model_id': model_id, 'result': overlap_result})
+            
+            if overlap_result:
+                contain_overlap = True
 
-        return JsonResponse({'results': results}, status=200)
+        return JsonResponse({'contain_overlap': contain_overlap, 'results': results}, status=200)
 
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': f'Failed to check overlap: {str(e)}'}, status=500)
