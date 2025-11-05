@@ -96,4 +96,5 @@ urlpatterns = [
     path('digitalhomes/add_custom_item/', digitalhome_views.add_custom_item),
     path('digitalhomes/get_deployed_items_details/<int:id>/', digitalhome_views.get_deployed_item_details),
     path('digitalhomes/get_deployed_item_detail/<int:id>/', digitalhome_views.get_deployed_item_detail),
+    path('digitalhomes/overlap_check/', digitalhome_views.check_overlap),
 ]

@@ -553,3 +553,73 @@ def get_deployed_item_detail(request, id):
         return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
+        
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def check_overlap(request):
+    try:
+        main_model_details_json = request.POST.get('main_model_details')
+        model_details_list_json = request.POST.get('model_details_list')
+
+        if not main_model_details_json or not model_details_list_json:
+            return JsonResponse({'status': 'error', 'message': 'Missing required parameters'}, status=400)
+
+        main_model_details = json.loads(main_model_details_json)
+        model_details_list = json.loads(model_details_list_json)
+
+        main_model_id = list(main_model_details.keys())[0]
+        main_model = fetch_3d_model(main_model_id)
+        if not main_model:
+            return JsonResponse({'status': 'error', 'message': 'Main model not found'}, status=404)
+
+        main_file_obj = main_model.get_file()
+        if not main_file_obj:
+            return JsonResponse({'status': 'error', 'message': 'Main model file not found'}, status=404)
+
+        try:
+            main_model_file = get_file_content(main_file_obj)
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': f'Cannot access main model file: {str(e)}'}, status=500)
+
+        main_model_data = main_model_details[main_model_id]
+        main_model_position = main_model_data.get('position', [0,0,0,0])
+        main_model_rotation = main_model_data.get('rotation', [0,0,0])
+        main_model_scale = main_model_data.get('scale', [1.0,1.0,1.0])
+
+        results = []
+        for model_id, details in model_details_list.items():
+            model = fetch_3d_model(model_id)
+            if not model:
+                return JsonResponse({'status': 'error', 'message': f'Model {model_id} not found'}, status=404)
+
+            file_obj = model.get_file()
+            if not file_obj:
+                return JsonResponse({'status': 'error', 'message': f'Model File {model_id} not found'}, status=404)
+
+            try:
+                model_file = get_file_content(file_obj)
+            except Exception as e:
+                return JsonResponse({'status': 'error', 'message': f'Cannot access model file of id {model_id}: {str(e)}'}, status=500)
+
+            model_position = details.get('position', [0,0,0,0])
+            model_rotation = details.get('rotation', [0,0,0])
+            model_scale = details.get('scale', [1.0,1.0,1.0])
+
+            # Check overlap
+            try:
+                overlap_result = check_models_overlap(
+                    main_model_file, model_file,
+                    main_model_position, model_position,
+                    main_model_rotation, model_rotation,
+                    main_model_scale, model_scale
+                )
+            except Exception as e:
+                overlap_result = {'status': 'error', 'message': f'Failed to check overlap: {str(e)}'}
+
+            results.append({'model_id': model_id, 'result': overlap_result})
+
+        return JsonResponse({'results': results}, status=200)
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': f'Failed to check overlap: {str(e)}'}, status=500)
