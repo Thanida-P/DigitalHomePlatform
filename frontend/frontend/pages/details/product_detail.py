@@ -2,7 +2,7 @@ import reflex as rx
 from ...template import template 
 from reflex.components.component import NoSSRComponent 
 from typing import Any, Dict, List 
-from ...state import ModelState, RoomSceneState, ModalState
+from ...state import ModelState, ModalState,RoomSceneState
 from ...config import API_BASE_URL
 from ...state import AuthState
 import urllib.parse
@@ -147,6 +147,8 @@ class CameraControls(rx.Component):
             }
             """
         ]
+    
+
 
 class ProductDetailState(rx.State):
     model_file: bytes = ""
@@ -285,9 +287,9 @@ class ProductDetailState(rx.State):
                             
                 # Set the first scene as selected if available
                 if self.display_scene_urls:
-                    RoomSceneState.selected_room_model = self.display_scene_urls[0]
+                    ProductDetailState.selected_room_model = self.display_scene_urls[0]
                 else:
-                    RoomSceneState.selected_room_model = ""
+                    ProductDetailState.selected_room_model = ""
                 
                 self.display_scenes_loaded = True
                 print(f"✅ Total scenes loaded: {len(self.display_scene_urls)}")
@@ -470,7 +472,7 @@ def simple_3d_viewer() -> rx.Component:
         ThreeFiberCanvas.create(
             SceneWithLighting.create(
                 ModelViewer3D.create(
-                    url=ProductDetailState.display_scene_urls[0],
+                    url=RoomSceneState.selected_room_model,
                     scale=3.0,
                     position=[0,0,0]
                 ),
@@ -618,15 +620,12 @@ def simple_3d_viewer() -> rx.Component:
 
 def vertical_3d_scenes(model_urls, scene_height: int = 200) -> rx.Component:
     """Render vertical list of 3D scene thumbnails"""
-
     return rx.cond(
         (model_urls == []) | (model_urls == None),
-        # Loading placeholder
         rx.box(
             rx.text("Loading scenes...", font_size="12px", color="gray"),
             padding="10px"
         ),
-        # Otherwise show list of scenes
         rx.vstack(
             rx.foreach(
                 model_urls,
@@ -645,10 +644,21 @@ def vertical_3d_scenes(model_urls, scene_height: int = 200) -> rx.Component:
                             "background": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                             "border_radius": "10px",
                             "height": f"{scene_height}px"
-                        }
+                        },
+                        pointer_events="none"  # Disable pointer events on canvas
                     ),
-                    on_click=RoomSceneState.set_selected_room_model(url),
-                    cursor="pointer",
+                    rx.box(
+                        position="absolute",
+                        top="0",
+                        left="0",
+                        width="100%",
+                        height="100%",
+                        border_radius="10px",
+                        on_click=lambda: RoomSceneState.select_room(url),
+                        cursor="pointer",
+                        z_index="10"
+                    ),
+                    position="relative",
                     border_radius="12px",
                     border=rx.cond(
                         RoomSceneState.selected_room_model == url,
@@ -667,7 +677,6 @@ def vertical_3d_scenes(model_urls, scene_height: int = 200) -> rx.Component:
             align="start"
         )
     )
-
 
 @rx.event 
 def go_to_demo(model: str): 

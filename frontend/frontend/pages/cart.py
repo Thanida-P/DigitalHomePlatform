@@ -3,7 +3,7 @@ from typing import List, Optional
 from ..template import template
 from ..state import AuthState
 from ..config import API_BASE_URL
-
+from ..components.navbar import NavCartState
 
 class CreditCard(rx.Base):
     id: int = 0
@@ -62,6 +62,11 @@ class CartState(rx.State):
     credit_cards: list[CreditCard] = []
     bank_accounts: list[BankAccount] = []
     is_loading_payments: bool = False
+
+    async def update_navbar_cart_quantity(self, quantity: int):
+        """Update the navbar cart quantity"""
+        nav_state = await self.get_state(NavCartState)
+        nav_state.cart_quantity = quantity
 
 
     def select_payment(self, payment_id: str):
@@ -277,6 +282,7 @@ class CartState(rx.State):
                     
                     self.cart_items = items
                     print(f"✅ Total items loaded: {len(items)}")
+                    await self.update_navbar_cart_quantity(len(items))
                     
                 elif response.status_code == 404:
                     self.cart_items = []
@@ -320,6 +326,7 @@ class CartState(rx.State):
                     # Remove item from local state
                     self.cart_items = [item for item in self.cart_items if item.id != item_id]
                     rx.toast.success("Item removed from cart")
+                    await self.update_navbar_cart_quantity(len(self.cart_items))
                 elif response.status_code == 404:
                     rx.toast.error("Item not found in cart")
                 else:
@@ -351,6 +358,7 @@ class CartState(rx.State):
                 
                     self.cart_items = []
                     rx.toast.success("Cart cleared successfully")
+                    await self.update_navbar_cart_quantity(0)
                 elif response.status_code == 404:
                     rx.toast.error("Cart not found")
                 else:
@@ -519,7 +527,9 @@ class CartState(rx.State):
                     rx.toast.success("Order created successfully!")
                     print("order successfully added,", order_id)
                     # Redirect to orders list page
+                    await self.update_navbar_cart_quantity(0)
                     return rx.redirect("/orders")
+                    
                 else:
                     error = response.json().get('error', 'Failed to place order')
                     rx.toast.error(f"Error: {error}")

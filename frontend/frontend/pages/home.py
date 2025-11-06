@@ -5,7 +5,6 @@ from typing import Any, Dict, List
 import urllib.parse
 from typing import Optional
 from reflex.event import Event
-from ..rooms_data import rooms_data
 from ..state import DynamicState, AuthState
 from ..config import API_BASE_URL
 import re,asyncio

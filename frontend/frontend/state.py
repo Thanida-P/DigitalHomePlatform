@@ -2,7 +2,6 @@ import reflex as rx
 import httpx
 import os
 from typing import Optional, List, Dict
-from .rooms_data import rooms_data
 from .config import API_BASE_URL
 
 SCENE_CREATOR_URL = os.getenv("SCENE_CREATOR_URL", "http://localhost:5173")
@@ -162,8 +161,6 @@ class AuthState(rx.State):
         
         # Build Scene Creator URL with token
         self.scene_creator_url = f"{SCENE_CREATOR_URL}/#/login?token={token}"
-        
-        print(f"🚀 Opening Scene Creator: {self.scene_creator_url}")
 
         return rx.call_script(f"window.open('{self.scene_creator_url}', '_blank')")
         
@@ -219,6 +216,7 @@ class RoomSceneState(rx.State):
     selected_room_model: str = ""  
 
     def select_room(self, room_url: str):
+        
         self.selected_room_model = room_url
         print(f"🏠 Room changed to: {room_url}")
 
@@ -275,7 +273,7 @@ class DynamicState(rx.State):
                     print(f"✅ Fetched {len(self.room_products)} products for category: {display_name}")
                     print(self.room_products)
                 else:
-                    print(f"❌ Failed to fetch products: {response.status_code}")
+                    
                     self.room_products = []
                
                 self.room_image = self.category_images.get(
@@ -284,7 +282,7 @@ class DynamicState(rx.State):
                 )
                     
         except Exception as e:
-            print(f"❌ Error loading room data: {e}")
+          
             self.room_products = []
         finally:
             self.is_loading = False
