@@ -108,19 +108,6 @@ def navbar_page():
         
    
         rx.hstack(
-          
-            rx.input(
-                rx.input.slot(rx.icon("search"), color="#807E80"),
-                placeholder="Search...",
-                type="search",
-                size="2",
-                width="400px",
-                justify="end",
-                background_color="#E0E6EA",
-                border_radius="20px",
-                color="#22282C",
-            ),
-          
             rx.box(
                 rx.button(
                     rx.icon("shopping-cart"),
@@ -129,7 +116,6 @@ def navbar_page():
                     style=icon_style,
                     on_click=rx.redirect("/cart"),
                 ),
-                # show red bubble only if there’s something in the cart
                 rx.cond(
                     NavCartState.cart_quantity > 0,
                     rx.box(
@@ -248,3 +234,18 @@ icon_style = {
     "width": "40px",
     "height": "40px",
 }
+
+
+  
+'''rx.input(
+                rx.input.slot(rx.icon("search"), color="#807E80"),
+                placeholder="Search...",
+                type="search",
+                size="2",
+                width="400px",
+                justify="end",
+                background_color="#E0E6EA",
+                border_radius="20px",
+                color="#22282C",
+),'''
+          

@@ -181,7 +181,9 @@ def get_reviews_for_product(request, product_id):
         return JsonResponse({'reviews': reviews_data}, status=200)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
-    
+  
+
+
 @login_required
 @require_http_methods(["GET"])
 def get_reviews_by_customer(request):

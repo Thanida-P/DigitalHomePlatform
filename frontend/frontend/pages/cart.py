@@ -4,6 +4,7 @@ from ..template import template
 from ..state import AuthState
 from ..config import API_BASE_URL
 from ..components.navbar import NavCartState
+from ..pages.orders import OrdersState
 
 class CreditCard(rx.Base):
     id: int = 0
@@ -527,8 +528,11 @@ class CartState(rx.State):
                     rx.toast.success("Order created successfully!")
                     print("order successfully added,", order_id)
                     # Redirect to orders list page
-                    await self.update_navbar_cart_quantity(0)
+                    #await self.update_navbar_cart_quantity(0)
+                    orders_state = await self.get_state(OrdersState)
+                    await orders_state.load_orders()
                     return rx.redirect("/orders")
+
                     
                 else:
                     error = response.json().get('error', 'Failed to place order')

@@ -154,21 +154,35 @@ class OrdersState(rx.State):
                         pass
     
     async def load_orders(self):
+        """Load orders from API"""
         import httpx
         self.is_loading = True
-        auth_state = await self.get_state(AuthState)
-        cookies_dict = auth_state.session_cookies or {}
         
         try:
-            async with httpx.AsyncClient() as client:
+            auth_state = await self.get_state(AuthState)
+            cookies_dict = auth_state.session_cookies or {}
+            
+            # DEBUG: Print what we're sending
+            print(f"DEBUG: Cookies available: {bool(cookies_dict)}")
+            print(f"DEBUG: Cookie keys: {list(cookies_dict.keys()) if cookies_dict else 'None'}")
+            print(f"DEBUG: API URL: {API_BASE_URL}/orders/list/")
+            
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(
                     f"{API_BASE_URL}/orders/list/",
                     cookies=cookies_dict,
                 )
                 
+                # DEBUG: Print response status and body
+                print(f"DEBUG: Response status code: {response.status_code}")
+                print(f"DEBUG: Response body: {response.text}")
+                
                 if response.status_code == 200:
                     data = response.json()
                     orders_data = data.get('orders', [])
+                    
+                    print(f"DEBUG: Number of orders received: {len(orders_data)}")
+                    
                     self.orders = [
                         Order(
                             order_id=order['order_id'],
@@ -181,13 +195,25 @@ class OrdersState(rx.State):
                         )
                         for order in orders_data
                     ]
-                else:
-                    rx.toast.error("Failed to load orders")
                     
+                    print(f"DEBUG: Orders successfully loaded. Total: {len(self.orders)}")
+                    
+                elif response.status_code == 401:
+                    print("DEBUG: Unauthorized - session may have expired")
+                    rx.toast.error("Your session has expired. Please log in again.")
+                elif response.status_code == 403:
+                    print("DEBUG: Forbidden - check permissions")
+                    rx.toast.error("You don't have permission to view orders")
+                else:
+                    print(f"DEBUG: Unexpected status code {response.status_code}")
+                    rx.toast.error(f"Failed to load orders (Status: {response.status_code})")
+                        
         except Exception as e:
-            rx.toast.error(f"Error: {e}")
+            print(f"DEBUG: Exception occurred: {type(e).__name__}: {e}")
+            rx.toast.error(f"Error loading orders: {str(e)}")
         finally:
             self.is_loading = False
+            print(f"DEBUG: Orders state after load: {len(self.orders)} orders")
     
     async def mark_payment_completed(self, order_id: int):
         """Mark order payment as completed"""
@@ -810,7 +836,7 @@ def orders_content() -> rx.Component:
                                     cursor="pointer",
                                     _hover={"bg": "#1a1f23"}
                                 ),
-                                href="/products"
+                                href="/shop"
                             ),
                             spacing="4",
                             align_items="center"

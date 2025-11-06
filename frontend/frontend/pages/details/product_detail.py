@@ -165,6 +165,8 @@ class ProductDetailState(rx.State):
 
     is_loading: bool = False
     has_loaded: bool = False
+    selected_room: str = ""
+    selected_room_index: int = 0
 
     async def on_load(self):
         self.is_loading = True
@@ -287,9 +289,9 @@ class ProductDetailState(rx.State):
                             
                 # Set the first scene as selected if available
                 if self.display_scene_urls:
-                    ProductDetailState.selected_room_model = self.display_scene_urls[0]
+                    self.selected_room = self.display_scene_urls[self.selected_room_index]
                 else:
-                    ProductDetailState.selected_room_model = ""
+                    self.selected_room = ""
                 
                 self.display_scenes_loaded = True
                 print(f"✅ Total scenes loaded: {len(self.display_scene_urls)}")
@@ -298,6 +300,22 @@ class ProductDetailState(rx.State):
             print(f"❌ Error fetching display scenes: {e}")
             traceback.print_exc()
             self.display_scene_urls = []
+
+    async def set_scene_up(self):
+        print("up")
+        if ((len(self.display_scene_urls) - 1) == self.selected_room_index):
+                return
+        else:
+            self.selected_room_index += 1
+        self.selected_room = self.display_scene_urls[self.selected_room_index]
+
+    async def set_scene_down(self):
+        print("down")
+        if ((len(self.display_scene_urls) - 1) == 0):
+                return
+        else:
+            self.selected_room_index -= 1
+        self.selected_room = self.display_scene_urls[self.selected_room_index]
 
 
 def model_detail_modal() -> rx.Component:
@@ -472,7 +490,7 @@ def simple_3d_viewer() -> rx.Component:
         ThreeFiberCanvas.create(
             SceneWithLighting.create(
                 ModelViewer3D.create(
-                    url=RoomSceneState.selected_room_model,
+                    url=ProductDetailState.selected_room,
                     scale=3.0,
                     position=[0,0,0]
                 ),
@@ -598,7 +616,7 @@ def simple_3d_viewer() -> rx.Component:
         rx.button(
             "View Detail",
             size="2", 
-            on_click=lambda: go_to_demo("/models/gaming_chair_pink.glb"),
+            # on_click=ModalState.open_demo_modal,
             position="absolute",
             top="20px",
             right="10px",
@@ -617,6 +635,8 @@ def simple_3d_viewer() -> rx.Component:
         }, 
     )
 
+def selected_scene():
+    ProductDetailState.increase_scene_index()
 
 def vertical_3d_scenes(model_urls, scene_height: int = 200) -> rx.Component:
     """Render vertical list of 3D scene thumbnails"""
@@ -630,33 +650,25 @@ def vertical_3d_scenes(model_urls, scene_height: int = 200) -> rx.Component:
             rx.foreach(
                 model_urls,
                 lambda url: rx.box(
-                    ThreeFiberCanvas.create(
-                        SceneWithLighting.create(
-                            ModelViewer3D.create(
-                                url=url,
-                                scale=3.0,
-                                position=[0, 0, 0]
-                            ),
-                            CameraControls.create()
-                        ),
-                        camera={"position": [3, 3, 3], "fov": 50},
-                        style={
-                            "background": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                            "border_radius": "10px",
-                            "height": f"{scene_height}px"
-                        },
-                        pointer_events="none"  # Disable pointer events on canvas
-                    ),
                     rx.box(
-                        position="absolute",
-                        top="0",
-                        left="0",
+                        ThreeFiberCanvas.create(
+                            SceneWithLighting.create(
+                                ModelViewer3D.create(
+                                    url=url,
+                                    scale=3.0,
+                                    position=[0, 0, 0]
+                                ),
+                                CameraControls.create()
+                            ),
+                            camera={"position": [3, 3, 3], "fov": 50},
+                            style={
+                                "background": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                "border_radius": "10px",
+                                "height": f"{scene_height}px"
+                            },
+                        ),
                         width="100%",
                         height="100%",
-                        border_radius="10px",
-                        on_click=lambda: RoomSceneState.select_room(url),
-                        cursor="pointer",
-                        z_index="10"
                     ),
                     position="relative",
                     border_radius="12px",
@@ -670,15 +682,21 @@ def vertical_3d_scenes(model_urls, scene_height: int = 200) -> rx.Component:
                         "border": "3px solid teal"
                     },
                     margin_bottom="10px",
-                    width="150px"
+                    width="150px",
+                    height=f"{scene_height}px"
                 )
+            ),
+            rx.button(
+                on_click=lambda e: [ProductDetailState.set_scene_up]
+            ),
+            rx.button(
+                on_click=lambda e: [ProductDetailState.set_scene_down]
             ),
             spacing="2",
             align="start"
         )
     )
-
-@rx.event 
+ 
 def go_to_demo(model: str): 
     return ModalState.open_demo_modal(model)
 

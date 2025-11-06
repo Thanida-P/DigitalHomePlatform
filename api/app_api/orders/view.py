@@ -81,7 +81,7 @@ def checkout(request):
     customer.save()
     return JsonResponse({'message': 'Order created successfully', 'order_id': order.id}, status=201)
 
-@login_required
+'''@login_required
 @require_http_methods(["GET"])
 def list_orders(request):
     connection, root = get_connection()
@@ -127,6 +127,89 @@ def list_orders(request):
         return JsonResponse({"error": str(e)}, status=500)
     finally:
         connection.close()
+'''
+
+
+@login_required
+@require_http_methods(["GET"])
+def list_orders(request):
+    connection, root = get_connection()
+    try:
+        customer = request.user.customer
+        if not customer:
+            return JsonResponse({'error': 'Only customers can view orders'}, status=403)
+        
+        orders_data = []
+        for order in customer.orders.all().order_by('-created_at'):
+            order_items = []
+            for order_item in order.order_items_rel.all():
+                try:
+                    product = root.products[order_item.product_id]
+                    item = product.item
+                    order_items.append({
+                        'id': order_item.id,
+                        'product_id': product.get_id(),
+                        'product_name': item.get_name(),
+                        'quantity': order_item.quantity,
+                        'type': order_item.type,
+                        'added_at': order_item.added_at.isoformat(),
+                    })
+                except Exception as item_error:
+                    print(f"DEBUG: Error processing order item {order_item.id}: {item_error}")
+                    continue
+            
+           
+            payment_method_data = None
+            if order.payment_method:
+                try:
+                    payment_method_data = {
+                        'type': order.payment_method.type,
+                        'credit_card_last4': None,
+                        'bank_account_last4': None,
+                    }
+                    
+              
+                    if hasattr(order.payment_method, 'credit_card') and order.payment_method.credit_card:
+                        cc_last4 = getattr(order.payment_method.credit_card, 'last4', None)
+                        if cc_last4:
+                            payment_method_data['credit_card_last4'] = str(cc_last4)[-4:] 
+                    
+                  
+                    if hasattr(order.payment_method, 'bank_account') and order.payment_method.bank_account:
+                        ba_last4 = getattr(order.payment_method.bank_account, 'last4', None)
+                        if ba_last4:
+                            payment_method_data['bank_account_last4'] = str(ba_last4)[-4:]  
+                        
+                except Exception as pm_error:
+                    print(f"DEBUG: Error processing payment method for order {order.id}: {pm_error}")
+                    payment_method_data = None
+            
+            orders_data.append({
+                'order_id': order.id,
+                'order_items': order_items,
+                'total_price': str(order.total_price),
+                'status': order.status,
+                'created_at': order.created_at.isoformat(),
+                'updated_at': order.updated_at.isoformat(),
+                'payment_method': payment_method_data,
+            })
+        
+        transaction.commit()
+        print(f"DEBUG: Successfully loaded {len(orders_data)} orders for user {request.user.id}")
+        return JsonResponse({'orders': orders_data}, status=200)
+        
+    except Exception as e:
+        try:
+            transaction.abort()
+        except Exception:
+            pass
+        print(f"DEBUG: Error in list_orders: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({"error": str(e)}, status=500)
+    finally:
+        connection.close()
+
 
 @csrf_exempt
 @login_required

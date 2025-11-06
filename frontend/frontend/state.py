@@ -208,18 +208,21 @@ class ModelState(rx.State):
         self.model_x = -2.0
         self.model_y = -3.0
         self.model_z = 4.0
-        self.model_rotation_y = 0.0
-    
-   
+        self.model_rotation_y = 0.0 
 
 class RoomSceneState(rx.State):
-    selected_room_model: str = ""  
+    selected_room_model: str = ""
 
+    @rx.event
     def select_room(self, room_url: str):
-        
-        self.selected_room_model = room_url
         print(f"🏠 Room changed to: {room_url}")
+        self.selected_room_model = ProductDetailState
 
+    @rx.event
+    def reselect_room(self, e, room_url):
+        print(e)
+        print(f"🏠 Room changed to: {room_url}")
+        self.selected_room_model = room_url
 
 class ModalState(rx.State):
     demo_modal_open: bool = False

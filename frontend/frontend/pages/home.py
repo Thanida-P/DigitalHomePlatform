@@ -408,13 +408,6 @@ def home_content() -> rx.Component:
         margin_bottom="50px"
    
     ),
-
-    rx.center(
-        rx.text("Top Collections",font_size = "2rem", font_weight="bold",color="#22282c",font_family="Racing Sans One",text_align="center"),
-    ),
-    rx.center(
-        rx.text("Our best furniture and decor picked just for you. Stylish, comfy, and high quality.",font_size = "16px", color="#22282c",margin_bottom="50px"),
-    ),
    
         features_section(),
 

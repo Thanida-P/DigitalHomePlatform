@@ -170,6 +170,7 @@ def adminsignup_page() -> rx.Component:
                     size="3",
                     width="100%",
                     background_color="#22282C",
+                    cursor="pointer",
                     border_radius="8px",
                     _hover={
                         "background_color": "white",

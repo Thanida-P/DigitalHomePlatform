@@ -7,23 +7,20 @@ import uuid
 import traceback
 
 class AdminDashboardState(rx.State):
-    # Product list
+  
     UPLOAD_DIR = "uploading_models"
 
     products: List[Dict] = []
     filtered_products: List[Dict] = []
     
-    # Search and filter
     search_query: str = ""
     selected_room: str = "all"
     selected_category: str = "all"
-    
-    # Add/Edit product form
+   
     show_add_modal: bool = False
     show_edit_modal: bool = False
     editing_product_id: str = ""
     
-    # Form fields
     product_name: str = ""
     description: str = ""
     physical_price: str = ""
@@ -32,28 +29,76 @@ class AdminDashboardState(rx.State):
     product_type: str = ""
     stock: str = ""
     
-    # File uploads - storing file paths/names
     product_image: str = ""
     texture_file: list[str] = []
     model_file: str = ""
     scene_file: list[str] = []
     
-    # Upload files (for handling the actual upload)
     uploaded_files: list[rx.UploadFile] = []
     
-    # Upload status
     upload_status: str = ""
     is_uploading: bool = False
     
-    # Availability options
     digital_available: bool = True
     physical_available: bool = True
     is_container: bool = False
-    
-    # Stats
+
     total_products: int = 0
     total_sold: int = 0
     total_revenue: float = 0.0
+    average_rating: float = 0.0
+
+    products: list[dict] = []
+    filtered_products: list[dict] = []
+    total_products: int = 0
+
+
+
+    async def calculate_average_rating(self):
+        """Fetch all product reviews and calculate average rating"""
+        try:
+            timeout = httpx.Timeout(connect=30.0, read=120.0, write=120.0, pool=60.0)
+            auth_state = await self.get_state(AuthState)
+
+            all_ratings = []
+
+        
+            for product in self.products:
+                try:
+                    async with httpx.AsyncClient(timeout=timeout) as client:
+                        cookies_dict = auth_state.session_cookies or {}
+
+                        response = await client.get(
+                            f"{API_BASE_URL}/reviews/get_product_reviews/{product['id']}/",
+                            cookies=cookies_dict,
+                            timeout=timeout,
+                        )
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        reviews = data.get("reviews", [])
+                        
+                      
+                        for review in reviews:
+                            rating = review.get("rating", 0)
+                            if rating:
+                                all_ratings.append(rating)
+                except Exception as e:
+                   
+                    continue
+            
+           
+            if all_ratings:
+                self.average_rating = round(sum(all_ratings) / len(all_ratings), 1)
+                
+            else:
+                self.average_rating = 0.0
+               
+
+        except Exception as e:
+           
+            self.average_rating = 0.0
+
 
     async def handle_product_image_upload(self, files: List[rx.UploadFile]):
         """Handle product image upload"""
@@ -129,11 +174,6 @@ class AdminDashboardState(rx.State):
     def toggle_is_container(self, value: bool):
         self.is_container = value
 
-    products: list[dict] = []
-    filtered_products: list[dict] = []
-    total_products: int = 0
-
-    
     
     async def load_products(self):
         try:
@@ -173,7 +213,7 @@ class AdminDashboardState(rx.State):
                     "digital_price": p.get("digital_price", "0"),
                     "physical_price": p.get("physical_price", "0"),
                     
-                    # ✅ product image from base64
+            
                     "image": (
                         f"data:image/png;base64,{p['image']}"
                         if p.get("image")
@@ -181,10 +221,11 @@ class AdminDashboardState(rx.State):
                     ),
                 })
 
-            # ✅ update state
+    
             self.products = normalized
             self.filtered_products = normalized
             self.total_products = len(normalized)
+            await self.calculate_average_rating()
             self.apply_filters()
 
         except Exception as e:
@@ -195,18 +236,16 @@ class AdminDashboardState(rx.State):
         """Apply search and filters"""
         filtered = self.products
         
-        # Search filter
+       
         if self.search_query:
             filtered = [
                 p for p in filtered 
                 if self.search_query.lower() in p["title"].lower()
             ]
-        
-        # Room filter
+
         if self.selected_room != "all":
             filtered = [p for p in filtered if p["room"] == self.selected_room]
-        
-        # Category filter
+   
         if self.selected_category != "all":
             filtered = [p for p in filtered if p["category"] == self.selected_category]
         
@@ -224,7 +263,7 @@ class AdminDashboardState(rx.State):
         self.selected_category = value
         self.apply_filters()
     
-    # Modal controls
+
     def open_add_modal(self):
         self.show_add_modal = True
         self.clear_form()
@@ -244,13 +283,12 @@ class AdminDashboardState(rx.State):
         self.product_type = product.get("type", "")
         self.stock = str(product.get("stock", "0"))
         
-        # ✅ File fields (for edit)
+
         self.product_image = product.get("product_image", "")
         self.texture_file = product.get("texture_file", [])
         self.model_file = product.get("model_file", "")
         self.scene_file = product.get("scene_file", [])
 
-        # ✅ Toggle fields
         self.digital_available = product.get("digital_available", False)
         self.physical_available = product.get("physical_available", False)
         self.is_container = product.get("is_container", False)
@@ -278,7 +316,7 @@ class AdminDashboardState(rx.State):
         self.is_container = False
         self.upload_status = ""
     
-    # Form setters
+  
     def set_product_name(self, value: str):
         self.product_name = value
     
@@ -305,7 +343,7 @@ class AdminDashboardState(rx.State):
         self.upload_status = ""
         
         try:
-            # Validate required fields
+           
             if not self.product_name or not self.physical_price or not self.digital_price:
                 self.upload_status = "Please fill in all required fields"
                 self.is_uploading = False
@@ -925,7 +963,7 @@ def admin_dashboard() -> rx.Component:
                 stats_card("Total Products", AdminDashboardState.total_products.to(str), "package", "#6366F1"),
                 stats_card("Total Sold", "1,234", "shopping-cart", "#10B981"),
                 stats_card("Revenue", "$48,567", "dollar-sign", "#F59E0B"),
-                stats_card("Avg Rating", "4.8", "star", "#EC4899"),
+                stats_card("Avg Rating", AdminDashboardState.average_rating.to(str), "star", "#EC4899"),
                 columns="4",
                 spacing="4",
                 width="100%",

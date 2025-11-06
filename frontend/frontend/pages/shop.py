@@ -338,6 +338,7 @@ def product_card(product: Dict) -> rx.Component:
                             border_radius="8px",
                             cursor = "pointer",
                             on_click=ShopState.add_to_cart(product["id"],"physical",quantity=1),
+                            
                         ),
                         width="100%",
                     ),
