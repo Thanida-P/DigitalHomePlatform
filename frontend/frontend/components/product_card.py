@@ -63,15 +63,49 @@ def hover_swap_photo(default_img: str, hover_img: str, link: str) -> rx.Componen
     )
 
 def product_card(product: Dict) -> rx.Component:
+ 
+    is_in_wishlist = ShopState.wishlist_items.contains(product["id"])
   
     return rx.box(
         rx.vstack(
-            hover_swap_photo(
-                product.get("image", "/images/default.png"),
-                product.get("hover_image", "/images/default.jpg"),
-                product.get("link", "/cart"),
-         
-            ),
+            rx.box(
+                    hover_swap_photo(
+                        product.get("image", "/images/default.png"),
+                        product.get("hover_image", "/images/default.jpg"),
+                        product.get("link", "/cart"),
+                    ),
+                    rx.button(
+                        rx.cond(
+                            is_in_wishlist,
+                            rx.icon("heart", color="#EF4444", fill="#EF4444", size=20),
+                            rx.icon("heart", color="#9CA3AF", size=20),
+                        ),
+                        position="absolute",
+                        top="10px",
+                        right="10px",
+                        border="none",
+                        border_radius="full",
+                        background = "white",
+                        padding="8px",
+                        width="40px",
+                        height="40px",
+                        display="flex",
+                        align_items="center",
+                        justify_content="center",
+                        cursor="pointer",
+                        transition="all 0.3s ease",
+                        _hover={
+                            "background_color": "rgba(255, 255, 255, 1)",
+                            "transform": "scale(1.1)",
+                        },
+                        on_click=lambda: ShopState.toggle_wishlist(product["id"]),
+                        z_index="10",
+                    ),
+                    position="relative",
+                    width="100%",
+    
+                ),
+            
             rx.vstack(
                 rx.hstack(
                     rx.badge(product["category"], color_scheme="orange", border_radius="md"),

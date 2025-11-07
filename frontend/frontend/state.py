@@ -3,6 +3,7 @@ import httpx
 import os
 from typing import Optional, List, Dict
 from .config import API_BASE_URL
+\
 
 SCENE_CREATOR_URL = os.getenv("SCENE_CREATOR_URL", "http://localhost:5173")
 
@@ -98,6 +99,7 @@ class AuthState(rx.State):
                     cookies=self.session_cookies,  
                     timeout=5.0
                 )
+
         except Exception as e:
             print(f"❌ Logout failed: {e}")
         
@@ -209,20 +211,6 @@ class ModelState(rx.State):
         self.model_y = -3.0
         self.model_z = 4.0
         self.model_rotation_y = 0.0 
-
-class RoomSceneState(rx.State):
-    selected_room_model: str = ""
-
-    @rx.event
-    def select_room(self, room_url: str):
-        print(f"🏠 Room changed to: {room_url}")
-        self.selected_room_model = ProductDetailState
-
-    @rx.event
-    def reselect_room(self, e, room_url):
-        print(e)
-        print(f"🏠 Room changed to: {room_url}")
-        self.selected_room_model = room_url
 
 class ModalState(rx.State):
     demo_modal_open: bool = False

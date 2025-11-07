@@ -3,15 +3,12 @@ import reflex as rx
 from ..template import template
 from ..state import AuthState
 import httpx
-from typing import Optional, Callable, Any,List
+from typing import Optional, Callable, Any,List,Dict
 import json
 import random
 import string
 from ..config import API_BASE_URL
 import base64,uuid
-
-
-
 
 class Address(rx.Base):
     id: int
@@ -29,9 +26,6 @@ class AddressState(rx.State):
     success_message: str = ""
     is_default: bool = False
 
-
-    def set_is_default(self, checked: bool):
-        self.is_default = checked
 
     def start_edit_address(self, address_id: int, current_address: str):
         self.editing_address_id = address_id
@@ -190,7 +184,6 @@ class AddressState(rx.State):
         cookies_dict = auth_state.session_cookies or {}
         
         try:
-            
             async with httpx.AsyncClient() as client:
                 response = await client.put(
                     f"{API_BASE_URL}/users/address/set_default/",
@@ -203,15 +196,29 @@ class AddressState(rx.State):
                 if response.status_code == 200:
                     self.success_message = "Default address updated successfully"
                     
+                    # ✅ FIX: Create a new list with Address objects instead of dict copies
                     updated_addresses = []
                     for addr in self.addresses:
-                        addr_copy = addr.copy()
-                        if addr_copy["id"] == address_id:
-                            addr_copy["is_default"] = True
+                        if addr.id == address_id:
+                            # Create new Address object with is_default=True
+                            updated_addresses.append(
+                                Address(
+                                    id=addr.id,
+                                    address=addr.address,
+                                    is_default=True  # ✅ Set to True for this address
+                                )
+                            )
                         else:
-                            addr_copy["is_default"] = False
-                        updated_addresses.append(addr_copy)
+                            # Create new Address object with is_default=False
+                            updated_addresses.append(
+                                Address(
+                                    id=addr.id,
+                                    address=addr.address,
+                                    is_default=False  # ✅ Set to False for others
+                                )
+                            )
                     
+                    # ✅ Assign the new list (this triggers state update)
                     self.addresses = updated_addresses
                     
                 elif response.status_code == 401:
@@ -1455,14 +1462,31 @@ class PaymentState(rx.State):
         try:
             async with httpx.AsyncClient() as client:
                 res = await client.put(
-                    f"{API_BASE_URL}/users/payment_methods/set_default_credit_card/",
+                    f"{API_BASE_URL}/users/payment_methods/set_default_credit_card/{card_id}/",
                     json={"card_id": card_id},
                     cookies=cookies_dict,
                     timeout=10.0
                 )
             
             if res.status_code == 200:
-                await self.load_credit_cards()
+                # ✅ FIX: Update state immediately instead of reloading
+                updated_cards = []
+                for card in self.credit_cards:
+                    updated_cards.append(
+                        CreditCard(
+                            id=card.id,
+                            card_brand=card.card_brand,
+                            last4=card.last4,
+                            exp_month=card.exp_month,
+                            exp_year=card.exp_year,
+                            is_default=(card.id == card_id),  # ✅ Set based on card_id
+                            provider=card.provider,
+                            provider_token=card.provider_token
+                        )
+                    )
+                
+                # ✅ Assign new list to trigger state update
+                self.credit_cards = updated_cards
                 return rx.toast.success("Default card updated!")
             else:
                 return rx.toast.error("Failed to update default card")
@@ -1470,7 +1494,7 @@ class PaymentState(rx.State):
         except Exception as e:
             print(f"Error setting default card: {e}")
             return rx.toast.error("Error updating default card")
-    
+
     async def set_default_bank(self, account_id: int):
         """Set a bank account as default."""
         auth_state = await self.get_state(AuthState)
@@ -1479,14 +1503,30 @@ class PaymentState(rx.State):
         try:
             async with httpx.AsyncClient() as client:
                 res = await client.put(
-                    f"{API_BASE_URL}/users/payment_methods/set_default_bank_account/",
+                    f"{API_BASE_URL}/users/payment_methods/set_default_bank_account/{account_id}/",
                     json={"account_id": account_id},
                     cookies=cookies_dict,
                     timeout=10.0
                 )
             
             if res.status_code == 200:
-                await self.load_bank_accounts()
+                # ✅ FIX: Update state immediately instead of reloading
+                updated_accounts = []
+                for account in self.bank_accounts:
+                    updated_accounts.append(
+                        BankAccount(
+                            id=account.id,
+                            bank_name=account.bank_name,
+                            account_holder=account.account_holder,
+                            last4=account.last4,
+                            is_default=(account.id == account_id),  # ✅ Set based on account_id
+                            provider=account.provider,
+                            provider_token=account.provider_token
+                        )
+                    )
+                
+                # ✅ Assign new list to trigger state update
+                self.bank_accounts = updated_accounts
                 return rx.toast.success("Default bank account updated!")
             else:
                 return rx.toast.error("Failed to update default bank account")
@@ -1725,6 +1765,437 @@ class ReviewState(rx.State):
             print(f"Error deleting review: {e}")
             return rx.toast.error("Error deleting review")
 
+class WishlistProductState(rx.State):
+    """State for managing wishlist products in profile"""
+    wishlist_products: List[Dict] = []
+    is_loading: bool = False
+    error_message: str = ""
+    selected_product_id: int = 0
+    
+    async def load_wishlist_products(self):
+        """Fetch wishlist products from backend"""
+        self.is_loading = True
+        self.error_message = ""
+        
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                print("📡 Sending GET request to /users/wishlist/...")
+                response = await client.get(
+                    f"{API_BASE_URL}/users/wishlist/",
+                    cookies=cookies_dict,
+                    timeout=10.0
+                )
+            
+            
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    
+                    # Get wishlist array from response
+                    wishlist_products = data.get("wishlist", [])
+                    print(f"📊 Number of products: {len(wishlist_products)}")
+                    
+                    if len(wishlist_products) > 0:
+                        print(f"🔍 First product: {wishlist_products[0]}")
+                    
+                    # Transform data to product card format
+                    self.wishlist_products = [
+                        {
+                            "id": p.get("id"),
+                            "title": p.get("name", "Untitled Product"),
+                            "description": p.get("description", ""),
+                            "category": p.get("category", "Uncategorized"),
+                            "digital_price": p.get("digital_price", "0"),
+                            "physical_price": p.get("physical_price", "0"),
+                            "image": f"data:image/png;base64,{p['image']}" if p.get("image") else "/placeholder.png",
+                            "rating": "4.6",
+                            "link": f"/details/{p.get('id')}",
+                        }
+                        for p in wishlist_products
+                    ]
+                    
+                    print(f"✅ Loaded {len(self.wishlist_products)} wishlist products")
+                    
+                except Exception as json_err:
+                    print(f"❌ JSON Parse Error: {json_err}")
+                    self.error_message = f"Failed to parse response: {str(json_err)}"
+                    
+            elif response.status_code == 401:
+                print(f"❌ 401 Unauthorized - User not authenticated")
+                self.error_message = "Please log in to view your wishlist"
+                
+            elif response.status_code == 403:
+                print(f"❌ 403 Forbidden")
+                self.error_message = "You don't have permission to view this wishlist"
+                
+            elif response.status_code == 404:
+                print(f"❌ 404 Not Found - Endpoint doesn't exist")
+                self.error_message = "Wishlist endpoint not found on server"
+                
+            elif response.status_code == 500:
+                print(f"❌ 500 Internal Server Error")
+                print(f"Backend Error Details: {response.text}")
+                self.error_message = f"Server Error: {response.text[:100]}"
+                
+            else:
+                print(f"❌ Unexpected status: {response.status_code}")
+                self.error_message = f"Error: {response.status_code}"
+                self.wishlist_products = []
+        
+        except httpx.TimeoutException as e:
+            print(f"❌ Timeout Error: {e}")
+            self.error_message = "Request timed out - server not responding"
+            
+        except httpx.RequestError as e:
+            print(f"❌ Connection Error: {e}")
+            self.error_message = f"Connection error: {str(e)}"
+            
+        except Exception as e:
+            print(f"❌ Unexpected Error: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            self.error_message = f"Error: {str(e)}"
+            self.wishlist_products = []
+        
+        finally:
+            print("🏁 Wishlist load completed")
+            self.is_loading = False
+
+    def _format_image(self, image_data: str) -> str:
+        """Format image data for display"""
+        if not image_data:
+            return "/placeholder.png"
+        
+        # If it already starts with data:, return as-is
+        if image_data.startswith("data:"):
+            return image_data
+        
+        # If it's already base64, add data URI prefix
+        if image_data and not image_data.startswith(("http://", "https://", "/")):
+            return f"data:image/png;base64,{image_data}"
+        
+        # If it's a URL or path, return as-is
+        return image_data
+    
+    async def remove_from_wishlist_profile(self, product_id: int):
+        """Remove product from wishlist"""
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.delete(
+                    f"{API_BASE_URL}/users/wishlist/remove/{product_id}/",
+                    cookies=cookies_dict,
+                )
+            
+            if response.status_code == 200:
+                self.wishlist_products = [
+                    p for p in self.wishlist_products if p["id"] != product_id
+                ]
+                rx.toast.success("💔 Removed from wishlist")
+            else:
+                print(f"Failed to remove: {response.status_code}")
+                rx.toast.error("Failed to remove from wishlist")
+        
+        except Exception as e:
+            print(f"Error removing from wishlist: {e}")
+            rx.toast.error(f"Error: {e}")
+
+    async def add_to_cart_from_wishlist(self, product_id: int, item_type: str, quantity: int = 1):
+        """Add product to cart directly from wishlist"""
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{API_BASE_URL}/carts/add_item/",
+                    data={
+                        "product_id": product_id,
+                        "type": item_type,
+                        "quantity": quantity,
+                    },
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                    cookies=cookies_dict,
+                )
+
+            if response.status_code == 201:
+                rx.toast.success("✅ Item added to cart successfully!")
+            else:
+                error = response.json().get("error", response.text)
+                rx.toast.error(f"❌ Failed: {error}")
+
+        except Exception as e:
+            print(f"Error adding to cart: {e}")
+            rx.toast.error(f"⚠️ Network error: {e}")
+
+
+def wishlist_product_card(product: Dict) -> rx.Component:
+    """Product card component for wishlist - same structure as shop page"""
+    product_id = product["id"]
+    
+    return rx.box(
+        rx.vstack(
+            # Image with hover effect and remove button
+            rx.box(
+                rx.box(
+                    rx.image(
+                        src=product.get("image", "/images/default.png"),
+                        width="100%",
+                        height="250px",
+                        border_radius="12px",
+                        object_fit="cover",
+                    ),
+                    rx.box(
+                        rx.image(
+                            src="/images/bedroom_grey.jpg",
+                            width="100%",
+                            height="250px",
+                            border_radius="12px",
+                            object_fit="cover",
+                        ),
+                        rx.center(
+                            rx.button(
+                                "See Detail",
+                                font_size="18px",
+                                font_weight="bold",
+                                color="white",
+                                background_color="rgba(0,0,0,0.6)",
+                                padding="6px 12px",
+                                border_radius="8px",
+                                border="none",
+                                cursor="pointer",
+                            ),
+                            position="absolute",
+                            top="50%",
+                            left="50%",
+                            transform="translate(-50%, -50%)",
+                        ),
+                        position="absolute",
+                        top="0",
+                        left="0",
+                        width="100%",
+                        height="100%",
+                        opacity="0",
+                        transition="opacity 0.3s ease",
+                        _hover={"opacity": "1"},
+                        z_index="2",
+                    ),
+                    position="relative",
+                    width="100%",
+                    overflow="hidden",
+                    cursor="pointer",
+                    on_click=rx.redirect(product.get("link", "/shop")),
+                ),
+                # Heart icon (remove from wishlist)
+                rx.button(
+                    rx.icon("heart", color="#EF4444", fill="#EF4444", size=20),
+                    position="absolute",
+                    top="10px",
+                    right="10px",
+                    background = "white",
+                    border="none",
+                    border_radius="full",
+                    padding="8px",
+                    width="40px",
+                    height="40px",
+                    display="flex",
+                    align_items="center",
+                    justify_content="center",
+                    cursor="pointer",
+                    transition="all 0.3s ease",
+                    _hover={
+                        "background_color": "rgba(255, 255, 255, 1)",
+                        "transform": "scale(1.1)",
+                    },
+                    on_click=lambda: WishlistProductState.remove_from_wishlist_profile(product_id),
+                    z_index="10",
+                ),
+                position="relative",
+                width="100%",
+                style={
+                    "width": "100%",
+                    "height": "220px",
+                    "border_radius": "12px 12px 0 0",
+                    "margin_bottom": "40px",
+                },
+            ),
+            
+            rx.vstack(
+                # Category and Rating
+                rx.hstack(
+                    rx.badge(
+                        product["category"],
+                        color_scheme="orange",
+                        border_radius="md",
+                    ),
+                    rx.spacer(),
+                    rx.icon("star", color="gold"),
+                    rx.text("4.5", font_weight="medium", color="#22282C"),
+                    align="center",
+                    width="100%",
+                ),
+                
+                # Product Title
+                rx.text(
+                    product["title"],
+                    font_weight="bold",
+                    font_size="1.1em",
+                    color="#22282C",
+                ),
+                
+                # Physical Price with Add Button
+                rx.hstack(
+                    rx.text("Physical: ", font_weight="medium", color="#22282C"),
+                    rx.text(f"${product['physical_price']}", font_weight="bold", color="#22282C"),
+                    rx.spacer(),
+                    rx.button(
+                        rx.icon("shopping-cart", color="#22282c", stroke_width=1),
+                        "Add",
+                        color="#22282C",
+                        border="1px solid #E5E7EB",
+                        background_color="white",
+                        border_radius="8px",
+                        cursor="pointer",
+                        on_click=lambda: WishlistProductState.add_to_cart_from_wishlist(product_id, "physical", 1),
+                    ),
+                    width="100%",
+                ),
+                
+                # Digital Price with Add Button
+                rx.hstack(
+                    rx.text("Digital: ", font_weight="medium", color="#22282C"),
+                    rx.text(f"${product['digital_price']}", font_weight="bold", color="#22282C"),
+                    rx.spacer(),
+                    rx.button(
+                        rx.icon("zap", color="#22282C", stroke_width=1),
+                        "Add",
+                        color="#22282C",
+                        border="1px solid #E5E7EB",
+                        background_color="white",
+                        border_radius="8px",
+                        cursor="pointer",
+                        on_click=lambda: WishlistProductState.add_to_cart_from_wishlist(product_id, "digital", 1),
+                    ),
+                    width="100%",
+                ),
+                
+                width="100%",
+                align="start",
+                padding="0px 20px",
+            ),
+            
+            bg="white",
+            border="1px solid #E5E7EB",
+            border_radius="16px",
+            width="280px",
+            height="450px",
+        )
+    )
+
+
+
+def wishlist_content() -> rx.Component:
+    """Display all wishlist products in profile"""
+    return rx.vstack(
+        # Header
+        rx.hstack(
+            rx.heading("My Wishlist", size="6", color="#22282c"),
+            rx.spacer(),
+            rx.text(
+                rx.cond(
+                    WishlistProductState.wishlist_products.length() > 0,
+                    f"{WishlistProductState.wishlist_products.length()} items",
+                    "0 items"
+                ),
+                font_size="14px",
+                color="#6B7280",
+            ),
+            width="100%",
+            align_items="center",
+            margin_bottom="20px",
+        ),
+        
+        # Loading State
+        rx.cond(
+            WishlistProductState.is_loading,
+            rx.center(
+                rx.vstack(
+                    rx.spinner(size="3"),
+                    rx.text("Loading wishlist...", color="#6B7280"),
+                    spacing="3",
+                    align_items="center",
+                ),
+                padding="60px 20px",
+                width="100%",
+            ),
+            # Error State
+            rx.cond(
+                WishlistProductState.error_message != "",
+                rx.box(
+                    rx.text(
+                        WishlistProductState.error_message,
+                        color="#EF4444",
+                        font_size="14px",
+                    ),
+                    padding="16px",
+                    bg="#FEE2E2",
+                    border_radius="8px",
+                    border="1px solid #FECACA",
+                    width="100%",
+                ),
+                # Products Grid or Empty State
+                rx.cond(
+                    WishlistProductState.wishlist_products.length() > 0,
+                    rx.grid(
+                        rx.foreach(
+                            WishlistProductState.wishlist_products,
+                            wishlist_product_card,
+                        ),
+                        columns="3",
+                        spacing="4",
+                        width="100%",
+                    ),
+                    # Empty State
+                    rx.center(
+                        rx.vstack(
+                            rx.icon("heart", size=64, color="#D1D5DB"),
+                            rx.text(
+                                "Your Wishlist is Empty",
+                                font_size="20px",
+                                font_weight="600",
+                                color="#6B7280",
+                            ),
+                            rx.text(
+                                "Start adding your favorite products to your wishlist",
+                                font_size="14px",
+                                color="#9CA3AF",
+                            ),
+                            rx.button(
+                                "Continue Shopping",
+                                on_click=rx.redirect("/shop"),
+                                color_scheme="blue",
+                                cursor="pointer",
+                            ),
+                            spacing="3",
+                            align_items="center",
+                        ),
+                        padding="80px 40px",
+                        width="100%",
+                    ),
+                ),
+            ),
+        ),
+        
+        spacing="4",
+        width="100%",
+        padding="20px",
+        on_mount=WishlistProductState.load_wishlist_products,
+    )
 
 def profile_content() -> rx.Component:
     return rx.center(
@@ -1759,6 +2230,8 @@ def profile_content() -> rx.Component:
                             nav_button("🏠 My Address", "address", active=ProfileState.active_section == "address"),
                             nav_button("💳 My Payment Methods", "card", active=ProfileState.active_section == "card"),
                             nav_button("⭐ My Reviews", "reviews", active=ProfileState.active_section == "reviews"),
+                            nav_button("♥️ My Wishlist", "wishlist", active=ProfileState.active_section == "wishlist"),
+                            
                             spacing="2",
                             width="100%",
                             justify="between"
@@ -1782,15 +2255,31 @@ def profile_content() -> rx.Component:
 
         
             rx.box(
-                rx.match(
-                    ProfileState.active_section,
-                    ("profile", profile_info_content()),
-                    ("address", address_content()),
-                    ("card", card_content()),
-                    ("wishlist", wishlist_content()),
-                    ("reviews", reviews_content()),
-                    ("notification", notification_content()),
+                # FIX: Use rx.cond instead of rx.match with proper tuple syntax
+                rx.cond(
+                    ProfileState.active_section == "profile",
                     profile_info_content(),
+                    rx.cond(
+                        ProfileState.active_section == "address",
+                        address_content(),
+                        rx.cond(
+                            ProfileState.active_section == "card",
+                            card_content(),
+                            rx.cond(
+                                ProfileState.active_section == "reviews",
+                                reviews_content(),
+                                rx.cond(
+                                    ProfileState.active_section == "wishlist",
+                                    wishlist_content(),
+                                    rx.cond(
+                                        ProfileState.active_section == "notification",
+                                        notification_content(),
+                                        profile_info_content()  # Default
+                                    )
+                                )
+                            )
+                        )
+                    )
                 ),
                 flex="1",
                 padding="40px",
@@ -1810,7 +2299,6 @@ def profile_content() -> rx.Component:
         ),
         width="100%",
         padding_y="6",
-        
       
     )
 
@@ -2443,15 +2931,7 @@ def new_address_modal() -> rx.Component:
                         width="100%",
                         align_items="flex-start",
                     ),
-                    # Set as default
-                    rx.hstack(
-                        rx.checkbox(
-                            checked=AddressState.is_default,
-                            on_change=AddressState.set_is_default,
-                        ),
-                        rx.text("Set as default payment method", font_size="14px", color="#22282c"),
-                        align_items="center",
-                    ),
+              
                     # Submit Button (text changes based on mode)
                     rx.button(
                         rx.cond(
@@ -2882,15 +3362,6 @@ def new_card_modal() -> rx.Component:
                         spacing="3",
                     ),
                     
-                    # Set as default
-                    rx.hstack(
-                        rx.checkbox(
-                            checked=PaymentState.is_default,
-                            on_change=PaymentState.set_is_default,
-                        ),
-                        rx.text("Set as default payment method", font_size="14px", color="#22282c"),
-                        align_items="center",
-                    ),
                     
                     # Error message
                     rx.cond(
@@ -3023,15 +3494,6 @@ def new_bank_model() -> rx.Component:
                             style=input_style
                         ),
                         
-                        rx.hstack(
-                            rx.checkbox(
-                                checked=PaymentState.bank_is_default,
-                                on_change=PaymentState.set_bank_is_default
-                            ),
-                            rx.text("Set as Default", color="#22282c", font_size="14px"),
-                            align_items="center",
-                        ),
-                        
                         # Error message
                         rx.cond(
                             PaymentState.error_message != "",
@@ -3085,23 +3547,6 @@ def new_bank_model() -> rx.Component:
         ),
     )
     
-
-def wishlist_content() -> rx.Component:
-    return rx.vstack(
-        rx.center(
-            rx.text(
-                "Wishlist",
-                font_size="20px",
-                font_weight="bold",
-                margin_bottom="20px",
-                color="#22282c",
-            ),
-            width="100%",
-        ),
-        rx.text("Your wishlist items will appear here...", color="#22282c"),
-        spacing="5",
-        width="100%",
-    )
 
 
 def orders_content() -> rx.Component:
@@ -3308,7 +3753,6 @@ def render_stars(rating):
         ]
     )
 
-
 def review_card(review: Review) -> rx.Component:
     """Display a single review card."""
     return rx.box(
@@ -3362,37 +3806,24 @@ def review_card(review: Review) -> rx.Component:
                 review.image,
                 rx.image(
                     src=f"data:image/jpeg;base64,{review.image}",
-                    width="200px",
-                    height="200px",
+                    width="150px",  # Reduced from 200px
+                    height="150px",  # Reduced from 200px
                     object_fit="cover",
                     border_radius="8px",
                 ),
                 rx.fragment(),
             ),
             
-            # Dates
-            rx.hstack(
-                rx.text(
-                    f"Created: {review.created_at}",
-                    font_size="12px",
-                    color="#9CA3AF",
-                ),
-                rx.text(
-                    f"Updated: {review.updated_at}",
-                    font_size="12px",
-                    color="#9CA3AF",
-                ),
-                spacing="4",
-            ),
             
             spacing="3",
             width="100%",
             align_items="start",
         ),
-        padding="20px",
+        padding="16px",  # Reduced from 20px
         border="1px solid #E5E7EB",
         border_radius="12px",
         bg="white",
+        max_width="430px",  # Added max width constraint
         width="100%",
         _hover={
             "box_shadow": "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
@@ -3400,8 +3831,6 @@ def review_card(review: Review) -> rx.Component:
         },
         transition="all 0.2s ease",
     )
-
-
 
 def reviews_content() -> rx.Component:
     """Main reviews content component - Load, Edit, and Delete only."""
@@ -3440,8 +3869,9 @@ def reviews_content() -> rx.Component:
             ),
             rx.cond(
                 ReviewState.reviews.length() > 0,
-                rx.vstack(
+                rx.grid(  # Changed from rx.vstack to rx.grid
                     rx.foreach(ReviewState.reviews, review_card),
+                    columns="2",  # 2 columns for grid
                     spacing="4",
                     width="100%",
                 ),

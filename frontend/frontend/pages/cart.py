@@ -3,8 +3,9 @@ from typing import List, Optional
 from ..template import template
 from ..state import AuthState
 from ..config import API_BASE_URL
-from ..components.navbar import NavCartState
 from ..pages.orders import OrdersState
+from ..components.navbar import NavCartState
+
 
 class CreditCard(rx.Base):
     id: int = 0
@@ -1340,7 +1341,6 @@ def cart_content() -> rx.Component:
             rx.heading(
                 "YOUR CART",
                 text_align="center",
-                margin_bottom="30px",
                 font_size="32px",
                 color="#22282c",
                 font_family="Poppins"

@@ -2,7 +2,7 @@ import reflex as rx
 from ...template import template 
 from reflex.components.component import NoSSRComponent 
 from typing import Any, Dict, List 
-from ...state import ModelState, ModalState,RoomSceneState
+from ...state import ModelState, ModalState
 from ...config import API_BASE_URL
 from ...state import AuthState
 import urllib.parse
@@ -628,7 +628,7 @@ def simple_3d_viewer() -> rx.Component:
         
         style={
             "position": "relative", 
-            "width": "100%", 
+            "width": "80%", 
             "height": "600px", 
             "margin": "auto",
         
@@ -638,7 +638,7 @@ def simple_3d_viewer() -> rx.Component:
 def selected_scene():
     ProductDetailState.increase_scene_index()
 
-def vertical_3d_scenes(model_urls, scene_height: int = 200) -> rx.Component:
+def vertical_3d_scenes(model_urls, scene_height: int = 250) -> rx.Component:
     """Render vertical list of 3D scene thumbnails"""
     return rx.cond(
         (model_urls == []) | (model_urls == None),
@@ -673,7 +673,7 @@ def vertical_3d_scenes(model_urls, scene_height: int = 200) -> rx.Component:
                     position="relative",
                     border_radius="12px",
                     border=rx.cond(
-                        RoomSceneState.selected_room_model == url,
+                        ProductDetailState.selected_room == url,
                         "3px solid teal",
                         "3px solid transparent"
                     ),
@@ -682,15 +682,52 @@ def vertical_3d_scenes(model_urls, scene_height: int = 200) -> rx.Component:
                         "border": "3px solid teal"
                     },
                     margin_bottom="10px",
-                    width="150px",
+                    width="200px",
                     height=f"{scene_height}px"
                 )
             ),
-            rx.button(
-                on_click=lambda e: [ProductDetailState.set_scene_up]
-            ),
-            rx.button(
-                on_click=lambda e: [ProductDetailState.set_scene_down]
+            rx.hstack(
+                rx.button(
+                    rx.icon("arrow-up", size=18),
+                    on_click=ProductDetailState.set_scene_up,
+                    width="36px",
+                    height="36px",
+                    padding="0",
+                    display="flex",
+                    align_items="center",
+                    justify_content="center",
+                    border_radius="6px",
+                    background_color="#4A5568",
+                    color="white",
+                    border="1px solid #5A6578",
+                    _hover={
+                        "background_color": "#5A6578",
+                        "cursor": "pointer",
+                        "transform": "scale(1.05)",
+                        "transition": "all 0.2s"
+                    },
+                ),
+                rx.button(
+                    rx.icon("arrow-down", size=18),
+                    on_click=ProductDetailState.set_scene_down,
+                    width="36px",
+                    height="36px",
+                    padding="0",
+                    display="flex",
+                    align_items="center",
+                    justify_content="center",
+                    border_radius="6px",
+                    background_color="#4A5568",
+                    color="white",
+                    border="1px solid #5A6578",
+                    _hover={
+                        "background_color": "#5A6578",
+                        "cursor": "pointer",
+                        "transform": "scale(1.05)",
+                        "transition": "all 0.2s"
+                    },
+                ),
+                spacing="2",
             ),
             spacing="2",
             align="start"
@@ -707,14 +744,14 @@ def product_detail_content() -> rx.Component:
             rx.box(
                 rx.hstack(
                     rx.box(
-                        vertical_3d_scenes(ProductDetailState.display_scene_urls, scene_height=100),
+                        vertical_3d_scenes(ProductDetailState.display_scene_urls, scene_height=200),
                     ),
                     simple_3d_viewer(),
                     align="start",
-                    width="100%"
+                 
                 ),
-                width="100%",
-                padding="20px"
+                width="70%",
+                padding="20px 5px"
             ),
 
             rx.box(
@@ -724,20 +761,20 @@ def product_detail_content() -> rx.Component:
                     rx.text("Colors", font_size="16px", margin_top="10px", color="#22282c", font_weight="bold"),
                     rx.hstack(
                             rx.hstack(
-                                rx.box(style={"width": "30px", "height": "30px", "border_radius": "50%", "background_color": "beige"}),
-                                rx.text("Beige", font_size="14px", color="gray"),
+                                rx.box(style={"width": "30px", "height": "30px", "border_radius": "50%", "background_color": "black"}),
+                                rx.text("Black", font_size="14px", color="gray"),
                                 spacing="2",
                                 align_items="center"
                             ),
                             rx.hstack(
-                                rx.box(style={"width": "30px", "height": "30px", "border_radius": "50%", "background_color": "wooden"}),
-                                rx.text("Dark Blue", font_size="14px", color="gray"),
+                                rx.box(style={"width": "30px", "height": "30px", "border_radius": "50%", "background_color": "pink"}),
+                                rx.text("Pink", font_size="14px", color="gray"),
                                 spacing="2",
                                 align_items="center"
                             ),
                             rx.hstack(
-                                rx.box(style={"width": "30px", "height": "30px", "border_radius": "50%", "background_color": "brown"}),
-                                rx.text("Brown", font_size="14px", color="gray"),
+                                rx.box(style={"width": "30px", "height": "30px", "border_radius": "50%", "background_color": "red"}),
+                                rx.text("Red", font_size="14px", color="gray"),
                                 spacing="2",
                                 align_items="center"
                             ),
@@ -749,7 +786,7 @@ def product_detail_content() -> rx.Component:
                         rx.text("Physical:", font_size="16px", color="#22282c"),
                         rx.text(f"${ProductDetailState.product_data.get('physical_price', '0')}", font_size="18px", color="#22282c", font_weight="bold"),
                         rx.divider(),
-                        rx.button(rx.icon("shopping-cart"), "Add", style=cart_button),
+                        rx.button(rx.icon("shopping-cart",stroke_width=1), "Add", style=cart_button,),
                         rx.button("Buy Now", bg="black", color="white"),
                         width="100%",
                     ),
@@ -757,7 +794,7 @@ def product_detail_content() -> rx.Component:
                         rx.text("Digital:", font_size="16px", color="#22282c"),
                         rx.text(f"${ProductDetailState.product_data.get('digital_price', '0')}", font_size="18px", color="#22282c", font_weight="bold"),
                         rx.divider(),
-                        rx.button(rx.icon("zap"), "Add", style=cart_button),
+                        rx.button(rx.icon("zap",stroke_width=1), "Add", style=cart_button,),
                         rx.button("Buy Now", bg="black", color="white"),
                         width="100%",
                     ),
@@ -777,7 +814,7 @@ def product_detail_content() -> rx.Component:
                           
                         },),
                 ),
-                width="40%",
+                width="35%",
                 padding="20px",
                 border="1px solid #ddd",
                 border_radius="12px",

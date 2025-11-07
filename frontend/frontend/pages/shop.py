@@ -19,7 +19,17 @@ class ShopState(rx.State):
     model_filename: str = ""       
     scene_file: bytes = b""      
     scene_filename: str = ""
+    
+    # Wishlist state
+    wishlist_items: List[int] = []
 
+    async def update_navbar_cart_quantity(self, quantity: int):
+        """Update the navbar cart quantity"""
+        nav_state = await self.get_state(NavCartState)
+        nav_state.cart_quantity = quantity
+    
+    def toggle_like(self):
+        self.is_liked = not self.is_liked
 
     def set_search_query(self, value: str):
         self.search_query = value
@@ -46,10 +56,10 @@ class ShopState(rx.State):
         sort_mapping = {
             "Most Popular": "popularity",
             "Newest": "newest",
-            "Digital: Low to High": "digital_price_low_to_high",
-            "Digital: High to Low": "digital_price_high_to_low",
-            "Physical: Low to High": "physical_price_low_to_high",
-            "Physical: High to Low": "physical_price_high_to_low"
+            "Digital Price: Low to High": "digital_price_low_to_high",
+            "Digital Price: High to Low": "digital_price_high_to_low",
+            "Physical Price: Low to High": "physical_price_low_to_high",
+            "Physical Price: High to Low": "physical_price_high_to_low"
         }
         
         format_mapping = {
@@ -71,6 +81,7 @@ class ShopState(rx.State):
         
         if self.sort_by:
             form_data["sort_by"] = sort_mapping.get(self.sort_by, "popularity")
+
         
         try:
             async with httpx.AsyncClient() as client:
@@ -101,12 +112,15 @@ class ShopState(rx.State):
                 for p in data.get("products", [])
             ]
             
+            # Reload wishlist to ensure fresh data
+            await self.fetch_wishlist()
+            
         except Exception as e:
             print(f"❌ Error loading products: {e}")
 
 
     async def add_to_cart(self, product_id: int, item_type: str, quantity: int = 1):
-        NavCartState.increment_cart_quantity()
+        
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies or {}
         """Send request to backend to add item to cart."""
@@ -126,7 +140,10 @@ class ShopState(rx.State):
 
             if response.status_code == 201:
                 rx.toast.success("✅ Item added to cart successfully!")
-                NavCartState.load_cart_quantity()
+                nav_state = await self.get_state(NavCartState)
+                await nav_state.load_cart_quantity()
+                print("item added ")
+
             else:
                 error = response.json().get("error", response.text)
                 rx.toast.error(f"❌ Failed: {error}")
@@ -136,6 +153,94 @@ class ShopState(rx.State):
             rx.toast.error(f"⚠️ Network error: {e}")
 
 
+    async def add_to_wishlist(self, product_id: int):
+        """Add product to wishlist via backend."""
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies or {}
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{API_BASE_URL}/users/wishlist/add/",
+                    data={"product_id": product_id},
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                    cookies=cookies_dict,
+                )
+            
+            if response.status_code in [200, 201]:
+                if product_id not in self.wishlist_items:
+                    self.wishlist_items.append(product_id)
+                rx.toast.success("❤️ Added to wishlist!")
+                print("add")
+                print(self.wishlist_items)
+                await self.fetch_wishlist()
+            else:
+                error = response.json().get("error", "Failed to add to wishlist")
+                rx.toast.error(f"❌ {error}")
+        
+        except Exception as e:
+            rx.toast.error(f"⚠️ Network error: {e}")
+
+
+    async def remove_from_wishlist(self, product_id: int):
+        """Remove product from wishlist via backend."""
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies or {}
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.delete(
+                    f"{API_BASE_URL}/users/wishlist/remove/{product_id}/",
+                    cookies=cookies_dict,
+                )
+            
+            if response.status_code == 200:
+                if product_id in self.wishlist_items:
+                    self.wishlist_items.remove(product_id)
+                rx.toast.success("💔 Removed from wishlist")
+                await self.fetch_wishlist()
+                print("remove")
+            else:
+                error = response.json().get("error", "Failed to remove from wishlist")
+                rx.toast.error(f"❌ {error}")
+        
+        except Exception as e:
+            rx.toast.error(f"⚠️ Network error: {e}")
+
+    async def fetch_wishlist(self):
+        """Fetch user's wishlist items and store them in state."""
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies or {}
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{API_BASE_URL}/users/wishlist/",
+                    cookies=cookies_dict,
+                )
+
+            if response.status_code == 200:
+                data = response.json()
+                self.wishlist_items = [item["id"] for item in data.get("wishlist", [])]
+                print("✅ Wishlist loaded:", self.wishlist_items)
+                
+            else:
+                print("⚠️ Failed to fetch wishlist")
+                self.wishlist_items = []
+        
+        except Exception as e:
+            print(f"❌ Error fetching wishlist: {e}")
+            self.wishlist_items = []
+
+
+    async def toggle_wishlist(self, product_id: int):
+        """Toggle product in wishlist."""
+        if product_id in self.wishlist_items:
+            await self.remove_from_wishlist(product_id)
+        else:
+            await self.add_to_wishlist(product_id)
+
+    
     product_detail: dict = {}
     async def fetch_product_detail(self, product_id:int):
 
@@ -178,27 +283,6 @@ class ShopState(rx.State):
             self.model_file = b""
             self.model_filename = ""
 
-    async def fetch_display_scene(self, scene_id: str):
-
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(f"{API_BASE_URL}/products/get_display_scene/{scene_id}/")
-
-            if response.status_code == 200:
-                self.scene_file = response.content
-                self.scene_filename = response.headers.get("Content-Disposition", f"{scene_id}.glb").split("filename=")[-1]
-            elif response.status_code == 404:
-                self.scene_file = b""
-                self.scene_filename = ""
-            else:
-                self.scene_file = b""
-                self.scene_filename = ""
-
-        except Exception as e:
-            self.scene_file = b""
-            self.scene_filename = ""
-
-    
 
 def search_and_filters() -> rx.Component:
     return rx.hstack(
@@ -307,13 +391,46 @@ def hover_swap_photo(default_img: str, hover_img: str, link: str) -> rx.Componen
     )
 
 def product_card(product: Dict) -> rx.Component:
+        product_id = product["id"]
+        is_in_wishlist =ShopState.wishlist_items.contains(product_id)
+        
         return rx.box(
             rx.vstack(
-                hover_swap_photo(
-                    product.get("image", "/images/default.png"),
-                    product.get("hover_image", "/images/default.jpg"),
-                    product.get("link", "/cart"),
-            
+                rx.box(
+                    hover_swap_photo(
+                        product.get("image", "/images/default.png"),
+                        product.get("hover_image", "/images/default.jpg"),
+                        product.get("link", "/cart"),
+                    ),
+                    rx.button(
+                        rx.cond(
+                            is_in_wishlist,
+                            rx.icon("heart", color="#EF4444", fill="#EF4444", size=20),
+                            rx.icon("heart", color="#3F4143", size=20),
+                        ),
+                        position="absolute",
+                        top="10px",
+                        right="10px",
+                        border="none",
+                        border_radius="full",
+                        background = "white",
+                        padding="8px",
+                        width="40px",
+                        height="40px",
+                        display="flex",
+                        align_items="center",
+                        justify_content="center",
+                        cursor="pointer",
+                        transition="all 0.3s ease",
+                        _hover={
+                            "background_color": "rgba(255, 255, 255, 1)",
+                            "transform": "scale(1.1)",
+                        },
+                        on_click=lambda: ShopState.toggle_wishlist(product_id),
+                        z_index="10",
+                    ),
+                    position="relative",
+                    width="100%",
                 ),
                 rx.vstack(
                     rx.hstack(
@@ -321,6 +438,7 @@ def product_card(product: Dict) -> rx.Component:
                         rx.spacer(),
                         rx.icon("star", color="gold"),
                         rx.text("4.5", font_weight="medium", color="#22282C"),
+                        
                         align="center",
                         width="100%",
                     ),
@@ -415,7 +533,7 @@ def shop_content() -> rx.Component:
                 ),
             ),
             
-            spacing="6",
+            spacing="4",
             width="100%",
             on_mount=ShopState.load_products,
         ),
@@ -430,4 +548,3 @@ filter_style = {
     "border": "1px solid #22282C",
     "border_radius":"12px"
 }
-
