@@ -1,33 +1,39 @@
 import reflex as rx
 from ..template import template
 from reflex.components.component import NoSSRComponent
-from ..components.product_card import product_list
 from typing import Any, Dict, List
 import urllib.parse
 from typing import Optional
 from reflex.event import Event
-from ..rooms_data import rooms_data
-from ..components.product_card import product_list
 from ..state import DynamicState, AuthState
 from ..config import API_BASE_URL
+import re,asyncio
+import httpx
 
 category_images = {
-    "Bedroom": "/images/bedroom.jpg",
     "Living Room": "/images/livingroom.jpg",
     "Office Room": "/images/officeroom.jpg",
-    "Kitchen": "/images/kitchenroom.jpg",
+    "Bedroom": "/images/bedroom.jpg",
+    "Kitchen": "/images/kitchenroom.jpg"
 }
+
+class CategoryItem(rx.Base):
+    """Model for category with image"""
+    name: str
+    image: str
+
 
 class CategoryState(rx.State):
     categories: list[str] = []
-    product_types: dict[str, list[str]] = {}  # stores product types for each category
-    selected_category: str = ""  # tracks currently selected category
+    category_items: list[CategoryItem] = []  
+    product_types: dict[str, list[str]] = {}  
+    selected_category: str = ""  
     is_loading: bool = False
     error_message: str = ""
 
     async def load_categories(self):
-        """Fetch all available categories"""
-        import httpx
+      
+        
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies or {}
         self.is_loading = True
@@ -42,67 +48,28 @@ class CategoryState(rx.State):
                     data = response.json()
                     raw_categories = data.get("categories", [])
 
-                    # 🧹 Clean spaces and remove duplicates while keeping order
                     cleaned = []
+                    items = []
+                    
                     for cat in raw_categories:
                         name = cat.strip()
                         if name not in cleaned:
                             cleaned.append(name)
-
+                           
+                            img_path = category_images.get(name, "/images/default.jpg")
+                            items.append(CategoryItem(name=name, image=img_path))
+                           
                     self.categories = cleaned
-                    print(f"✅ Cleaned categories: {self.categories}")
+                    self.category_items = items
+                    
                 else:
                     self.error_message = "Failed to load categories"
-                    print(f"❌ Error loading categories: {response.status_code}")
-
+                 
         except Exception as e:
             self.error_message = f"Error: {str(e)}"
-            print(f"❌ Exception loading categories: {str(e)}")
 
         finally:
             self.is_loading = False
-
-
-    async def load_product_types(self, category: str):
-        """Fetch product types for a specific category"""
-        import httpx
-        auth_state = await self.get_state(AuthState)
-        cookies_dict = auth_state.session_cookies or {} 
-        if not category:
-            return
-            
-        self.is_loading = True
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{API_BASE_URL}/products/types/",
-                    data={"category": category},
-                    cookies=cookies_dict,
-                )
-
-                if response.status_code == 200:
-                    data = response.json()
-                    product_types_list = data.get("product_types", [])
-                    print(product_types_list)
-                    # Store in dictionary with category as key
-                    self.product_types[category] = product_types_list
-                    self.selected_category = category
-                    
-                    print(f"✅ Fetched product types for {category}: {product_types_list}")
-                else:
-                    self.error_message = f"Failed to load product types for {category}"
-                    print(f"❌ Error loading product types: {response.status_code}")
-        except Exception as e:
-            self.error_message = f"Error: {str(e)}"
-            print(f"❌ Exception loading product types: {str(e)}")
-        finally:
-            self.is_loading = False
-
-    async def load_product_types_for_all_categories(self):
-        """Fetch product types for all categories"""
-        for category in self.categories:
-            await self.load_product_types(category)
-
 
 def hover_photo(name: str, img: str, link: str) -> rx.Component:
     return rx.vstack(
@@ -178,12 +145,82 @@ def product_spot(x: str, y: str, name: str, price: str, url: str) -> rx.Componen
             ),
             rx.hover_card.content(
                 rx.vstack(
-                    rx.text(name, font_weight="bold", color="#22282c", font_size="12px"),
-                    rx.text(price, color="black",font_size = "16px",font_weight="bold"),
-                    rx.link("View >", href=url, color="#22282c",font_size = "12px"),
+                    rx.text(
+                        name,
+                        font_weight="bold",
+                        color="#22282c",
+                        font_size="14px",
+                        letter_spacing="0.5px",
+                        margin_bottom="8px",
+                    ),
+                    
+                    # Price section with highlight
+                    rx.hstack(
+                        rx.hstack(
+                            rx.text(
+                            price,
+                            color="#22282c",
+                            font_size="22px",
+                            font_weight="700",
+                        ),
+                        rx.text("THB", font_size="13px", color="#484848"),
+                        spacing = "1",
+                        align_items="baseline",
+
+                        ),
+                        
+                        rx.box(
+                            width="2px",
+                            height="20px",
+                            background="linear-gradient(180deg, #2E6FF2 0%, #764ba2 100%)",
+                            margin_x="10px",
+                        ),
+                        rx.text(
+                            "Premium",
+                            color="#929FA7",
+                            font_size="11px",
+                            font_weight="600",
+                            text_transform="uppercase",
+                            letter_spacing="1px",
+                        ),
+                        align_items="center",
+                        justify_content="center",
+                    ),
+                    
+                    # Decorative line
+                    rx.box(
+                        height="1px",
+                        background="linear-gradient(90deg, transparent 0%, #E5E7EB 50%, transparent 100%)",
+                        width="100%",
+                        margin_y="12px",
+                    ),
+                    
+                    # Quick stats (optional elegant details)
+                    rx.hstack(
+                        rx.vstack(
+                            rx.icon("star", size=14, color="#FCD34D"),
+                            align_items="center",
+                        ),
+                        rx.text("4.9", font_size="12px", color="#22282c", font_weight="600"),
+                        rx.text("(324 reviews)", font_size="10px", color="#929FA7"),
+                        spacing="2",
+                        align_items="center",
+                    ),
+                    
+                    spacing="3",
+                    width="100%",
+                    padding="16px",
                 ),
                 side="right",
-                style={"background": "white", "padding": "10px", "border_radius": "8px"},
+                style={
+                    "background": "rgba(255, 255, 255, 0.95)",
+                    "backdrop_filter": "blur(10px)",
+                    "border": "1px solid rgba(255, 255, 255, 0.3)",
+                    "border_radius": "12px",
+                    "box_shadow": "0 20px 60px rgba(46, 111, 242, 0.15), 0 0 1px rgba(0, 0, 0, 0.1)",
+                    "padding": "0",
+                    "min_width": "250px",
+                },
             ),
         ),
         position="absolute",
@@ -191,41 +228,6 @@ def product_spot(x: str, y: str, name: str, price: str, url: str) -> rx.Componen
         left=x,
     )
 
-
-def testimonials_section():
-    card_style = {
-        "border_radius": "10px",
-        "padding": "20px",
-        "width": "300px",
-        "min_height": "200px",
-        "text_align": "center",
-        "box_shadow": "0 4px 8px rgba(0, 0, 0, 0.1)"
-    }
-
-    reviews = [
-        {"name": "Cyntra", "rating": 5, "text": "I absolutely love my new sofa! The color matches perfectly with my living room, and it's even more comfortable than I expected. Delivery was quick and hassle-free", "bg": "#e0e5e8","color":"black"},
-        {"name": "Pop", "rating": 5, "text": "I absolutely love my new sofa! The color matches perfectly with my living room, and it's even more comfortable than I expected. Delivery was quick and hassle-free", "bg": "#212529", "color": "white"},
-        {"name": "Mai", "rating": 5, "text": "I absolutely love my new sofa! The color matches perfectly with my living room, and it's even more comfortable than I expected. Delivery was quick and hassle-free", "bg": "#e0e5e8","color":"black"},
-    ]
-
-    review_cards = []
-    for review in reviews:
-        review_cards.append(
-            rx.vstack(
-                rx.hstack(
-                    *[rx.text("★", color="#FFA500") for _ in range(review["rating"])],
-                    spacing="2"
-                   
-                ),
-                rx.text(review["name"], font_weight="bold", font_size="1.1em",color=review.get("color", "black")),
-                rx.text(review["text"], font_size="0.9em", color=review.get("color", "black")),
-                bg=review["bg"],
-                **card_style
-            ),
-            
-        )
-
-    return review_cards
 
 
 def ikea_showcase_layout() -> rx.Component:
@@ -248,7 +250,7 @@ def ikea_showcase_layout() -> rx.Component:
                             rx.text("MALM", font_weight="700", font_size="15px", color="#111"),
                             rx.text("Bed frame, high", font_size="12px", color="#484848"),
                             rx.hstack(
-                                rx.text("7,290", font_weight="700", font_size="22px", color="#111"),
+                                rx.text("7,290", font_weight="700", font_size="22px", color="#22282c"),
                                 rx.text("THB", font_size="13px", color="#484848"),
                                 spacing="1",
                                 align_items="baseline",
@@ -256,11 +258,7 @@ def ikea_showcase_layout() -> rx.Component:
                             align_items="start",
                             spacing="0",
                         ),
-                        rx.box(
-                            rx.text("›", font_size="24px", color="#484848",on_click=rx.redirect("/product_detail")),
-                            display="flex",
-                            align_items="center",
-                        ),
+                      
                         justify_content="space-between",
                         align_items="center",
                         width="100%",
@@ -271,7 +269,7 @@ def ikea_showcase_layout() -> rx.Component:
                     bg="white",
                     padding="14px 16px",
                     box_shadow="0 2px 8px rgba(0,0,0,0.12)",
-                    width="190px",
+                    width="150px",
                     cursor="pointer",
                     transition="all 0.2s ease",
                     _hover={
@@ -279,7 +277,7 @@ def ikea_showcase_layout() -> rx.Component:
                         "transform": "translateY(-1px)",
                     },
                 ),
-                product_spot("20%", "80%", "Modern Sofa", "299 THB", "/product_detail"),
+                product_spot("20%", "80%", "Modern Sofa", "299", "/product_detail"),
                 
                 position="relative",
                 width="40%",
@@ -297,7 +295,7 @@ def ikea_showcase_layout() -> rx.Component:
                         object_fit="cover",
                     ),
                     
-                    product_spot("60%", "35%", "Modern Chair", "569 THB", "/product_detail"),
+                    product_spot("60%", "35%", "Modern Chair", "569", "/product_detail"),
                 
                     position="relative",
                     height="300px",
@@ -313,8 +311,8 @@ def ikea_showcase_layout() -> rx.Component:
                         height="100%",
                         object_fit="cover",
                     ),
-                    product_spot("30%", "30%", "Bedside Table", "799 THB", "/product_detail"),
-                    product_spot("60%", "70%", "Modern Sofa", "299 THB", "/product_detail"),
+                    product_spot("30%", "30%", "Bedside Table", "799", "/product_detail"),
+                    product_spot("60%", "70%", "Modern Sofa", "299", "/product_detail"),
                     position="relative",
                     height="500px",
                     overflow="hidden",
@@ -336,8 +334,8 @@ def ikea_showcase_layout() -> rx.Component:
                         height="100%",
                         object_fit="cover",
                     ),
-                    product_spot("48%", "30%", "Wooden Wardrobe", "1909 THB", "/product_detail"),
-                    product_spot("70%", "80%", "Bedside Table", "249 THB", "/product_detail"),
+                    product_spot("48%", "30%", "Wooden Wardrobe", "1909", "/product_detail"),
+                    product_spot("70%", "80%", "Bedside Table", "249", "/product_detail"),
                    
                     position="relative",
                     height="550px",
@@ -353,7 +351,7 @@ def ikea_showcase_layout() -> rx.Component:
                         height="100%",
                         object_fit="cover",
                     ),
-                    product_spot("40%", "25%", "Book Shelf", "799 THB", "/product_detail"),
+                    product_spot("40%", "25%", "Book Shelf", "799", "/product_detail"),
                     position="relative",
                     height="250px",
                     overflow="hidden",
@@ -389,7 +387,6 @@ def home_content() -> rx.Component:
          rx.text("Whether it's your living room, bedroom, or office, we've got the perfect pieces to match your style.",font_size = "16px", color="#22282c",margin_bottom="50px"),
     ),
 
-    # Loading indicator
     rx.cond(
         CategoryState.is_loading,
         rx.center(
@@ -398,17 +395,16 @@ def home_content() -> rx.Component:
         ),
         rx.box()
     ),
-
-    # Categories section
+ 
     rx.hstack(
         rx.foreach(
-            CategoryState.categories,
-            lambda category: rx.link(
+            CategoryState.category_items,
+            lambda item: rx.link(
                 rx.vstack(
                     rx.image(
-                        src=category_images.get(category.strip(), "/images/default.jpg"),
-                        width="200px",
-                        height="150px",
+                        src=item.image,
+                        width="300px",
+                        height="250px",
                         object_fit="cover",
                         border_radius="10px",
                         _hover={
@@ -418,7 +414,7 @@ def home_content() -> rx.Component:
                         }
                     ),
                     rx.text(
-                        category,
+                        item.name,
                         font_size="16px",
                         font_weight="bold",
                         text_align="center",
@@ -426,9 +422,9 @@ def home_content() -> rx.Component:
                     ),
                     spacing="2",
                     align="center",
-                    on_click=CategoryState.load_product_types(category),
+                 
                 ),
-                href=f"/rooms/{category.strip().lower().replace(' ', '-')}",
+                href=f"/rooms/{item.name.lower().replace(' ', '-')}",
                 style={"textDecoration": "none","color":"#22282c"}
             )
         ),
@@ -438,87 +434,6 @@ def home_content() -> rx.Component:
         margin_bottom="3rem"
     ),
 
-    # Product types display for selected category
-    rx.cond(
-        CategoryState.selected_category != "",
-        rx.vstack(
-            rx.text(
-                f"Product Types in {CategoryState.selected_category}",
-                font_size="1.5rem",
-                font_weight="bold",
-                color="#22282c"
-            ),
-            rx.hstack(
-                rx.foreach(
-                    CategoryState.product_types.get(CategoryState.selected_category, []),
-                    lambda product_type: rx.box(
-                        rx.text(
-                            product_type,
-                            font_size="14px",
-                            color="white",
-                            padding="8px 16px",
-                            border_radius="20px",
-                            background_color="#22282C",
-                            cursor="pointer",
-                        ),
-                        _hover={
-                            "background_color": "#929FA7",
-                            "transition": "background_color 0.3s"
-                        }
-                    )
-                ),
-                spacing="2",
-                wrap="wrap",
-            ),
-            width="100%",
-            spacing="2",
-            margin_bottom="3rem",
-            padding="2rem",
-            background_color="#f5f5f5",
-            border_radius="10px"
-        ),
-        rx.box()
-    ),
-
-    rx.vstack(
-        
-        rx.hstack(
-        
-            rx.vstack(
-                hover_photo("Bedroom", "/images/bedroom.jpg", "/rooms/bedroom"),
-        
-            ),
-
-            rx.vstack(
-                hover_photo("Office Room", "/images/officeroom.jpg", "/rooms/officeroom"),
-        
-            ),
-            
-            rx.vstack(
-                hover_photo("Living Room", "/images/livingroom.jpg", "/rooms/livingroom"),
-                
-            ),
-            rx.vstack(
-                hover_photo("Kitchen", "/images/kitchenroom.jpg", "/rooms/kitchen"),
-        
-            ),
-          
-        
-            ),
-              rx.center(
-                 rx.button(
-                "Load More Rooms", style = load_button
-            ),
-           
-            width="100%",
-            justify="between",
-            margin_bottom="50px",
-            align_item = "center"
-            
-        ),
-   
-    ),
-   
     rx.hstack(
         rx.vstack(
             rx.text("UNIQUE & STYLISH COLLECTIONS",font_size="14px"),
@@ -534,7 +449,7 @@ def home_content() -> rx.Component:
             ),
             rx.text("that Inspire everyday",font_size="1.5rem"),
             rx.text("Explore your dream furniture in stunning 3D AR/VR and see exactly how it fits your space before you buy",margin_bottom="2rem",font_size="14px"),
-            rx.button("Explore More",style=button_style, ),
+            rx.button(rx.icon("circle-chevron-right"),"Explore More",style=button_style, ),
             color="#22282C",
             width="50%",    
         ),
@@ -559,74 +474,8 @@ def home_content() -> rx.Component:
         margin_bottom="50px"
    
     ),
-
-    rx.center(
-        rx.text("Top Collections",font_size = "2rem", font_weight="bold",color="#22282c",font_family="Racing Sans One",text_align="center"),
-    ),
-    rx.center(
-        rx.text("Our best furniture and decor picked just for you. Stylish, comfy, and high quality.",font_size = "16px", color="#22282c",margin_bottom="50px"),
-    ),
-
-    rx.box(
-        rx.hstack(
-            rx.foreach(
-            DynamicState.room_products,
-            lambda product: product_list([product]),
-                    
-            ),    
-            justify="center",   
-            align="center",    
-            width="100%",      
-            spacing="2",
-
-            ),    
-            
-        ),
-    
    
-    rx.hstack(
-            rx.vstack(
-                rx.image(src="/images/high_quality.png", width="60px", height="60px",style=icon_style),
-                rx.text("High Quality", font_size="16px", font_weight="bold",color="#22282C"),
-                rx.text("Startup interaction design sales", font_size="16px", color="#22282C",text_align="center"),
-                spacing="2",
-                align="center",
-                width="25%",
-            ),
-            rx.vstack(
-                rx.image(src="/images/location.png", width="60px", height="60px",style=icon_style),
-                rx.text("Fast Delivery", font_size="16px", font_weight="bold",color="#22282C"),
-                rx.text("Startup interaction design sales", font_size="16px", color="#22282C",text_align="center"),
-                spacing="2",
-                align="center",
-                width="25%",
-            ),
-            rx.vstack(
-                rx.image(src="/images/3D.png", width="60px", height="60px",style=icon_style),
-                rx.text("AR/VR Preview", font_size="16px", font_weight="bold",color="#22282C"),
-                rx.text("Startup interaction design sales", font_size="16px", color="#22282C",text_align="center"),
-                spacing="2",
-                align="center",
-                width="25%",
-            ),
-            rx.vstack(
-                rx.image(src="/images/service.png", width="60px", height="60px",style=icon_style),
-                rx.text("24Hour Service", font_size="16px", font_weight="bold",color="#22282C"),
-                rx.text("Startup interaction design sales", font_size="16px", color="#22282C",text_align="center"),
-                spacing="2",
-                align="center",
-                width="25%",
-            ),
-            margin_bottom = "3rem",
-            justify="center",
-            align="center",
-            padding="40px",
-            spacing="6",
-            width="100%",
-            style={
-            "background": "linear-gradient(to bottom, white 30%, #929FA7 10%)"
-        }
-        ),
+        features_section(),
 
     rx.hstack(
         rx.vstack(
@@ -640,7 +489,7 @@ def home_content() -> rx.Component:
                 line_height="1.5",
             ),
             rx.text("Discover the perfect sofa for your home and enjoy amazing savings while this promotion lasts.",margin_bottom="2rem"),
-            rx.button("Shop Now",style=button_style, ),
+            rx.button(rx.icon("shopping-bag"),"Shop Now",style=button_style, on_click = rx.redirect("/shop")),
             color="#22282C",
             width="40%",    
         ),
@@ -656,31 +505,763 @@ def home_content() -> rx.Component:
         margin_bottom="1rem",
    
     ),
+         footer(),
 
-    
-    rx.hstack(
-        rx.button("←", bg="#212529", color="white", border_radius="50%",width="40px",height="40px"),
-        rx.hstack(
-            *testimonials_section(),   
-            align="center",
-            justify="center"
-        ),
-        rx.button("→", bg="#212529", color="white", border_radius="50%",width="40px",height="40px"),
-        width="100%",
-        justify="center",
-        align = "center",
-        padding="40px",
-    ),
     
     height="100%",
     on_mount=CategoryState.load_categories,
   
 )
 
+def feature_card(icon_src: str, title: str, description: str) -> rx.Component:
+    """Premium feature card with animations."""
+    return rx.box(
+        rx.vstack(
+       
+            rx.box(
+                rx.image(
+                    src=icon_src,
+                    width="64px",
+                    height="64px",
+                    style={"object_fit": "contain"},
+                    border_radius = "0.5rem"
+                ),
+                padding="20px",
+                border_radius="16px",
+                display="flex",
+                align_items="center",
+                justify_content="center",
+                width="104px",
+                height="104px",
+                position="relative",
+                transition="all 0.3s ease",
+                _before={
+                    "content": '""',
+                    "position": "absolute",
+                    "top": "-4px",
+                    "right": "-4px",
+                    "width": "100%",
+                    "height": "100%",
+                    "border_radius": "16px",
+                    "transition": "all 0.3s ease",
+                },
+            ),
+            
+            # Number badge
+            rx.box(
+                rx.text(
+                    "✓",
+                    font_size="18px",
+                    font_weight="900",
+                    color="#22282c"
+                ),
+                padding="4px 8px",
+                border_radius="8px",
+                width="fit-content",
+            ),
+            
+            # Title
+            rx.text(
+                title,
+                font_size="20px",
+                font_weight="800",
+                color="#22282C",
+                text_align="center",
+                letter_spacing="-0.5px",
+            ),
+            
+            # Description with better styling
+            rx.text(
+                description,
+                font_size="14px",
+                color="#6B7280",
+                text_align="center",
+                line_height="1.6",
+                font_weight="500",
+            ),
+            
+            spacing="2",
+            align_items="center",
+            width="100%",
+        ),
+        padding="40px 28px",
+        border="2px solid #E5E7EB",
+        border_radius="20px",
+        background="white",
+        width="100%",
+        position="relative",
+        overflow="hidden",
+        transition="all 0.4s cubic-bezier(0.23, 1, 0.320, 1)",
+        _before={
+            "content": '""',
+            "position": "absolute",
+            "top": "0",
+            "left": "-100%",
+            "width": "100%",
+            "height": "100%",
+            "transition": "left 0.5s ease",
+        },
+        _hover={
+            "transform": "translateY(-8px) scale(1.02)",
+        },
+    )
+
+
+def features_section() -> rx.Component:
+    """Ultra-premium features showcase section."""
+    return rx.box(
+        rx.vstack(
+            
+            # Section Header
+            rx.vstack(
+                rx.text(
+                    "Why Choose",
+                    font_size="14px",
+                    font_weight="700",
+                    color="#929FA7",
+                    text_transform="uppercase",
+                    letter_spacing="2px",
+                ),
+                rx.heading(
+                    "Digital Home Platform",
+                    font_family="Racing Sans One",
+                    font_size = "2rem",
+                    color="#22282C",
+                    text_align="center",
+                    weight="bold",
+                    margin_bottom="8px",
+                ),
+             
+                spacing="2",
+                align_items="center",
+                margin_bottom="10px",
+                width="100%",
+            ),
+            
+            # Feature Cards Grid
+            rx.grid(
+                feature_card(
+                    "/images/high_quality.png",
+                    "Premium Quality",
+                    "Handpicked curated products from top designers worldwide",
+                   
+                ),
+                feature_card(
+                    "/images/location.png",
+                    "Express Delivery",
+                    "Fast and secure shipping with real-time tracking",
+                   
+                ),
+                feature_card(
+                    "/images/3D.png",
+                    "AR/VR Experience",
+                    "Visualize furniture in your space with immersive 3D preview",
+                    
+                ),
+                feature_card(
+                    "/images/service.png",
+                    "24/7 Support",
+                    "Dedicated customer service available round the clock",
+                    
+                ),
+                columns="4",
+                spacing="8",
+                width="100%",
+                auto_rows="1fr",
+            ),
+            
+            spacing="8",
+            width="100%",
+            padding="40px 30px",
+            align_items="center",
+        ),
+        background="linear-gradient(135deg, #FFFFFF 0%, #F9FAFB 50%, #F3F4F6 100%)",
+        border_radius="32px",
+        border="1px solid #E5E7EB",
+        width="100%",
+        margin_top="30px",
+        margin_bottom="30px",
+        box_shadow="0 2px 8px rgba(0, 0, 0, 0.04)",
+    )
+
+
+class NewsletterState(rx.State):
+    """State for newsletter subscription."""
+    email: str = ""
+    is_subscribing: bool = False
+    subscribe_message: str = ""
+    subscribe_status: str = ""  # "idle", "loading", "success", "error"
+    
+    def set_email(self, value: str):
+        """Update email input."""
+        self.email = value
+    
+    def validate_email(self) -> bool:
+        """Validate email format."""
+        email_pattern = r'^\S+@\S+\.\S+$'
+
+        return re.match(email_pattern, self.email) is not None
+    
+    def clear_subscription(self):
+        """Clear subscription form and message after delay."""
+        self.email = ""
+        self.subscribe_message = ""
+        self.subscribe_status = "idle"
+    
+    show_modal: bool = False
+    
+    def open_modal(self):
+        """Open subscription modal."""
+        self.show_modal = True
+    
+    def close_modal(self):
+        """Close subscription modal."""
+        self.show_modal = False
+        self.clear_subscription()
+    
+    async def subscribe_newsletter(self):
+        self.subscribe_message = ""
+        self.subscribe_status = "loading"
+        self.is_subscribing = True
+
+        if not self.email.strip():
+            self.subscribe_message = "Please enter your email address"
+            self.subscribe_status = "error"
+            self.is_subscribing = False
+            return
+
+        if not self.validate_email():
+            self.subscribe_message = "Please enter a valid email address"
+            self.subscribe_status = "error"
+            self.is_subscribing = False
+            return
+
+        # Simulate API call
+        await asyncio.sleep(0.2)
+
+        # ✅ Open modal first (triggers re-render)
+        self.open_modal()
+
+        # Then mark success
+        self.subscribe_message = "✓ Successfully subscribed!"
+        self.subscribe_status = "success"
+        self.is_subscribing = False
+
+
+
+def subscription_modal() -> rx.Component:
+    """Modal showing subscription confirmation."""
+    return rx.cond(
+        NewsletterState.show_modal,
+        rx.box(
+            rx.box(
+                rx.vstack(
+                    # Close Button
+                    rx.box(
+                        rx.icon(
+                            "x",
+                            size=28,
+                            color="#6B7280",
+                            cursor="pointer",
+                            on_click=NewsletterState.close_modal,
+                            _hover={"color": "#22282C"},
+                        ),
+                        width="100%",
+                        display="flex",
+                        justify_content="flex-end",
+                    ),
+                    
+                    # Success Icon
+                    rx.cond(
+                        NewsletterState.subscribe_status == "success",
+                        rx.box(
+                            rx.text("✓", font_size="64px", color="#10B981"),
+                            width="100%",
+                            text_align="center",
+                            margin_bottom="16px",
+                        ),
+                        rx.box(
+                            rx.text("!", font_size="64px", color="#EF4444"),
+                            width="100%",
+                            text_align="center",
+                            margin_bottom="16px",
+                        ),
+                    ),
+                    
+                    # Title
+                    rx.heading(
+                        rx.cond(
+                            NewsletterState.subscribe_status == "success",
+                            "Subscription Confirmed!",
+                            "Subscription Error"
+                        ),
+                        size="6",
+                        color="#22282C",
+                        text_align="center",
+                    ),
+                    
+                    # Message
+                    rx.text(
+                        NewsletterState.subscribe_message,
+                        font_size="16px",
+                        color="#6B7280",
+                        text_align="center",
+                        line_height="1.6",
+                    ),
+                    
+                    # Additional Info (only on success)
+                    rx.cond(
+                        NewsletterState.subscribe_status == "success",
+                        rx.vstack(
+                            rx.box(
+                                rx.hstack(
+                                    rx.icon("mail", size=20, color="#2E6FF2"),
+                                    rx.text(
+                                        "Check your email for exclusive offers",
+                                        font_size="14px",
+                                        color="#22282C",
+                                    ),
+                                    spacing="2",
+                                    align_items="center",
+                                ),
+                                padding="16px",
+                                background="#EFF6FF",
+                                border_radius="8px",
+                                width="100%",
+                            ),
+                            rx.box(
+                                rx.hstack(
+                                    rx.icon("gift", size=20, color="#F59E0B"),
+                                    rx.text(
+                                        "Get 10% discount on your first purchase",
+                                        font_size="14px",
+                                        color="#22282C",
+                                    ),
+                                    spacing="2",
+                                    align_items="center",
+                                ),
+                                padding="16px",
+                                background="#FFFBEB",
+                                border_radius="8px",
+                                width="100%",
+                            ),
+                            spacing="3",
+                            width="100%",
+                            margin_top="16px",
+                        ),
+                        rx.fragment(),
+                    ),
+                    
+                    # Email Display
+                    rx.box(
+                        rx.text(
+                            f"Email: {NewsletterState.email}",
+                            font_size="14px",
+                            color="#929FA7",
+                            text_align="center",
+                        ),
+                        padding="16px",
+                        background="#F3F4F6",
+                        border_radius="8px",
+                        width="100%",
+                    ),
+                    
+                    # Close Button
+                    rx.button(
+                        "Got It!",
+                        width="100%",
+                        padding="14px",
+                        background=rx.cond(
+                            NewsletterState.subscribe_status == "success",
+                            "linear-gradient(135deg, #2E6FF2 0%, #0078D4 100%)",
+                            "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)"
+                        ),
+                        color="white",
+                        border="none",
+                        border_radius="10px",
+                        font_weight="600",
+                        cursor="pointer",
+                        font_size="16px",
+                        on_click=NewsletterState.close_modal,
+                        _hover={
+                            "box_shadow": "0 8px 20px rgba(46, 111, 242, 0.3)",
+                        },
+                        margin_top="20px",
+                    ),
+                    
+                    spacing="4",
+                    width="100%",
+                ),
+                background="white",
+                padding="40px",
+                border_radius="16px",
+                width="500px",
+                max_width="90vw",
+                box_shadow="0 20px 60px rgba(0, 0, 0, 0.2)",
+                position="relative",
+            ),
+            position="fixed",
+            top="0",
+            left="0",
+            right="0",
+            bottom="0",
+            background="rgba(0, 0, 0, 0.5)",
+            display="flex",
+            align_items="center",
+            justify_content="center",
+            z_index="1000",
+        ),
+    )
+
+
+def footer() -> rx.Component:
+    """Premium footer for Digital Home Platform."""
+    return rx.box(
+        rx.vstack(
+            # Main Footer Content
+            rx.vstack(
+                # Top Section with Logo and Description
+                rx.hstack(
+                    rx.vstack(
+                        rx.text(
+                            "Digital Home",
+                            font_size="28px",
+                            font_weight="800",
+                            color="white",
+                        ),
+                        rx.text(
+                            "Premium Curated Design Products",
+                            font_size="14px",
+                            color="#929FA7",
+                        ),
+                        spacing="2",
+                        margin_bottom="20px",
+                    ),
+                    rx.spacer(),
+                    rx.vstack(
+                        rx.text(
+                            "Follow Us",
+                            font_size="14px",
+                            font_weight="700",
+                            color="white",
+                            text_transform="uppercase",
+                            letter_spacing="1px",
+                        ),
+                        rx.hstack(
+                            rx.link(
+                                rx.box(
+                                    rx.icon("facebook", size=20, color="white"),
+                                    padding="12px",
+                                    border_radius="8px",
+                                    background="#374151",
+                                    cursor="pointer",
+                                    transition="all 0.3s ease",
+                                    _hover={
+                                        "background": "#2E6FF2",
+                                        "transform": "translateY(-2px)",
+                                    },
+                                ),
+                                href="https://facebook.com",
+                                is_external=True,
+                            ),
+                            rx.link(
+                                rx.box(
+                                    rx.icon("twitter", size=20, color="white"),
+                                    padding="12px",
+                                    border_radius="8px",
+                                    background="#374151",
+                                    cursor="pointer",
+                                    transition="all 0.3s ease",
+                                    _hover={
+                                        "background": "#1DA1F2",
+                                        "transform": "translateY(-2px)",
+                                    },
+                                ),
+                                href="https://twitter.com",
+                                is_external=True,
+                            ),
+                            rx.link(
+                                rx.box(
+                                    rx.icon("instagram", size=20, color="white"),
+                                    padding="12px",
+                                    border_radius="8px",
+                                    background="#374151",
+                                    cursor="pointer",
+                                    transition="all 0.3s ease",
+                                    _hover={
+                                        "background": "#E1306C",
+                                        "transform": "translateY(-2px)",
+                                    },
+                                ),
+                                href="https://instagram.com",
+                                is_external=True,
+                            ),
+                            rx.link(
+                                rx.box(
+                                    rx.icon("linkedin", size=20, color="white"),
+                                    padding="12px",
+                                    border_radius="8px",
+                                    background="#374151",
+                                    cursor="pointer",
+                                    transition="all 0.3s ease",
+                                    _hover={
+                                        "background": "#0077B5",
+                                        "transform": "translateY(-2px)",
+                                    },
+                                ),
+                                href="https://linkedin.com",
+                                is_external=True,
+                            ),
+                            spacing="3",
+                            align_items="center",
+                        ),
+                        spacing="3",
+                        align_items="flex-start",
+                    ),
+                    width="100%",
+                    align_items="flex-start",
+                    padding_bottom="40px",
+                    border_bottom="1px solid #374151",
+                ),
+                
+                # Newsletter Subscription
+                rx.vstack(
+                    rx.text(
+                        "Subscribe to Our Newsletter",
+                        font_size="18px",
+                        font_weight="700",
+                        color="white",
+                    ),
+                    rx.text(
+                        "Get exclusive offers and new product launches delivered to your inbox",
+                        font_size="14px",
+                        color="#929FA7",
+                    ),
+                    
+                    # Email Input and Subscribe Button
+                    rx.hstack(
+                        rx.input(
+                            placeholder="Enter your email",
+                            value=NewsletterState.email,
+                            on_change=NewsletterState.set_email,
+                            width="100%",
+                            padding="5px",
+                            border="1.5px solid #374151",
+                            border_radius="10px",
+                            background_color="#1F2937",
+                            color="white",
+                            font_size="14px",
+                            _placeholder={"color": "#6B7280"},
+                            _focus={
+                                "border_color": "#2E6FF2",
+                                "box_shadow": "0 0 0 3px rgba(46, 111, 242, 0.1)",
+                            },
+                            transition="all 0.2s ease",
+                            is_disabled=NewsletterState.is_subscribing,
+                        ),
+                        rx.button(
+                            rx.cond(
+                                NewsletterState.is_subscribing,
+                                rx.hstack(
+                                    rx.spinner(size="2"),
+                                    rx.text("Subscribing...", font_weight="600"),
+                                    spacing="2",
+                                    align_items="center",
+                                ),
+                                rx.hstack(
+                                    rx.icon("send", size=16),
+                                    rx.text("Subscribe", font_weight="600"),
+                                    spacing="2",
+                                    align_items="center",
+                                ),
+                            ),
+                            padding="14px 24px",
+                            background="linear-gradient(135deg, #2E6FF2 0%, #0078D4 100%)",
+                            color="white",
+                            border="none",
+                            border_radius="10px",
+                            cursor="pointer",
+                            transition="all 0.3s ease",
+                            is_disabled=NewsletterState.is_subscribing,
+                            _hover={
+                                "box_shadow": "0 8px 20px rgba(46, 111, 242, 0.3)",
+                                "transform": "translateY(-2px)",
+                            },
+                            on_click=NewsletterState.subscribe_newsletter,
+                        ),
+                        spacing="3",
+                        width="100%",
+                    ),
+                    
+                 
+                    rx.cond(
+                        NewsletterState.subscribe_message != "",
+                        rx.box(
+                            rx.text(
+                                NewsletterState.subscribe_message,
+                                font_size="13px",
+                                color=rx.cond(
+                                    NewsletterState.subscribe_status == "success",
+                                    "#10B981",
+                                    "#EF4444"
+                                ),
+                                font_weight="500",
+                            ),
+                            padding="12px 16px",
+                            border_radius="8px",
+                            background=rx.cond(
+                                NewsletterState.subscribe_status == "success",
+                                "#10B98120",
+                                "#EF444420"
+                            ),
+                            border=rx.cond(
+                                NewsletterState.subscribe_status == "success",
+                                "1px solid #10B98140",
+                                "1px solid #EF444440"
+                            ),
+                            width="100%",
+                        ),
+                        rx.fragment(),
+                    ),
+                    
+                    spacing="4",
+                    width="100%",
+                    padding="40px 0",
+                    border_bottom="1px solid #374151",
+                ),
+                
+              
+                rx.grid(
+                  
+                    rx.vstack(
+                        rx.text(
+                            "Company",
+                            font_size="14px",
+                            font_weight="700",
+                            color="white",
+                            text_transform="uppercase",
+                            letter_spacing="1px",
+                            margin_bottom="12px",
+                        ),
+                        rx.link(rx.text("About Us", font_size="14px", color="#929FA7", _hover={"color": "#2E6FF2"}, transition="all 0.2s ease"), href="#"),
+                        rx.link(rx.text("Our Team", font_size="14px", color="#929FA7", _hover={"color": "#2E6FF2"}, transition="all 0.2s ease"), href="#"),
+                        rx.link(rx.text("Careers", font_size="14px", color="#929FA7", _hover={"color": "#2E6FF2"}, transition="all 0.2s ease"), href="#"),
+                        rx.link(rx.text("Blog", font_size="14px", color="#929FA7", _hover={"color": "#2E6FF2"}, transition="all 0.2s ease"), href="#"),
+                        spacing="3",
+                    ),
+                    
+                   
+                    rx.vstack(
+                        rx.text(
+                            "Support",
+                            font_size="14px",
+                            font_weight="700",
+                            color="white",
+                            text_transform="uppercase",
+                            letter_spacing="1px",
+                            margin_bottom="12px",
+                        ),
+                        rx.link(rx.text("Contact Us", font_size="14px", color="#929FA7", _hover={"color": "#2E6FF2"}, transition="all 0.2s ease"), href="#"),
+                        rx.link(rx.text("FAQs", font_size="14px", color="#929FA7", _hover={"color": "#2E6FF2"}, transition="all 0.2s ease"), href="#"),
+                        rx.link(rx.text("Shipping Info", font_size="14px", color="#929FA7", _hover={"color": "#2E6FF2"}, transition="all 0.2s ease"), href="#"),
+                        rx.link(rx.text("Returns", font_size="14px", color="#929FA7", _hover={"color": "#2E6FF2"}, transition="all 0.2s ease"), href="#"),
+                        spacing="3",
+                    ),
+                    
+                  
+                    rx.vstack(
+                        rx.text(
+                            "Legal",
+                            font_size="14px",
+                            font_weight="700",
+                            color="white",
+                            text_transform="uppercase",
+                            letter_spacing="1px",
+                            margin_bottom="12px",
+                        ),
+                        rx.link(rx.text("Privacy Policy", font_size="14px", color="#929FA7", _hover={"color": "#2E6FF2"}, transition="all 0.2s ease"), href="#"),
+                        rx.link(rx.text("Terms of Service", font_size="14px", color="#929FA7", _hover={"color": "#2E6FF2"}, transition="all 0.2s ease"), href="#"),
+                        rx.link(rx.text("Cookie Policy", font_size="14px", color="#929FA7", _hover={"color": "#2E6FF2"}, transition="all 0.2s ease"), href="#"),
+                        rx.link(rx.text("Sitemap", font_size="14px", color="#929FA7", _hover={"color": "#2E6FF2"}, transition="all 0.2s ease"), href="#"),
+                        spacing="3",
+                    ),
+                    
+                    
+                    rx.vstack(
+                        rx.text(
+                            "Contact",
+                            font_size="14px",
+                            font_weight="700",
+                            color="white",
+                            text_transform="uppercase",
+                            letter_spacing="1px",
+                            margin_bottom="12px",
+                        ),
+                        rx.hstack(
+                            rx.icon("phone", size=16, color="#2E6FF2"),
+                            rx.link(rx.text("+1 (555) 123-4567", font_size="14px", color="#929FA7", _hover={"color": "#2E6FF2"}, transition="all 0.2s ease"), href="tel:+15551234567"),
+                            spacing="2",
+                            align_items="center",
+                        ),
+                        rx.hstack(
+                            rx.icon("mail", size=16, color="#2E6FF2"),
+                            rx.link(rx.text("support@digitalhome.com", font_size="14px", color="#929FA7", _hover={"color": "#2E6FF2"}, transition="all 0.2s ease"), href="mailto:support@digitalhome.com"),
+                            spacing="2",
+                            align_items="center",
+                        ),
+                        rx.hstack(
+                            rx.icon("map-pin", size=16, color="#2E6FF2"),
+                            rx.text("Bangkok, Thailand", font_size="14px", color="#929FA7"),
+                            spacing="2",
+                            align_items="center",
+                        ),
+                        spacing="3",
+                    ),
+                    
+                    columns="4",
+                    spacing="8",
+                    width="100%",
+                    padding="40px 0",
+                    border_bottom="1px solid #374151",
+                ),
+                
+            
+                rx.hstack(
+                    rx.text(
+                        "© 2024 Digital Home Platform. All rights reserved.",
+                        font_size="12px",
+                        color="#6B7280",
+                    ),
+                    rx.spacer(),
+                    rx.hstack(
+                        rx.text("Made with ", font_size="12px", color="#6B7280"),
+                        rx.text("❤️", font_size="14px"),
+                        rx.text(" in Bangkok", font_size="12px", color="#6B7280"),
+                        spacing="1",
+                        align_items="center",
+                    ),
+                    width="100%",
+                    align_items="center",
+                    padding="24px 0",
+                ),
+                
+                spacing="0",
+                width="100%",
+            ),
+            
+            spacing="0",
+            width="100%",
+        ),
+     
+        subscription_modal(),
+        background="linear-gradient(135deg, #22282C 0%, #2A3037 100%)",
+        padding="60px 50px",
+        width="100%",
+    )
+
 @rx.page(route="/home", on_load=CategoryState.load_categories)
 def home_page() -> rx.Component:
     return template(home_content)
-
 
 button_style = {
     "background_color": "#22282C",
@@ -720,3 +1301,96 @@ load_button = {
        
     } 
 }
+
+
+######################### DON'T REMOVE THIS #########################################
+'''rx.vstack(
+        
+        rx.hstack(
+        
+            rx.vstack(
+                hover_photo("Bedroom", "/images/bedroom.jpg", "/rooms/bedroom"),
+        
+            ),
+
+            rx.vstack(
+                hover_photo("Office Room", "/images/officeroom.jpg", "/rooms/officeroom"),
+        
+            ),
+            
+            rx.vstack(
+                hover_photo("Living Room", "/images/livingroom.jpg", "/rooms/livingroom"),
+                
+            ),
+            rx.vstack(
+                hover_photo("Kitchen", "/images/kitchenroom.jpg", "/rooms/kitchen"),
+        
+            ),
+          
+        
+            ),
+              rx.center(
+                 rx.button(
+                "Load More Rooms", style = load_button
+            ),
+           
+            width="100%",
+            justify="between",
+            margin_bottom="50px",
+            align_item = "center"
+            
+        ),
+   
+    ),
+   '''
+#testimonials_session
+'''rx.hstack(
+        rx.button("←", bg="#212529", color="white", border_radius="50%",width="40px",height="40px"),
+        rx.hstack(
+            *testimonials_section(),   
+            align="center",
+            justify="center"
+        ),
+        rx.button("→", bg="#212529", color="white", border_radius="50%",width="40px",height="40px"),
+        width="100%",
+        justify="center",
+        align = "center",
+        padding="40px",
+    ),'''
+
+#function
+
+def testimonials_section():
+    card_style = {
+        "border_radius": "10px",
+        "padding": "20px",
+        "width": "300px",
+        "min_height": "200px",
+        "text_align": "center",
+        "box_shadow": "0 4px 8px rgba(0, 0, 0, 0.1)"
+    }
+
+    reviews = [
+        {"name": "Cyntra", "rating": 5, "text": "I absolutely love my new sofa! The color matches perfectly with my living room, and it's even more comfortable than I expected. Delivery was quick and hassle-free", "bg": "#e0e5e8","color":"black"},
+        {"name": "Pop", "rating": 5, "text": "I absolutely love my new sofa! The color matches perfectly with my living room, and it's even more comfortable than I expected. Delivery was quick and hassle-free", "bg": "#212529", "color": "white"},
+        {"name": "Mai", "rating": 5, "text": "I absolutely love my new sofa! The color matches perfectly with my living room, and it's even more comfortable than I expected. Delivery was quick and hassle-free", "bg": "#e0e5e8","color":"black"},
+    ]
+
+    '''review_cards = []
+    for review in reviews:
+        review_cards.append(
+            rx.vstack(
+                rx.hstack(
+                    *[rx.text("★", color="#FFA500") for _ in range(review["rating"])],
+                    spacing="2"
+                   
+                ),
+                rx.text(review["name"], font_weight="bold", font_size="1.1em",color=review.get("color", "black")),
+                rx.text(review["text"], font_size="0.9em", color=review.get("color", "black")),
+                bg=review["bg"],
+                **card_style
+            ),
+            
+        )
+
+    return review_cards'''

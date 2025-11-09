@@ -3,6 +3,8 @@ from typing import List, Optional
 from ..template import template
 from ..state import AuthState
 from ..config import API_BASE_URL
+from ..pages.orders import OrdersState
+from ..components.navbar import NavCartState
 
 
 class CreditCard(rx.Base):
@@ -62,6 +64,11 @@ class CartState(rx.State):
     credit_cards: list[CreditCard] = []
     bank_accounts: list[BankAccount] = []
     is_loading_payments: bool = False
+
+    async def update_navbar_cart_quantity(self, quantity: int):
+        """Update the navbar cart quantity"""
+        nav_state = await self.get_state(NavCartState)
+        nav_state.cart_quantity = quantity
 
 
     def select_payment(self, payment_id: str):
@@ -162,19 +169,17 @@ class CartState(rx.State):
                 response = await client.get(
                     f"{API_BASE_URL}/carts/view/",
                     cookies=cookies_dict,
-                    timeout=10.0  # Add timeout
+                    timeout=10.0  # 
                 )
                 
                 if response.status_code == 200:
                     data = response.json()
-                    print(f"📦 Cart data: {data}")
                     
                     self.cart_id = data.get('cart_id')
-                    print(f"🛒 Cart ID: {self.cart_id}")
                     
                     items = []
                     for item in data.get('items', []):
-                        print(f"\n🔍 Processing item: {item}")
+                     
                         product_id = item.get('product_id')
                         
                         try:
@@ -185,17 +190,12 @@ class CartState(rx.State):
                                 timeout=10.0
                             )
                             
-                            print(f"📡 Product response status: {product_response.status_code}")
-                            print(f"📡 Product response headers: {product_response.headers}")
                             
                             if product_response.status_code == 200:
                                 response_data = product_response.json()
-                                print(f"✅ Full response for {product_id}: {response_data}")
                                 
                                 
-                                product_data = response_data.get('product', {})
-                                print(f"✅ Product data: {product_data}")
-                                
+                                product_data = response_data.get('product', {})   
                               
                                 item_type = item.get('type', 'physical')
                                 
@@ -204,23 +204,12 @@ class CartState(rx.State):
                                 else:
                                     price_value = product_data.get('physical_price', 0)
                                 
-                                
                                 try:
                                     price = int(float(price_value))
                                 except (ValueError, TypeError):
                                     print(f"⚠️ Could not convert price '{price_value}' to int, using 0")
                                     price = 0
                                 
-                                print(f"💰 Price for {item_type}: {price}")
-                                
-                           
-                                image_data = product_data.get('image', '')
-                                if image_data and not image_data.startswith(('http://', 'https://', 'data:', '/')):
-                                    
-                                    image_url = f"data:image/avif;base64,{image_data}"
-                                else:
-                                    
-                                    image_url = image_data or '/placeholder.png'
                                 
                                 cart_item = CartItem(
                                     id=item.get('id'),
@@ -229,19 +218,18 @@ class CartState(rx.State):
                                     price=price,
                                     quantity=item.get('quantity', 1),
                                     colors=["#C0C0C0", "#F5F5DC", "#D2B48C"],
-                                    image=image_url,
+                                    image=f"data:image/png;base64,{product_data.get('image')}",
                                     item_type=item_type
                                 )
+                                
                                 items.append(cart_item)
-                                print(f"✅ Added cart item: {cart_item}")
+                                
                                 
                             else:
                                
-                                print(f"❌ Failed to fetch product {product_id}")
-                                print(f"   Status: {product_response.status_code}")
                                 try:
                                     error_data = product_response.json()
-                                    print(f"   Error data: {error_data}")
+                                   
                                 except:
                                     print(f"   Response text: {product_response.text}")
                                 
@@ -291,7 +279,7 @@ class CartState(rx.State):
                             items.append(cart_item)
                     
                     self.cart_items = items
-                    print(f"✅ Total items loaded: {len(items)}")
+                    await self.update_navbar_cart_quantity(len(items))
                     
                 elif response.status_code == 404:
                     self.cart_items = []
@@ -335,6 +323,7 @@ class CartState(rx.State):
                     # Remove item from local state
                     self.cart_items = [item for item in self.cart_items if item.id != item_id]
                     rx.toast.success("Item removed from cart")
+                    await self.update_navbar_cart_quantity(len(self.cart_items))
                 elif response.status_code == 404:
                     rx.toast.error("Item not found in cart")
                 else:
@@ -366,6 +355,7 @@ class CartState(rx.State):
                 
                     self.cart_items = []
                     rx.toast.success("Cart cleared successfully")
+                    await self.update_navbar_cart_quantity(0)
                 elif response.status_code == 404:
                     rx.toast.error("Cart not found")
                 else:
@@ -418,7 +408,7 @@ class CartState(rx.State):
                     )
                     for card in cards_data
                 ]
-                print(f"Loaded {len(self.credit_cards)} credit cards")
+               
             else:
                 print(f"Failed to load credit cards: {res.status_code}")
                 self.credit_cards = []
@@ -457,7 +447,7 @@ class CartState(rx.State):
                     )
                     for account in accounts_data
                 ]
-                print(f"Loaded {len(self.bank_accounts)} bank accounts")
+              
             else:
                 print(f"Failed to load bank accounts: {res.status_code}")
                 self.bank_accounts = []
@@ -530,11 +520,12 @@ class CartState(rx.State):
                 
                 if response.status_code == 201:
                     data = response.json()
-                    order_id = data.get('order_id')
                     rx.toast.success("Order created successfully!")
-                    print("order successfully added,", order_id)
-                    # Redirect to orders list page
+                    orders_state = await self.get_state(OrdersState)
+                    await orders_state.load_orders()
                     return rx.redirect("/orders")
+
+                    
                 else:
                     error = response.json().get('error', 'Failed to place order')
                     rx.toast.error(f"Error: {error}")
@@ -547,10 +538,7 @@ def cart_item(item: CartItem) -> rx.Component:
     print(f"🎨 Rendering cart item with image: {item.image}") 
     return rx.box(
         rx.hstack(
-          
-            rx.checkbox(size="2"),
             
-       
             rx.box(
                 rx.image(
                     src=item.image,
@@ -590,7 +578,7 @@ def cart_item(item: CartItem) -> rx.Component:
                     spacing="2",
                 ),
                 rx.text(
-                    f"Price: ${item.price} / pre item",
+                    f"Price: ${item.price} / per item",
                     color="#22282c",
                     font_size="14px",
                 ),
@@ -601,6 +589,7 @@ def cart_item(item: CartItem) -> rx.Component:
                         variant="outline",
                         size="1",
                         border_radius="md",
+                        cursor="pointer"
                     ),
                     rx.text(item.quantity, font_weight="600",color="#22282c", min_width="30px", text_align="center"),
                     rx.button(
@@ -609,6 +598,7 @@ def cart_item(item: CartItem) -> rx.Component:
                         variant="outline",
                         size="1",
                         border_radius="md",
+                        cursor = "pointer",
                     ),
                     spacing="2",
                 ),
@@ -624,6 +614,7 @@ def cart_item(item: CartItem) -> rx.Component:
                     on_click=lambda: CartState.remove_item(item.id),
                     variant="ghost",
                     color_scheme="red",
+                    cursor = "pointer"
                 ),
                 rx.text(
                     f"$ {item.price * item.quantity}",
@@ -1341,10 +1332,9 @@ def cart_content() -> rx.Component:
             rx.heading(
                 "YOUR CART",
                 text_align="center",
-                margin_bottom="30px",
                 font_size="32px",
                 color="#22282c",
-                font_family="Poppins"
+                font_family="Racing Sans One"
             ),
             
             rx.box(

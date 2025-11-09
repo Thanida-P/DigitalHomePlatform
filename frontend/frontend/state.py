@@ -1,8 +1,7 @@
 import reflex as rx
 import httpx
 import os
-from typing import Optional
-from .rooms_data import rooms_data
+from typing import Optional, List, Dict
 from .config import API_BASE_URL
 
 SCENE_CREATOR_URL = os.getenv("SCENE_CREATOR_URL", "http://localhost:5173")
@@ -34,7 +33,6 @@ class AuthState(rx.State):
                     self.is_admin = data.get("is_admin", False)
                     self.is_staff = data.get("is_staff", False)
                     
-                    print(f"✅ Auth check: logged_in={self.is_logged_in}, username={self.username}")
                     
                     if not self.is_logged_in:
                         self.session_cookies = {}
@@ -65,15 +63,12 @@ class AuthState(rx.State):
                     # 👈 SAVE ALL COOKIES FROM LOGIN RESPONSE
                     self.session_cookies = dict(response.cookies)
                     
-                    print(f"🍪 Saved cookies: {list(self.session_cookies.keys())}")
-                    
                     # Update auth state 
                     self.is_logged_in = True
                     self.username = data.get("username", identifier)
                     self.is_admin = data.get("is_admin", False)
                     self.is_staff = data.get("is_staff", False)
                     
-                    print(f"✅ Login successful: {self.username}")
 
                     if self.is_admin:
                         return rx.redirect("/admin_dashboard")
@@ -99,6 +94,7 @@ class AuthState(rx.State):
                     cookies=self.session_cookies,  
                     timeout=5.0
                 )
+
         except Exception as e:
             print(f"❌ Logout failed: {e}")
         
@@ -107,8 +103,7 @@ class AuthState(rx.State):
         self.is_admin = False
         self.is_staff = False
         self.session_cookies = {}
-        
-        print("✅ Logged out, cookies cleared")
+    
         
         return rx.redirect("/")
     
@@ -142,7 +137,7 @@ class AuthState(rx.State):
                 if response.status_code == 200:
                     data = response.json()
                     token = data.get("token")
-                    print(f"🎟️ Got login token for user: {self.username}")
+                  
                     return token
                 else:
                     print(f"❌ Failed to get token: {response.status_code}")
@@ -162,8 +157,6 @@ class AuthState(rx.State):
         
         # Build Scene Creator URL with token
         self.scene_creator_url = f"{SCENE_CREATOR_URL}/#/login?token={token}"
-        
-        print(f"🚀 Opening Scene Creator: {self.scene_creator_url}")
 
         return rx.call_script(f"window.open('{self.scene_creator_url}', '_blank')")
         
@@ -211,17 +204,7 @@ class ModelState(rx.State):
         self.model_x = -2.0
         self.model_y = -3.0
         self.model_z = 4.0
-        self.model_rotation_y = 0.0
-    
-   
-
-class RoomSceneState(rx.State):
-    selected_room_model: str = ""  
-
-    def select_room(self, room_url: str):
-        self.selected_room_model = room_url
-        print(f"🏠 Room changed to: {room_url}")
-
+        self.model_rotation_y = 0.0 
 
 class ModalState(rx.State):
     demo_modal_open: bool = False
@@ -246,7 +229,6 @@ class DynamicState(rx.State):
     is_loading: bool = False
     current_room: str = ""
     
-    # Category images mapping
     category_images = {
         "bedroom": "/images/bedroom.jpg",
         "living-room": "/images/livingroom.jpg",
@@ -255,7 +237,7 @@ class DynamicState(rx.State):
     }
     
     async def on_load(self):
-  
+       
         self.is_loading = True
         
         self.current_room = self.router.page.params.get("room", "")
@@ -264,34 +246,31 @@ class DynamicState(rx.State):
         self.room_title = display_name
         
         try:
-            API_BASE_URL = "http://localhost:8001"
-            
             async with httpx.AsyncClient() as client:
-                # Use the display name for the API call
-                response = await client.get(
-                    f"{API_BASE_URL}/products/",
-                    params={"category": display_name}
+                response = await client.post(
+                    f"{API_BASE_URL}/products/list/",
+                    data={"category": display_name}  
                 )
                 
                 if response.status_code == 200:
                     data = response.json()
                     self.room_products = data.get("products", [])
-                    print(f"✅ Fetched {len(self.room_products)} products for category: {display_name}")
+        
                 else:
-                    print(f"❌ Failed to fetch products: {response.status_code}")
+                    
                     self.room_products = []
-                
-                # Set room image based on category
+               
                 self.room_image = self.category_images.get(
                     self.current_room, 
                     "/images/default-room.jpg"
                 )
                     
         except Exception as e:
-            print(f"❌ Error loading room data: {e}")
+          
             self.room_products = []
         finally:
             self.is_loading = False
+    
 
 class ProfileState(rx.State):
     selected_menu: str = "personal_info"  

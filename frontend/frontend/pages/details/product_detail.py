@@ -2,13 +2,14 @@ import reflex as rx
 from ...template import template 
 from reflex.components.component import NoSSRComponent 
 from typing import Any, Dict, List 
-from ...state import ModelState, RoomSceneState, ModalState
+from ...state import ModelState, ModalState
 from ...config import API_BASE_URL
 from ...state import AuthState
 import urllib.parse
 import httpx
 import os
 import traceback
+from ...pages.shop import ShopState
 
 class ThreeFiberCanvas(NoSSRComponent):
     library = "@react-three/fiber" 
@@ -147,6 +148,8 @@ class CameraControls(rx.Component):
             }
             """
         ]
+    
+
 
 class ProductDetailState(rx.State):
     model_file: bytes = ""
@@ -163,13 +166,14 @@ class ProductDetailState(rx.State):
 
     is_loading: bool = False
     has_loaded: bool = False
+    selected_room: str = ""
+    selected_room_index: int = 0
 
     async def on_load(self):
         self.is_loading = True
 
         self.product_id = self.router.page.params.get("product_Id", "")
 
-        print(f"🔍 Product ID from URL: {self.product_id}")  
         
         if self.product_id:
             await self.fetch_product_data(self.product_id)
@@ -185,17 +189,14 @@ class ProductDetailState(rx.State):
         try:
          
             url = f"{API_BASE_URL}/products/get_product_detail/{product_id}/"
-            print(f"📡 Fetching from: {url}")  
             
             async with httpx.AsyncClient() as client:
                 response = await client.get(url, cookies=cookies_dict)
             
-            print(f"📊 Response status: {response.status_code}")  
             
             if response.status_code == 200:
                 data = response.json()
                 self.product_data = data.get('product', {})
-                print(f"✅ Fetched product: {self.product_data.get('name', 'N/A')}")
 
                 model_id = self.product_data.get('model_id')
                 if model_id:
@@ -283,19 +284,38 @@ class ProductDetailState(rx.State):
                         print(f"⚠️ Error fetching scene {scene_id}: {inner_e}")
                         traceback.print_exc()
                             
-                # Set the first scene as selected if available
-                if self.display_scene_urls:
-                    RoomSceneState.selected_room_model = self.display_scene_urls[0]
+            
+                 # ✅ FIXED: Check if list is not empty AND index is valid
+                if self.display_scene_urls and len(self.display_scene_urls) > 0:
+                    # Always start with first room (index 0)
+                    self.selected_room = self.display_scene_urls[0]
                 else:
-                    RoomSceneState.selected_room_model = ""
+                    self.selected_room = ""
                 
                 self.display_scenes_loaded = True
-                print(f"✅ Total scenes loaded: {len(self.display_scene_urls)}")
+              
 
         except Exception as e:
             print(f"❌ Error fetching display scenes: {e}")
             traceback.print_exc()
             self.display_scene_urls = []
+
+    async def set_scene_up(self):
+   
+        if ((len(self.display_scene_urls) - 1) == self.selected_room_index):
+                print("up")
+                return
+        else:
+            self.selected_room_index += 1
+        self.selected_room = self.display_scene_urls[self.selected_room_index]
+
+    async def set_scene_down(self):
+        # Check if we're already at the first room
+        if self.selected_room_index <= 0:
+            print("down")
+            return
+        self.selected_room_index -= 1
+        self.selected_room = self.display_scene_urls[self.selected_room_index]
 
 
 def model_detail_modal() -> rx.Component:
@@ -406,7 +426,6 @@ def model_detail_modal() -> rx.Component:
                             rx.text("$1299", font_size="18px", color="#22282c", font_weight="bold"),
                             rx.divider(),
                             rx.button(rx.icon("shopping-cart"), "Add", style=cart_button),
-                            rx.button("Buy Now", bg="black", color="white"),
                             width="100%",
                         ),
                             rx.hstack(
@@ -414,7 +433,6 @@ def model_detail_modal() -> rx.Component:
                                 rx.text("$99", font_size="18px", color="#22282c", font_weight="bold"),
                                 rx.divider(),
                                 rx.button(rx.icon("zap"), "Add", style=cart_button),
-                                rx.button("Buy Now", bg="black", color="white"),
                                 width="100%",
                                 margin_bottom="30px"
                             ),
@@ -470,7 +488,7 @@ def simple_3d_viewer() -> rx.Component:
         ThreeFiberCanvas.create(
             SceneWithLighting.create(
                 ModelViewer3D.create(
-                    url=ProductDetailState.display_scene_urls[0],
+                    url=ProductDetailState.selected_room,
                     scale=3.0,
                     position=[0,0,0]
                 ),
@@ -495,14 +513,17 @@ def simple_3d_viewer() -> rx.Component:
                     rx.icon("minus", size=16),
                     on_click=ModelState.decrease_scale,
                     size="1",
-                    variant="soft"
+                    variant="soft",
+                    cursor = "pointer"
+    
                 ),
                 rx.text(f"{ModelState.model_scale:.1f}", font_size="12px", color="white"),
                 rx.button(
                     rx.icon("plus", size=16),
                     on_click=ModelState.increase_scale,
                     size="1",
-                    variant="soft"
+                    variant="soft",
+                    cursor = "pointer"
                 ),
                 spacing="2"
             ),
@@ -513,13 +534,15 @@ def simple_3d_viewer() -> rx.Component:
                     rx.icon("arrow-left", size=16),
                     on_click=ModelState.move_left,
                     size="1",
-                    variant="soft"
+                    variant="soft",
+                    cursor = "pointer"
                 ),
                 rx.button(
                     rx.icon("arrow-right", size=16),
                     on_click=ModelState.move_right,
                     size="1",
-                    variant="soft"
+                    variant="soft",
+                    cursor = "pointer"
                 ),
                 spacing="2"
             ),
@@ -530,13 +553,15 @@ def simple_3d_viewer() -> rx.Component:
                     rx.icon("arrow-up", size=16),
                     on_click=ModelState.move_up,
                     size="1",
-                    variant="soft"
+                    variant="soft",
+                    cursor = "pointer"
                 ),
                 rx.button(
                     rx.icon("arrow-down", size=16),
                     on_click=ModelState.move_down,
                     size="1",
-                    variant="soft"
+                    variant="soft",
+                    cursor = "pointer"
                 ),
                 spacing="2"
             ),
@@ -547,13 +572,15 @@ def simple_3d_viewer() -> rx.Component:
                     rx.icon("move-up", size=16),
                     on_click=ModelState.move_forward,
                     size="1",
-                    variant="soft"
+                    variant="soft",
+                    cursor = "pointer"
                 ),
                 rx.button(
                     rx.icon("move-down", size=16),
                     on_click=ModelState.move_back,
                     size="1",
-                    variant="soft"
+                    variant="soft",
+                    cursor = "pointer"
                 ),
                 spacing="2"
             ),
@@ -564,13 +591,15 @@ def simple_3d_viewer() -> rx.Component:
                     rx.icon("rotate-ccw", size=16),
                     on_click=ModelState.rotate_left,
                     size="1",
-                    variant="soft"
+                    variant="soft",
+                    cursor = "pointer"
                 ),
                 rx.button(
                     rx.icon("rotate-cw", size=16),
                     on_click=ModelState.rotate_right,
                     size="1",
-                    variant="soft"
+                    variant="soft",
+                    cursor = "pointer"
                 ),
                 spacing="2"
             ),
@@ -580,7 +609,8 @@ def simple_3d_viewer() -> rx.Component:
                 on_click=ModelState.reset_position,
                 size="1",
                 variant="outline",
-                color_scheme="gray"
+                color_scheme="gray",
+                cursor = "pointer"
             ),
             
             position="absolute",
@@ -596,62 +626,61 @@ def simple_3d_viewer() -> rx.Component:
         rx.button(
             "View Detail",
             size="2", 
-            on_click=lambda: go_to_demo("/models/gaming_chair_pink.glb"),
+            #on_click=ModalState.open_demo_modal,
             position="absolute",
             top="20px",
             right="10px",
             z_index="10",
             color_scheme="teal",
             cursor = "pointer",
-            font_weight= "bold"
+            font_weight= "bold",
         ),
         
         style={
             "position": "relative", 
-            "width": "100%", 
+            "width": "80%", 
             "height": "600px", 
             "margin": "auto",
         
         }, 
     )
 
-
-def vertical_3d_scenes(model_urls, scene_height: int = 200) -> rx.Component:
+def vertical_3d_scenes(model_urls, scene_height: int = 250) -> rx.Component:
     """Render vertical list of 3D scene thumbnails"""
-
     return rx.cond(
         (model_urls == []) | (model_urls == None),
-        # Loading placeholder
         rx.box(
             rx.text("Loading scenes...", font_size="12px", color="gray"),
             padding="10px"
         ),
-        # Otherwise show list of scenes
         rx.vstack(
             rx.foreach(
                 model_urls,
                 lambda url: rx.box(
-                    ThreeFiberCanvas.create(
-                        SceneWithLighting.create(
-                            ModelViewer3D.create(
-                                url=url,
-                                scale=3.0,
-                                position=[0, 0, 0]
+                    rx.box(
+                        ThreeFiberCanvas.create(
+                            SceneWithLighting.create(
+                                ModelViewer3D.create(
+                                    url=url,
+                                    scale=3.0,
+                                    position=[0, 0, 0]
+                                ),
+                                CameraControls.create()
                             ),
-                            CameraControls.create()
+                            camera={"position": [3, 3, 3], "fov": 50},
+                            style={
+                                "background": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                "border_radius": "10px",
+                                "height": f"{scene_height}px"
+                            },
                         ),
-                        camera={"position": [3, 3, 3], "fov": 50},
-                        style={
-                            "background": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                            "border_radius": "10px",
-                            "height": f"{scene_height}px"
-                        }
+                        width="100%",
+                        height="100%",
                     ),
-                    on_click=RoomSceneState.set_selected_room_model(url),
-                    cursor="pointer",
+                    position="relative",
                     border_radius="12px",
                     border=rx.cond(
-                        RoomSceneState.selected_room_model == url,
+                        ProductDetailState.selected_room == url,
                         "3px solid teal",
                         "3px solid transparent"
                     ),
@@ -660,16 +689,58 @@ def vertical_3d_scenes(model_urls, scene_height: int = 200) -> rx.Component:
                         "border": "3px solid teal"
                     },
                     margin_bottom="10px",
-                    width="150px"
+                    width="200px",
+                    height=f"{scene_height}px"
                 )
+            ),
+            rx.hstack(
+                rx.button(
+                    rx.icon("arrow-down", size=18),
+                    on_click=ProductDetailState.set_scene_up,
+                    width="36px",
+                    height="36px",
+                    padding="0",
+                    display="flex",
+                    align_items="center",
+                    justify_content="center",
+                    border_radius="6px",
+                    background_color="#4A5568",
+                    color="white",
+                    border="1px solid #5A6578",
+                    _hover={
+                        "background_color": "#5A6578",
+                        "cursor": "pointer",
+                        "transform": "scale(1.05)",
+                        "transition": "all 0.2s"
+                    },
+                ),
+                rx.button(
+                    rx.icon("arrow-up", size=18),
+                    on_click=ProductDetailState.set_scene_down,
+                    width="36px",
+                    height="36px",
+                    padding="0",
+                    display="flex",
+                    align_items="center",
+                    justify_content="center",
+                    border_radius="6px",
+                    background_color="#4A5568",
+                    color="white",
+                    border="1px solid #5A6578",
+                    _hover={
+                        "background_color": "#5A6578",
+                        "cursor": "pointer",
+                        "transform": "scale(1.05)",
+                        "transition": "all 0.2s"
+                    },
+                ),
+                spacing="2",
             ),
             spacing="2",
             align="start"
         )
     )
-
-
-@rx.event 
+ 
 def go_to_demo(model: str): 
     return ModalState.open_demo_modal(model)
 
@@ -680,14 +751,14 @@ def product_detail_content() -> rx.Component:
             rx.box(
                 rx.hstack(
                     rx.box(
-                        vertical_3d_scenes(ProductDetailState.display_scene_urls, scene_height=100),
+                        vertical_3d_scenes(ProductDetailState.display_scene_urls, scene_height=200),
                     ),
                     simple_3d_viewer(),
                     align="start",
-                    width="100%"
+                 
                 ),
-                width="100%",
-                padding="20px"
+                width="70%",
+                padding="20px 5px"
             ),
 
             rx.box(
@@ -697,20 +768,20 @@ def product_detail_content() -> rx.Component:
                     rx.text("Colors", font_size="16px", margin_top="10px", color="#22282c", font_weight="bold"),
                     rx.hstack(
                             rx.hstack(
-                                rx.box(style={"width": "30px", "height": "30px", "border_radius": "50%", "background_color": "beige"}),
-                                rx.text("Beige", font_size="14px", color="gray"),
+                                rx.box(style={"width": "30px", "height": "30px", "border_radius": "50%", "background_color": "black"}),
+                                rx.text("Black", font_size="14px", color="gray"),
                                 spacing="2",
                                 align_items="center"
                             ),
                             rx.hstack(
-                                rx.box(style={"width": "30px", "height": "30px", "border_radius": "50%", "background_color": "wooden"}),
-                                rx.text("Dark Blue", font_size="14px", color="gray"),
+                                rx.box(style={"width": "30px", "height": "30px", "border_radius": "50%", "background_color": "pink"}),
+                                rx.text("Pink", font_size="14px", color="gray"),
                                 spacing="2",
                                 align_items="center"
                             ),
                             rx.hstack(
-                                rx.box(style={"width": "30px", "height": "30px", "border_radius": "50%", "background_color": "brown"}),
-                                rx.text("Brown", font_size="14px", color="gray"),
+                                rx.box(style={"width": "30px", "height": "30px", "border_radius": "50%", "background_color": "red"}),
+                                rx.text("Red", font_size="14px", color="gray"),
                                 spacing="2",
                                 align_items="center"
                             ),
@@ -722,27 +793,25 @@ def product_detail_content() -> rx.Component:
                         rx.text("Physical:", font_size="16px", color="#22282c"),
                         rx.text(f"${ProductDetailState.product_data.get('physical_price', '0')}", font_size="18px", color="#22282c", font_weight="bold"),
                         rx.divider(),
-                        rx.button(rx.icon("shopping-cart"), "Add", style=cart_button),
-                        rx.button("Buy Now", bg="black", color="white"),
+                        rx.button(rx.icon("shopping-cart",stroke_width=1), "Add", style=cart_button, on_click=ShopState.add_to_cart(ProductDetailState.product_data.get('id'),"physical",quantity=1), ),
                         width="100%",
                     ),
                     rx.hstack(
                         rx.text("Digital:", font_size="16px", color="#22282c"),
                         rx.text(f"${ProductDetailState.product_data.get('digital_price', '0')}", font_size="18px", color="#22282c", font_weight="bold"),
                         rx.divider(),
-                        rx.button(rx.icon("zap"), "Add", style=cart_button),
-                        rx.button("Buy Now", bg="black", color="white"),
+                        rx.button(rx.icon("zap",stroke_width=1), "Add", style=cart_button,on_click=ShopState.add_to_cart(ProductDetailState.product_data.get('id'),"digital",quantity=1),),
                         width="100%",
                     ),
 
-                    rx.button("Browse More Products", margin_top="20px", border="1px solid #929FA7", background_color="white", style=button_style, on_click=lambda: ProductDetailState.fetch_3d_model(3),
+                    rx.button("Browse More Products", margin_top="20px", on_click=rx.redirect("/shop"), border="1px solid #929FA7", background_color="white", style=button_style,
                      _hover={
                             "background_color": "#22282c",
                             "border": "1px solid #22282C",
                             "color": "white"
                             
                         },),
-                    rx.button("Preview in AR", bg="black", color="white", style=button_style,
+                    rx.button("Preview in VR/AR", bg="black", color="white", style=button_style,
                     _hover={
                             "background_color": "white",
                             "border": "1px solid #22282C",
@@ -750,7 +819,7 @@ def product_detail_content() -> rx.Component:
                           
                         },),
                 ),
-                width="40%",
+                width="35%",
                 padding="20px",
                 border="1px solid #ddd",
                 border_radius="12px",
@@ -789,7 +858,8 @@ button_style = {
 
 cart_button = {
     "color": "#22282C",
-    "border": "1px solid #929FA7",
+    "border": "1px solid #E5E7EB",
     "background_color": "white",
     "border_radius": "8px",
+    "cursor":"pointer", 
 }

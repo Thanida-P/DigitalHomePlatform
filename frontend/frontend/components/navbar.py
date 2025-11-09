@@ -4,12 +4,16 @@ import os
 from ..state import AuthState
 from ..config import API_BASE_URL
 
-
 class NavCartState(rx.State):
     total_itmes: int = 0
     total_quantity: int = 0
     is_loading = True
     cart_quantity: int = 0
+
+    @rx.var
+    def current_url(self) -> str:
+        return self.router.page.path
+
 
     async def load_cart_quantity(self):
         import httpx
@@ -33,11 +37,11 @@ class NavCartState(rx.State):
                     
                     self.cart_quantity = total_quantity
 
-                    print(f"🛒 Cart quantity: {total_quantity}")
+                 
                 
                 elif response.status_code == 404:
                     self.cart_quantity = 0
-                    print("Cart is empty.")
+                 
                 
                 else:
                     error = response.json().get('error', 'Failed to load cart quantity')
@@ -50,23 +54,33 @@ class NavCartState(rx.State):
         finally:
             self.is_loading = False
 
-    def increment_cart_quantity(self):
-        self.cart_quantity += 1
-
-    def decrement_cart_quantity(self, amount: int = 1):
-        self.cart_quantity = max(self.cart_quantity - amount, 0)
-
 
 def nav_link(label: str, href: str):
+    """Create a nav link with active state styling"""
     return rx.link(
         label,
         href=href,
         style={
             "font_family": "Lato, sans-serif",
             "font_size": "16px",
-            "color": "#22282C",
+            "color": rx.cond(
+                NavCartState.current_url == href,
+                "#22282c",  
+                "#22282C"   
+            ),
+            "font_weight": rx.cond(
+                NavCartState.current_url == href,
+                "mdedium",
+                "normal"
+            ),
             "display": "inline-block",
+            "padding_bottom": "2px",
             "text_decoration": "none",
+            "border_bottom": rx.cond(
+                NavCartState.current_url == href,
+                "1px solid #22282c",
+                "2px solid transparent"
+            ),
         },
     )
 
@@ -75,12 +89,22 @@ def navbar_page():
     return rx.hstack(
      
         rx.hstack(
-            nav_link("Digital Home", "/"),
+            rx.link(
+                "Digital Home",
+                href="/",
+                style={
+                    "font_family": "Racing Sans One",
+                    "font_size": "16px", 
+                    "font_weight": "bold",
+                    "font_style": " italic",
+                    "color": "#22282c",
+                    "text_decoration": "none",
+                },
+            ),
             nav_link("Shop", "/shop"),
-            # nav_link("My Home", "/my_home"),
             rx.cond(
                 AuthState.is_logged_in,
-                rx.button(
+                rx.link(
                     rx.hstack(
                         rx.text("My Home"),
                         spacing="2",
@@ -90,6 +114,8 @@ def navbar_page():
                         "color": "#22282C",
                         "font_family": "Lato, sans-serif",
                         "font_size": "16px",
+                        "align-item": "center",
+                        "text_decoration": "none",
                         "_hover": {
                             "cursor": "pointer",
                             "color": "#E0E6EA",
@@ -98,38 +124,40 @@ def navbar_page():
                     },
                     on_click=AuthState.open_scene_creator,
                 ),
-                rx.fragment(),  # HIDDEN if not logged in
+                rx.fragment(),  
             ),
-            # nav_link("About", "/about"),
+   
             spacing="6",
         ),
+
         
         rx.spacer(),
         
    
         rx.hstack(
-          
-            rx.input(
-                rx.input.slot(rx.icon("search"), color="#807E80"),
-                placeholder="Search...",
-                type="search",
-                size="2",
-                width="400px",
-                justify="end",
-                background_color="#E0E6EA",
-                border_radius="20px",
-                color="#22282C",
-            ),
-          
             rx.box(
                 rx.button(
                     rx.icon("shopping-cart"),
+                    cursor = "pointer",
                     aria_label="Cart",
                     variant="ghost",
-                    style=icon_style,
+                    style={
+                        "color": rx.cond(
+                            NavCartState.current_url == "/cart",
+                            "#299FCA",  
+                            "#22282C"  
+                        ),
+                        "width": "40px",
+                        "height": "40px",
+                        "_hover": {
+                                    "background_color": "white",
+                                    "varient": "ghost",
+                                    "color": "#299FCA"
+                                },
+                    },
                     on_click=rx.redirect("/cart"),
+                    
                 ),
-                # show red bubble only if there’s something in the cart
                 rx.cond(
                     NavCartState.cart_quantity > 0,
                     rx.box(
@@ -162,7 +190,7 @@ def navbar_page():
          
                 rx.menu.root(
                     rx.menu.trigger(
-                        rx.button(
+                        rx.link(
                             rx.hstack(
                                 rx.icon("user", size=20),
                                 rx.text(AuthState.username, weight="medium"),
@@ -170,9 +198,15 @@ def navbar_page():
                             ),
                             variant="ghost",
                             style={
-                                "color": "#22282C",
-                                "padding": "8px 16px",
+                               
+                                "color": rx.cond(
+                                    NavCartState.current_url == "/profile",
+                                    "#299FCA",
+                                    "#22282c",   
+                                ),
+                                "padding": "10px 5px",
                                 "border_radius": "8px",
+                                "text_decoration": "none",
                                 "_hover": {
                                     "background_color": "#F3F4F6",
                                 },
@@ -185,6 +219,7 @@ def navbar_page():
                                 rx.icon("user", size=16),
                                 rx.text("Profile"),
                                 spacing="2",
+                                
                             ),
                             on_click=rx.redirect("/profile"),
                         ),
@@ -206,6 +241,8 @@ def navbar_page():
                     color="white",
                     background_color="#22282C",
                     border_radius="8px",
+                    cursor = "pointer",
+                    text_decoration =  "none",
                     _hover={
                         "background_color": "#3A4248",
                     },
@@ -247,4 +284,31 @@ icon_style = {
     "color": "#22282C",
     "width": "40px",
     "height": "40px",
+
 }
+  
+'''rx.input(
+                rx.input.slot(rx.icon("search"), color="#807E80"),
+                placeholder="Search...",
+                type="search",
+                size="2",
+                width="400px",
+                justify="end",
+                background_color="#E0E6EA",
+                border_radius="20px",
+                color="#22282C",
+),'''
+          
+  
+'''rx.input(
+                rx.input.slot(rx.icon("search"), color="#807E80"),
+                placeholder="Search...",
+                type="search",
+                size="2",
+                width="400px",
+                justify="end",
+                background_color="#E0E6EA",
+                border_radius="20px",
+                color="#22282C",
+),'''
+          

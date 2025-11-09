@@ -7,23 +7,20 @@ import uuid
 import traceback
 
 class AdminDashboardState(rx.State):
-    # Product list
+  
     UPLOAD_DIR = "uploading_models"
 
     products: List[Dict] = []
     filtered_products: List[Dict] = []
     
-    # Search and filter
     search_query: str = ""
     selected_room: str = "all"
     selected_category: str = "all"
-    
-    # Add/Edit product form
+   
     show_add_modal: bool = False
     show_edit_modal: bool = False
     editing_product_id: str = ""
     
-    # Form fields
     product_name: str = ""
     description: str = ""
     physical_price: str = ""
@@ -32,28 +29,81 @@ class AdminDashboardState(rx.State):
     product_type: str = ""
     stock: str = ""
     
-    # File uploads - storing file paths/names
     product_image: str = ""
     texture_file: list[str] = []
     model_file: str = ""
     scene_file: list[str] = []
     
-    # Upload files (for handling the actual upload)
     uploaded_files: list[rx.UploadFile] = []
     
-    # Upload status
     upload_status: str = ""
     is_uploading: bool = False
     
-    # Availability options
     digital_available: bool = True
     physical_available: bool = True
     is_container: bool = False
-    
-    # Stats
+
     total_products: int = 0
     total_sold: int = 0
     total_revenue: float = 0.0
+    average_rating: float = 0.0
+
+    products: list[dict] = []
+    filtered_products: list[dict] = []
+    total_products: int = 0
+
+    async def logout(self):
+        """Logout the admin user"""
+        auth_state = await self.get_state(AuthState)
+        auth_state.is_logged_in = False
+        auth_state.session_cookies = {}
+        return rx.redirect("/login")
+
+    async def calculate_average_rating(self):
+        """Fetch all product reviews and calculate average rating"""
+        try:
+            timeout = httpx.Timeout(connect=30.0, read=120.0, write=120.0, pool=60.0)
+            auth_state = await self.get_state(AuthState)
+
+            all_ratings = []
+
+        
+            for product in self.products:
+                try:
+                    async with httpx.AsyncClient(timeout=timeout) as client:
+                        cookies_dict = auth_state.session_cookies or {}
+
+                        response = await client.get(
+                            f"{API_BASE_URL}/reviews/get_product_reviews/{product['id']}/",
+                            cookies=cookies_dict,
+                            timeout=timeout,
+                        )
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        reviews = data.get("reviews", [])
+                        
+                      
+                        for review in reviews:
+                            rating = review.get("rating", 0)
+                            if rating:
+                                all_ratings.append(rating)
+                except Exception as e:
+                   
+                    continue
+            
+           
+            if all_ratings:
+                self.average_rating = round(sum(all_ratings) / len(all_ratings), 1)
+                
+            else:
+                self.average_rating = 0.0
+               
+
+        except Exception as e:
+           
+            self.average_rating = 0.0
+
 
     async def handle_product_image_upload(self, files: List[rx.UploadFile]):
         """Handle product image upload"""
@@ -64,7 +114,6 @@ class AdminDashboardState(rx.State):
         upload_data = await file.read()
         filename = f"product_img_{uuid.uuid4().hex[:8]}_{file.name}"
         
-        # Save file locally (adjust path as needed)
         outfile = rx.get_upload_dir() / filename
         with outfile.open("wb") as f:
             f.write(upload_data)
@@ -129,11 +178,6 @@ class AdminDashboardState(rx.State):
     def toggle_is_container(self, value: bool):
         self.is_container = value
 
-    products: list[dict] = []
-    filtered_products: list[dict] = []
-    total_products: int = 0
-
-    
     
     async def load_products(self):
         try:
@@ -154,7 +198,6 @@ class AdminDashboardState(rx.State):
                 
 
             if response.status_code != 200:
-                print(f"❌ Backend error: {response.status_code} {response.text}")
                 return
 
             data = response.json()
@@ -173,7 +216,7 @@ class AdminDashboardState(rx.State):
                     "digital_price": p.get("digital_price", "0"),
                     "physical_price": p.get("physical_price", "0"),
                     
-                    # ✅ product image from base64
+            
                     "image": (
                         f"data:image/png;base64,{p['image']}"
                         if p.get("image")
@@ -181,10 +224,11 @@ class AdminDashboardState(rx.State):
                     ),
                 })
 
-            # ✅ update state
+    
             self.products = normalized
             self.filtered_products = normalized
             self.total_products = len(normalized)
+            await self.calculate_average_rating()
             self.apply_filters()
 
         except Exception as e:
@@ -195,18 +239,16 @@ class AdminDashboardState(rx.State):
         """Apply search and filters"""
         filtered = self.products
         
-        # Search filter
+       
         if self.search_query:
             filtered = [
                 p for p in filtered 
                 if self.search_query.lower() in p["title"].lower()
             ]
-        
-        # Room filter
+
         if self.selected_room != "all":
             filtered = [p for p in filtered if p["room"] == self.selected_room]
-        
-        # Category filter
+   
         if self.selected_category != "all":
             filtered = [p for p in filtered if p["category"] == self.selected_category]
         
@@ -224,7 +266,7 @@ class AdminDashboardState(rx.State):
         self.selected_category = value
         self.apply_filters()
     
-    # Modal controls
+
     def open_add_modal(self):
         self.show_add_modal = True
         self.clear_form()
@@ -244,13 +286,12 @@ class AdminDashboardState(rx.State):
         self.product_type = product.get("type", "")
         self.stock = str(product.get("stock", "0"))
         
-        # ✅ File fields (for edit)
+
         self.product_image = product.get("product_image", "")
         self.texture_file = product.get("texture_file", [])
         self.model_file = product.get("model_file", "")
         self.scene_file = product.get("scene_file", [])
 
-        # ✅ Toggle fields
         self.digital_available = product.get("digital_available", False)
         self.physical_available = product.get("physical_available", False)
         self.is_container = product.get("is_container", False)
@@ -278,7 +319,7 @@ class AdminDashboardState(rx.State):
         self.is_container = False
         self.upload_status = ""
     
-    # Form setters
+  
     def set_product_name(self, value: str):
         self.product_name = value
     
@@ -305,13 +346,12 @@ class AdminDashboardState(rx.State):
         self.upload_status = ""
         
         try:
-            # Validate required fields
+           
             if not self.product_name or not self.physical_price or not self.digital_price:
                 self.upload_status = "Please fill in all required fields"
                 self.is_uploading = False
                 return
             
-            # Prepare form data - convert all values to strings for multipart/form-data
             data = {
                 "name": str(self.product_name),
                 "description": str(self.description),
@@ -325,7 +365,6 @@ class AdminDashboardState(rx.State):
                 "is_container": "true" if self.is_container else "false",
             }
             
-            # Prepare files for upload
             files = {}
             upload_dir = rx.get_upload_dir()
             
@@ -383,6 +422,7 @@ class AdminDashboardState(rx.State):
                 
                 if response.status_code == 201:
                     self.upload_status = "Product saved successfully!"
+               
                     self.close_add_modal()
                     await self.load_products()
                 elif response.status_code == 400:
@@ -401,7 +441,7 @@ class AdminDashboardState(rx.State):
                     self.upload_status = f"Error: {error_msg}"
                     
             finally:
-                # Close file handles
+        
                 for file in files.values():
                     try:
                         file.close()
@@ -435,7 +475,7 @@ class AdminDashboardState(rx.State):
                 )
             
             if response.status_code == 200:
-                # Remove product from the list
+             
                 self.products = [p for p in self.products if p["id"] != product_id]
                 await self.load_products()
                 return rx.toast.success(f"Product deleted successfully!")
@@ -563,7 +603,6 @@ class AdminDashboardState(rx.State):
 
 
 
-
 def stats_card(title: str, value: str, icon: str, color: str) -> rx.Component:
     """Stats card component"""
     return rx.card(
@@ -586,8 +625,6 @@ def stats_card(title: str, value: str, icon: str, color: str) -> rx.Component:
         ),
         width="100%",
     )
-
-
 
 def file_upload_section(
     title: str,
@@ -614,6 +651,7 @@ def file_upload_section(
                     "Select File",
                     variant="soft",
                     size="2",
+                    cursor = "pointer",
                 ),
                 rx.text(
                     accepted_types,
@@ -634,6 +672,7 @@ def file_upload_section(
             rx.button(
                 "Upload",
                 size="1",
+                cursor = "pointer",
                 on_click=upload_handler(
                     rx.upload_files(
                         upload_id=f"upload_{title.lower().replace(' ', '_')}"
@@ -643,7 +682,6 @@ def file_upload_section(
             rx.cond(
                 current_file != "",
                 rx.hstack(
-                    rx.icon("check-circle", size=16, color="#10B981"),
                     rx.text(current_file, size="1", color="#10B981"),
                     spacing="1",
                 ),
@@ -659,7 +697,6 @@ def file_upload_section(
         background_color="#F8FAFC",
         border_radius="8px",
     )
-
 
 def product_form_modal(is_edit: bool = False) -> rx.Component:
     """Modal for adding/editing products"""
@@ -679,7 +716,7 @@ def product_form_modal(is_edit: bool = False) -> rx.Component:
             
             rx.scroll_area(
                 rx.vstack(
-                    # Product Name
+                  
                     rx.vstack(
                         rx.text("Product Name *", size="2", weight="medium"),
                         rx.input(
@@ -691,7 +728,7 @@ def product_form_modal(is_edit: bool = False) -> rx.Component:
                         width="100%",
                     ),
                     
-                    # Description
+                    
                     rx.vstack(
                         rx.text("Description", size="2", weight="medium"),
                         rx.text_area(
@@ -704,7 +741,7 @@ def product_form_modal(is_edit: bool = False) -> rx.Component:
                         width="100%",
                     ),
                     
-                    # Prices
+                 
                     rx.hstack(
                         rx.vstack(
                             rx.text("Physical Price ($) *", size="2", weight="medium"),
@@ -732,7 +769,7 @@ def product_form_modal(is_edit: bool = False) -> rx.Component:
                         width="100%",
                     ),
                     
-                    # Category and Product Type
+                 
                     rx.hstack(
                         rx.vstack(
                             rx.text("Category *", size="2", weight="medium"),
@@ -758,7 +795,7 @@ def product_form_modal(is_edit: bool = False) -> rx.Component:
                         width="100%",
                     ),
                     
-                    # Stock
+                  
                     rx.vstack(
                         rx.text("Stock Quantity *", size="2", weight="medium"),
                         rx.input(
@@ -771,13 +808,11 @@ def product_form_modal(is_edit: bool = False) -> rx.Component:
                         width="100%",
                     ),
                     
-                    # Divider
                     rx.divider(),
                     
-                    # File Uploads Section
                     rx.heading("File Uploads", size="4", weight="bold", margin_bottom="8px"),
                     
-                    # Product Image Upload
+        
                     file_upload_section(
                         "Product Image",
                         "Upload product display image",
@@ -786,8 +821,7 @@ def product_form_modal(is_edit: bool = False) -> rx.Component:
                         AdminDashboardState.product_image,
                         "image"
                     ),
-                    
-                    # Texture File Upload
+                
                     file_upload_section(
                         "Texture File",
                         "Upload texture file for 3D model",
@@ -797,7 +831,6 @@ def product_form_modal(is_edit: bool = False) -> rx.Component:
                         "palette"
                     ),
                     
-                    # 3D Model Upload
                     file_upload_section(
                         "3D Model",
                         "Upload 3D product model",
@@ -807,7 +840,6 @@ def product_form_modal(is_edit: bool = False) -> rx.Component:
                         "box"
                     ),
                     
-                    # Scene Model Upload
                     file_upload_section(
                         "Scene Model",
                         "Upload 3D room scene model",
@@ -880,6 +912,7 @@ def product_form_modal(is_edit: bool = False) -> rx.Component:
                         variant="soft", 
                         color_scheme="gray",
                         on_click=close_fn,
+                        cursor = "pointer",
                     ),
                 ),
                 rx.button(
@@ -893,6 +926,7 @@ def product_form_modal(is_edit: bool = False) -> rx.Component:
                         rx.text("Save Product"),
                     ),
                     on_click=save_fn,
+                    cursor = "pointer",
                     disabled=AdminDashboardState.is_uploading,
                 ),
                 spacing="3",
@@ -906,58 +940,153 @@ def product_form_modal(is_edit: bool = False) -> rx.Component:
         open=show_state,
     )
 
+def admin_header() -> rx.Component:
+    """Admin dashboard header with logout button"""
+    return rx.box(
+        rx.vstack(
+            rx.hstack(
+               
+                rx.heading(
+                    "Product Management",
+                    size="8",
+                    weight="bold",
+                    color="#22282c",
+                ),
+                rx.spacer(),
+                
+                rx.hstack(
+                    rx.button(
+                        rx.icon("plus", size=20),
+                        "Add Product",
+                        size="3",
+                        on_click=AdminDashboardState.open_add_modal,
+                        color_scheme="blue",
+                        cursor = "pointer",
+                        variant="soft",
+                        _hover={"color": "#104BC1",
+                                },
+                    ),
+                    
+                 
+                    rx.menu.root(
+                        rx.menu.trigger(
+                            rx.button(
+                                rx.icon("log-out", size=20),
+                                "Logout",
+                                size="3",
+                                variant="soft",
+                                color_scheme="red",
+                                cursor = "pointer",
+                                _hover={
+                                    "background": "#FEE2E2",
+                                    "color": "#DC2626",
+                                },
+                            ),
+                        ),
+                        rx.menu.content(
+                            rx.menu.item(
+                                "Are you sure you want to logout?",
+                                disabled=True,
+                                color="white",
+                                font_size="12px",
+                            ),
+                            rx.menu.separator(),
+                            rx.menu.item(
+                                rx.hstack(
+                                    rx.text("Yes, Logout", color="#10B981"),
+                                    spacing="2",
+                                ),
+                                on_click=AdminDashboardState.logout,
+                                color="#10B981",
+                            ),
+                            rx.menu.item(
+                                rx.hstack(
+                                   
+                                    rx.text("Cancel", color="#6B7280"),
+                                    spacing="2",
+                                ),
+                                color="#6B7280",
+                            ),
+                        ),
+                    ),
+                    
+                    spacing="3",
+                    align="center",
+                ),
+                
+                width="100%",
+                align="center",
+                spacing="4",
+            ),
+            
+            spacing="4",
+            width="100%",
+        ),
+        position="sticky",
+        justify = "between",
+        bg="white",
+        width="100%",
+        padding="20px 40px",
+        border_bottom="1px solid #E5E7EB",
+        box_shadow="0 2px 4px rgba(0, 0, 0, 0.05)",
+    )
+
 
 def admin_dashboard() -> rx.Component:
     """Main admin dashboard page"""
     return rx.box(
         rx.vstack(
-            # Header
-            rx.hstack(
-                rx.heading("Product Management", size="8", weight="bold",color="#22282c"),
-                rx.spacer(),
-                rx.button(
-                    rx.icon("plus", size=20),
-                    "Add Product",
-                    size="3",
-                    on_click=AdminDashboardState.open_add_modal,
-                ),
-                width="100%",
-                align="center",
-            ),
+            admin_header(),
             
-            # Stats cards
+          
             rx.grid(
                 stats_card("Total Products", AdminDashboardState.total_products.to(str), "package", "#6366F1"),
                 stats_card("Total Sold", "1,234", "shopping-cart", "#10B981"),
                 stats_card("Revenue", "$48,567", "dollar-sign", "#F59E0B"),
-                stats_card("Avg Rating", "4.8", "star", "#EC4899"),
+                stats_card("Avg Rating", AdminDashboardState.average_rating.to(str), "star", "#EC4899"),
                 columns="4",
                 spacing="4",
                 width="100%",
             ),
             
-           # Filters
-           
+         
+            rx.box(
                 rx.hstack(
                     rx.input(
-                        rx.input.slot(rx.icon("search"),color="#807E80"),
+                        rx.input.slot(
+                            rx.icon("search", size=20, color="#A8B1C2"),
+                            padding="0 12px",
+                        ),
                         placeholder="Search products...",
                         value=AdminDashboardState.search_query,
                         on_change=AdminDashboardState.set_search_query,
-                        width="300px",
-                        background_color="#E0E6EA",
-                        border_radius="20px",
+                        width="100%",
+                        max_width="400px",
+                        background_color="white",
+                        border="2px solid #E5E7EB",
+                        border_radius="12px",
                         color="#22282C",
-                        type = "search"
+                        padding="5px",
+                        font_size="14px",
+                        _focus={
+                            "border_color": "#2E6FF2",
+                            "box_shadow": "0 0 0 3px rgba(46, 111, 242, 0.1)",
+                        },
+                        _placeholder={
+                            "color": "#9CA3AF",
+                        },
+                        type="search",
+                        transition="all 0.2s ease",
                     ),
-                 
+                    rx.spacer(),
                     spacing="3",
-                    width="100%",   
-                   
+                    width="100%",
+                    padding="16px 0",
                 ),
+                width="100%",
+            ),
         
         
-            # Products grid
             rx.cond(
                 AdminDashboardState.filtered_products.length() > 0,
                 rx.grid(
@@ -983,7 +1112,7 @@ def admin_dashboard() -> rx.Component:
             width="100%",
         ),
         
-        # Modals
+      
         product_form_modal(is_edit=False),
         product_form_modal(is_edit=True),
         
@@ -997,66 +1126,161 @@ def admin_dashboard() -> rx.Component:
 
 
 def product_card(product: Dict) -> rx.Component:
-    return rx.card(
+    """Beautiful product card with hover effects"""
+    return rx.box(
         rx.vstack(
-            rx.image(
-                src=product.get("image", "/placeholder.png"),
+           
+            rx.box(
+                rx.image(
+                    src=product.get("image", "/placeholder.png"),
+                    width="100%",
+                    height="250px",
+                    object_fit="cover",
+                    border_radius="12px 12px 0 0",
+                ),
+                position="relative",
                 width="100%",
-                height="200px",
-                object_fit="cover",
-                border_radius="8px",
+                overflow="hidden",
             ),
             
+           
             rx.vstack(
+               
                 rx.hstack(
-                    rx.heading(product.get("title", "No Title"), size="2", weight="bold",color="#22282c"),
+                    rx.badge(
+                        product.get("category", "N/A"),
+                        color_scheme="blue",
+                        variant="soft",
+                        padding="8px 14px",
+                        border_radius="8px",
+                        font_size="13px",
+                        font_weight="bold",
+                        bg="#EFF6FF",
+                        color="#2E6FF2",
+                    ),
                     rx.spacer(),
-                    rx.badge(product.get("category", "N/A"), variant="soft"),
+                    spacing="2",
                     width="100%",
                 ),
+                
+           
+                rx.heading(
+                    product.get("title", "No Title"),
+                    size="3",
+                    weight="bold",
+                    color="#22282C",
+                    no_of_lines=2,
+                ),
+                
+              
+                rx.divider(margin="8px 0"),
+                
                
                 rx.hstack(
+                  
                     rx.vstack(
-                    rx.vstack(
-                        rx.text("Physical", size="1",color="#22282c"),
-                        rx.text(f"${product.get('physical_price','0')}", size="3", weight="bold",color="#22282c"),
-                        spacing="0",
-                    ),
-                    rx.vstack(
-                        rx.text("Digital", size="1",color="#22282c"),
-                        rx.text(f"${product.get('digital_price','0')}", size="3", weight="bold",color="#22282c"),
-                        spacing="0",
-                    ),
-                    ),
-                    rx.spacer(),
-                    rx.vstack(
-                        rx.button(
-                            rx.icon("pencil", size=16),
-                            "Edit",
-                            variant="soft",
-                            size="2",
-                            on_click=lambda: AdminDashboardState.open_edit_modal(product),
+                        rx.hstack(
+                            rx.icon("package", size=16, color="#6B7280"),
+                            rx.text(
+                                "Physical",
+                                size="1",
+                                color="#6B7280",
+                                weight="bold",
+                            ),
+                            spacing="2",
+                            align="center",
                         ),
-                    
-                        rx.button(
-                            rx.icon("trash-2", size=16),
-                            "Delete",
-                            variant="soft",
-                            color_scheme="red",
-                            size="2",
-                            on_click=lambda: AdminDashboardState.delete_product(product["id"]),
+                        rx.heading(
+                            f"${product.get('physical_price', '0')}",
+                            size="4",
+                            weight="bold",
+                            color="#22282C",
                         ),
-                        spacing="2",
+                        spacing="1",
                         width="100%",
-                    ),    
-                    width = "100%",
-                    text_align = "center"  
+                    ),
+                    
+                 
+                    rx.vstack(
+                        rx.hstack(
+                            rx.icon("zap", size=4, color="#6B7280"),
+                            rx.text(
+                                "Digital",
+                                size="1",
+                                color="#6B7280",
+                                weight="bold",
+                            ),
+                            spacing="2",
+                            align="center",
+                        ),
+                        rx.heading(
+                            f"${product.get('digital_price', '0')}",
+                            size="4",
+                            weight="bold",
+                            color="#22282C",
+                        ),
+                        spacing="1",
+                        width="100%",
+                    ),
+                    
+                    width="100%",
+                    spacing="4",
                 ),
-               
+                
+               rx.hstack(
+                    rx.button(
+                        rx.icon("pencil", size=16),
+                        "Edit",
+                        flex="1",
+                        color_scheme="blue",
+                        variant="soft",
+                        border_radius="8px",
+                        font_weight="bold",
+                        cursor = "pointer",
+                        on_click=lambda: AdminDashboardState.open_edit_modal(product),
+                        _hover={
+                            "bg": "#1E5FE2",
+                            "color": "white"
+                        },
+                        transition="all 0.2s ease",
+                    ),
+                    rx.button(
+                        rx.icon("trash-2", size=16),
+                        "Delete",
+                        flex="1",
+                        color_scheme="red",
+                        variant="soft",
+                        border_radius="8px",
+                        font_weight="bold",
+                        cursor = "pointer",
+                        on_click=lambda: AdminDashboardState.delete_product(product["id"]),
+                        _hover={
+                            "bg": "#DC2626",
+                            "color": "white"
+                        },
+                        transition="all 0.2s ease",
+                    ),
+                    spacing="2",
+                    width="100%",
+                ),
+                
+                padding="16px",
+                spacing="3",
+                width="100%",
             ),
-            spacing="3",
+            
+            bg="white",
+            border="1px solid #E5E7EB",
+            border_radius="12px",
+            overflow="hidden",
+            spacing="0",
             width="100%",
+            _hover={
+                "box_shadow": "0 12px 24px rgba(0, 0, 0, 0.1)",
+                "border_color": "#2E6FF2",
+                "transform": "translateY(-4px)",
+            },
+            transition="all 0.3s ease",
         ),
-        width="100%",
     )
 

@@ -3,24 +3,19 @@ import reflex as rx
 from ..template import template
 from ..state import AuthState
 import httpx
-from typing import Optional, Callable, Any,List
+from typing import Optional, Callable, Any,List,Dict
 import json
 import random
 import string
 from ..config import API_BASE_URL
 import base64,uuid
-
-
-class Address(rx.Base):
-    id: int
-    address: str
-    is_default: bool
-
+from ..components.navbar import NavCartState
 
 class Address(rx.Base):
     id: int
     address: str
     is_default: bool = False
+    
 
 class AddressState(rx.State):
     show_form: bool = False
@@ -30,6 +25,7 @@ class AddressState(rx.State):
     is_loading: bool = False
     error_message: str = ""
     success_message: str = ""
+    is_default: bool = False
 
 
     def start_edit_address(self, address_id: int, current_address: str):
@@ -119,7 +115,7 @@ class AddressState(rx.State):
                     )
                     for addr in addresses_list
                 ]
-                print("Addresses loaded:", self.addresses)
+                
             else:
                 print("Failed to fetch addresses:", res.text)
         except Exception as e:
@@ -189,7 +185,6 @@ class AddressState(rx.State):
         cookies_dict = auth_state.session_cookies or {}
         
         try:
-            
             async with httpx.AsyncClient() as client:
                 response = await client.put(
                     f"{API_BASE_URL}/users/address/set_default/",
@@ -202,15 +197,29 @@ class AddressState(rx.State):
                 if response.status_code == 200:
                     self.success_message = "Default address updated successfully"
                     
+                    # ✅ FIX: Create a new list with Address objects instead of dict copies
                     updated_addresses = []
                     for addr in self.addresses:
-                        addr_copy = addr.copy()
-                        if addr_copy["id"] == address_id:
-                            addr_copy["is_default"] = True
+                        if addr.id == address_id:
+                            # Create new Address object with is_default=True
+                            updated_addresses.append(
+                                Address(
+                                    id=addr.id,
+                                    address=addr.address,
+                                    is_default=True  # ✅ Set to True for this address
+                                )
+                            )
                         else:
-                            addr_copy["is_default"] = False
-                        updated_addresses.append(addr_copy)
-                    
+                          
+
+                            updated_addresses.append(
+                                Address(
+                                    id=addr.id,
+                                    address=addr.address,
+                                    is_default=False  
+                                )
+                            )
+                
                     self.addresses = updated_addresses
                     
                 elif response.status_code == 401:
@@ -343,7 +352,7 @@ class BankAccount(rx.Base):
                     )
                     for addr in addresses_list
                 ]
-                print("Addresses loaded:", self.addresses)
+               
             else:
                 print("Failed to fetch addresses:", res.text)
         except Exception as e:
@@ -620,10 +629,6 @@ class ProfileState(rx.State):
         self.password_error = ""
         self.password_success = ""
 
-        print(f"Current password length: {len(self.current_password)}")
-        print(f"New password length: {len(self.new_password)}")
-        print(f"Confirm password length: {len(self.confirm_password)}")
-
         if not self.current_password:
             self.password_error = "Please enter your current password"
             self.is_submitting = False
@@ -729,9 +734,6 @@ class ProfileState(rx.State):
             print(f"Unexpected error: {e}")
 
         self.is_submitting = False
-        print("=== PASSWORD CHANGE ENDED ===")
-        print(f"Final error message: {self.password_error}")
-        print(f"Final success message: {self.password_success}")
 
     async def save_profile(self):
 
@@ -786,33 +788,14 @@ class ProfileState(rx.State):
                 data = response.json()
                 user = data.get("user_profile", {})
 
-               
-                print("=== USER DATA ===")
-                print(f"Full user object: {user}")
-                print(f"Profile pic raw: {user.get('profilePic', 'NOT FOUND')}")
-                print(f"All keys: {user.keys()}")
+                self.first_name = user.get("first_name") or ""
+                self.last_name = user.get("last_name") or ""
+                self.username = user.get("username") or ""
+                self.email = user.get("email") or ""
+                self.phone_number = user.get("phone_no") or ""
+                self.gender = user.get("gender") or ""
+                self.birthday = user.get("date_of_birth") or ""
 
-                self.first_name = user.get("first_name", "")
-                self.last_name = user.get("last_name", "")
-                self.username = user.get("username", "")
-                self.email = user.get("email", "")
-                self.phone_number = user.get("phone_no", "")
-                self.gender = user.get("gender", "")
-                self.birthday = user.get("date_of_birth", "")
-
-                profile_pic = user.get("profilePic", "")
-                if profile_pic:
-                   
-                    if profile_pic.startswith("data:image"):
-                        self.profile_picture = profile_pic
-                    else:
-                        self.profile_picture = f"data:image/png;base64,{profile_pic}"
-                    print(
-                        f"Profile picture set to: {self.profile_picture[:100]}..."
-                    ) 
-                else:
-                    self.profile_picture = ""
-                    print("Profile picture is empty")
 
         except Exception as e:
             print(f"Error loading user data: {str(e)}")
@@ -1138,10 +1121,6 @@ class PaymentState(rx.State):
                     timeout=10.0
                 )
                 
-                print(f"Response status code: {res.status_code}")
-                print(f"Response text: '{res.text}'")
-                print(f"Response length: {len(res.text)}")
-                
                 if res.status_code == 201:
                     try:
                         response_data = res.json()
@@ -1243,18 +1222,13 @@ class PaymentState(rx.State):
                     timeout=10.0
                 )
                 
-                print(f"Response status code: {res.status_code}")
-                print(f"Response headers: {res.headers}")
-                print(f"Response text: '{res.text}'")
-                print(f"Response length: {len(res.text)}")
-                
                 if res.status_code == 201:
                     try:
                         response_data = res.json()
-                        print("Credit card added successfully:", response_data)
+                        
                     except Exception as json_err:
                         print(f"JSON parse error on success: {json_err}")
-                        print("Card might have been added despite JSON error")
+                        
                     
                     self.success_message = "Card added successfully!"
                     self.error_message = ""
@@ -1341,7 +1315,6 @@ class PaymentState(rx.State):
                     )
                     for card in cards_data
                 ]
-                print(f"Loaded {len(self.credit_cards)} credit cards")
             else:
                 print(f"Failed to load credit cards: {res.status_code}")
                 self.credit_cards = []
@@ -1379,7 +1352,6 @@ class PaymentState(rx.State):
                     )
                     for account in accounts_data
                 ]
-                print(f"Loaded {len(self.bank_accounts)} bank accounts")
             else:
                 print(f"Failed to load bank accounts: {res.status_code}")
                 self.bank_accounts = []
@@ -1454,14 +1426,31 @@ class PaymentState(rx.State):
         try:
             async with httpx.AsyncClient() as client:
                 res = await client.put(
-                    f"{API_BASE_URL}/users/payment_methods/set_default_credit_card/",
+                    f"{API_BASE_URL}/users/payment_methods/set_default_credit_card/{card_id}/",
                     json={"card_id": card_id},
                     cookies=cookies_dict,
                     timeout=10.0
                 )
             
             if res.status_code == 200:
-                await self.load_credit_cards()
+                # ✅ FIX: Update state immediately instead of reloading
+                updated_cards = []
+                for card in self.credit_cards:
+                    updated_cards.append(
+                        CreditCard(
+                            id=card.id,
+                            card_brand=card.card_brand,
+                            last4=card.last4,
+                            exp_month=card.exp_month,
+                            exp_year=card.exp_year,
+                            is_default=(card.id == card_id),  # ✅ Set based on card_id
+                            provider=card.provider,
+                            provider_token=card.provider_token
+                        )
+                    )
+                
+                # ✅ Assign new list to trigger state update
+                self.credit_cards = updated_cards
                 return rx.toast.success("Default card updated!")
             else:
                 return rx.toast.error("Failed to update default card")
@@ -1469,7 +1458,7 @@ class PaymentState(rx.State):
         except Exception as e:
             print(f"Error setting default card: {e}")
             return rx.toast.error("Error updating default card")
-    
+
     async def set_default_bank(self, account_id: int):
         """Set a bank account as default."""
         auth_state = await self.get_state(AuthState)
@@ -1478,14 +1467,30 @@ class PaymentState(rx.State):
         try:
             async with httpx.AsyncClient() as client:
                 res = await client.put(
-                    f"{API_BASE_URL}/users/payment_methods/set_default_bank_account/",
+                    f"{API_BASE_URL}/users/payment_methods/set_default_bank_account/{account_id}/",
                     json={"account_id": account_id},
                     cookies=cookies_dict,
                     timeout=10.0
                 )
             
             if res.status_code == 200:
-                await self.load_bank_accounts()
+                # ✅ FIX: Update state immediately instead of reloading
+                updated_accounts = []
+                for account in self.bank_accounts:
+                    updated_accounts.append(
+                        BankAccount(
+                            id=account.id,
+                            bank_name=account.bank_name,
+                            account_holder=account.account_holder,
+                            last4=account.last4,
+                            is_default=(account.id == account_id),  # ✅ Set based on account_id
+                            provider=account.provider,
+                            provider_token=account.provider_token
+                        )
+                    )
+                
+                # ✅ Assign new list to trigger state update
+                self.bank_accounts = updated_accounts
                 return rx.toast.success("Default bank account updated!")
             else:
                 return rx.toast.error("Failed to update default bank account")
@@ -1503,7 +1508,6 @@ class Review(rx.Base):
     created_at: str = ""
     updated_at: str = ""
 
-
 class ReviewState(rx.State):
     reviews: list[Review] = []
     is_loading: bool = False
@@ -1512,16 +1516,16 @@ class ReviewState(rx.State):
     
     show_edit_form: bool = False
     
- 
     product_id: str = ""
     rating: str = "5"
     comment: str = ""
-    review_image: Optional[str] = None
     editing_review_id: int = 0
     
-
     is_uploading_image: bool = False
     upload_image_error: str = ""
+    review_image: str = ""  # This stores the filename
+    review_image_preview: str = ""  # This stores the preview URL/base64
+    upload_status: str = ""
 
     def set_rating(self, value: str):
         self.rating = value
@@ -1535,7 +1539,9 @@ class ReviewState(rx.State):
         self.product_id = str(review.product_id)
         self.rating = str(review.rating)
         self.comment = review.comment
-        self.review_image = review.image
+        self.review_image = f"data:image/jpeg;base64,{review.image}" if review.image else ""
+        # If image exists and is base64, store it for preview
+        self.review_image_preview = f"data:image/jpeg;base64,{review.image}" if review.image else ""
 
     def close_form(self):
         self.show_edit_form = False
@@ -1545,7 +1551,8 @@ class ReviewState(rx.State):
         self.product_id = ""
         self.rating = "5"
         self.comment = ""
-        self.review_image = None
+        self.review_image = ""
+        self.review_image_preview = ""
         self.editing_review_id = 0
         self.error_message = ""
         self.success_message = ""
@@ -1582,7 +1589,7 @@ class ReviewState(rx.State):
                     )
                     for review in reviews_data
                 ]
-                print(f"Loaded {len(self.reviews)} reviews")
+               
             elif response.status_code == 403:
                 self.error_message = "Only customers can view reviews"
             else:
@@ -1594,50 +1601,56 @@ class ReviewState(rx.State):
         finally:
             self.is_loading = False
 
-    async def handle_image_upload(self, files):
-        """Handle image upload for review."""
+    async def handle_review_image_upload(self, files: List[rx.UploadFile]):
+        """Handle review image upload"""
         if not files:
+            print("No files provided")
             return
-
+        
+        file = files[0]
+        
+        
         try:
-            self.is_uploading_image = True
-            self.upload_image_error = ""
+            upload_data = await file.read()
+            filename = f"review_img_{uuid.uuid4().hex[:8]}_{file.name}"
+            
+            # Save file to upload directory
+            outfile = rx.get_upload_dir() / filename
+            with outfile.open("wb") as f:
+                f.write(upload_data)
+            
+            self.review_image = filename
+            self.upload_status = f"Review image uploaded: {file.name}"
+            
+            import base64
+            b64_string = base64.b64encode(upload_data).decode('utf-8')
+            
+            file_extension = file.name.split('.')[-1].lower()
+            mime_type = self._get_mime_type(file_extension)
+            
 
-            upload_file = files[0] if isinstance(files, list) else files
-
-            if hasattr(upload_file, "read"):
-                file_content = await upload_file.read()
-                filename = getattr(upload_file, "filename", "review.png")
-                content_type = getattr(upload_file, "type", "image/png")
-            elif isinstance(upload_file, str):
-                with open(upload_file, "rb") as f:
-                    file_content = f.read()
-                filename = upload_file.split("/")[-1]
-                ext = filename.split(".")[-1].lower()
-                content_type = "image/jpeg" if ext in ["jpg", "jpeg"] else "image/png"
-            else:
-                self.upload_image_error = "Unsupported file format"
-                return
-
-            if content_type not in ["image/png", "image/jpeg", "image/jpg"]:
-                self.upload_image_error = "Only PNG and JPEG images are allowed"
-                return
-
-            if len(file_content) > 5 * 1024 * 1024:
-                self.upload_image_error = "Image size must be less than 5MB"
-                return
-
-            self.review_image = base64.b64encode(file_content).decode('utf-8')
-
+            self.review_image_preview = f"data:{mime_type};base64,{b64_string}"
+            
         except Exception as e:
-            self.upload_image_error = f"Error uploading image: {str(e)}"
-            print(f"Error in handle_image_upload: {e}")
-        finally:
-            self.is_uploading_image = False
+            self.upload_image_error = f"Error uploading file: {str(e)}"
+            import traceback
+            traceback.print_exc()
+    
+    def _get_mime_type(self, extension: str) -> str:
+        """Get MIME type based on file extension"""
+        mime_types = {
+            "jpg": "image/jpeg",
+            "jpeg": "image/jpeg",
+            "png": "image/png",
+            "gif": "image/gif",
+            "webp": "image/webp",
+        }
+        return mime_types.get(extension.lower(), "image/jpeg")
 
     def remove_image(self):
         """Remove the uploaded image."""
-        self.review_image = None
+        self.review_image = ""
+        self.review_image_preview = ""
 
     async def edit_review(self):
         """Edit an existing review."""
@@ -1652,7 +1665,6 @@ class ReviewState(rx.State):
         cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
 
         try:
-            
             form_data = {
                 "review_id": str(self.editing_review_id),
                 "rating": self.rating,
@@ -1661,10 +1673,11 @@ class ReviewState(rx.State):
 
             # Prepare files if image exists
             files = None
-            if self.review_image:
-                # Decode base64 and prepare for upload
-                image_bytes = base64.b64decode(self.review_image)
-                files = {"image": ("review.jpg", image_bytes, "image/jpeg")}
+            if self.review_image and self.review_image.strip():
+                upload_dir = rx.get_upload_dir()
+                image_path = upload_dir / self.review_image
+                if image_path.exists():
+                    files = {"image": open(image_path, 'rb')}
             else:
                 # Send empty image to remove it
                 form_data["image"] = ""
@@ -1724,56 +1737,518 @@ class ReviewState(rx.State):
             print(f"Error deleting review: {e}")
             return rx.toast.error("Error deleting review")
 
-
-def profile_content() -> rx.Component:
-    return rx.hstack(
-        rx.box(
-            rx.vstack(
-                profile_avatar_section(),
-                profile_upload_modal(),
-                #rx.button("Upload Profile Picture",on_click=ProfileState.open_profile_modal),
-                rx.vstack(
-                    nav_button("Personal Information", "profile"),
-                    nav_button("My Address", "address"),
-                    nav_button("My Payment Medthods", "card"),
-                    nav_button("Wishlist", "wishlist"),
-                    #nav_button("My Orders", "orders"),
-                    nav_button("My Reviews", "reviews"),
-                    #nav_button("Notification", "notification"),
-                    #rx.link("Logout", href="/logout", style=menu_item_style(False)),
-                    spacing="3",
+class WishlistProductState(rx.State):
+    """State for managing wishlist products in profile"""
+    wishlist_products: List[Dict] = []
+    is_loading: bool = False
+    error_message: str = ""
+    selected_product_id: int = 0
+    
+    async def load_wishlist_products(self):
+        """Fetch wishlist products from backend"""
+        self.is_loading = True
+        self.error_message = ""
+        
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+        
+        try:
+            async with httpx.AsyncClient() as client:
+            
+                response = await client.get(
+                    f"{API_BASE_URL}/users/wishlist/",
+                    cookies=cookies_dict,
+                    timeout=10.0
+                )
+            
+            
+            if response.status_code == 200:
+                try:
+                    data = response.json()
                     
+                    # Get wishlist array from response
+                    wishlist_products = data.get("wishlist", [])
+                    
+                
+                    self.wishlist_products = [
+                        {
+                            "id": p.get("id"),
+                            "title": p.get("name", "Untitled Product"),
+                            "description": p.get("description", ""),
+                            "category": p.get("category", "Uncategorized"),
+                            "digital_price": p.get("digital_price", "0"),
+                            "physical_price": p.get("physical_price", "0"),
+                            "image": f"data:image/png;base64,{p['image']}" if p.get("image") else "/placeholder.png",
+                            "rating": "4.6",
+                            "link": f"/details/{p.get('id')}",
+                        }
+                        for p in wishlist_products
+                    ]
+                    
+                    
+                except Exception as json_err:
+                    print(f"❌ JSON Parse Error: {json_err}")
+                    self.error_message = f"Failed to parse response: {str(json_err)}"
+                    
+            elif response.status_code == 401:
+                print(f"❌ 401 Unauthorized - User not authenticated")
+                self.error_message = "Please log in to view your wishlist"
+                
+            elif response.status_code == 403:
+                print(f"❌ 403 Forbidden")
+                self.error_message = "You don't have permission to view this wishlist"
+                
+            elif response.status_code == 404:
+                print(f"❌ 404 Not Found - Endpoint doesn't exist")
+                self.error_message = "Wishlist endpoint not found on server"
+                
+            elif response.status_code == 500:
+            
+                self.error_message = f"Server Error: {response.text[:100]}"
+                
+            else:
+                print(f"❌ Unexpected status: {response.status_code}")
+                self.error_message = f"Error: {response.status_code}"
+                self.wishlist_products = []
+        
+        except httpx.TimeoutException as e:
+            print(f"❌ Timeout Error: {e}")
+            self.error_message = "Request timed out - server not responding"
+            
+        except httpx.RequestError as e:
+            print(f"❌ Connection Error: {e}")
+            self.error_message = f"Connection error: {str(e)}"
+            
+        except Exception as e:
+            print(f"❌ Unexpected Error: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            self.error_message = f"Error: {str(e)}"
+            self.wishlist_products = []
+        
+        finally:
+            self.is_loading = False
+    
+    async def remove_from_wishlist_profile(self, product_id: int):
+        """Remove product from wishlist"""
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.delete(
+                    f"{API_BASE_URL}/users/wishlist/remove/{product_id}/",
+                    cookies=cookies_dict,
+                )
+            
+            if response.status_code == 200:
+                self.wishlist_products = [
+                    p for p in self.wishlist_products if p["id"] != product_id
+                ]
+                rx.toast.success("💔 Removed from wishlist")
+            else:
+                print(f"Failed to remove: {response.status_code}")
+                rx.toast.error("Failed to remove from wishlist")
+        
+        except Exception as e:
+            print(f"Error removing from wishlist: {e}")
+            rx.toast.error(f"Error: {e}")
+
+    async def add_to_cart_from_wishlist(self, product_id: int, item_type: str, quantity: int = 1):
+        """Add product to cart directly from wishlist"""
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{API_BASE_URL}/carts/add_item/",
+                    data={
+                        "product_id": product_id,
+                        "type": item_type,
+                        "quantity": quantity,
+                    },
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                    cookies=cookies_dict,
+                )
+
+            if response.status_code == 201:
+                rx.toast.success("✅ Item added to cart successfully!")
+                nav_state = await self.get_state(NavCartState)
+                await nav_state.load_cart_quantity()
+            else:
+                error = response.json().get("error", response.text)
+                rx.toast.error(f"❌ Failed: {error}")
+
+        except Exception as e:
+            print(f"Error adding to cart: {e}")
+            rx.toast.error(f"⚠️ Network error: {e}")
+
+
+def wishlist_product_card(product: Dict) -> rx.Component:
+    """Product card component for wishlist - same structure as shop page"""
+    product_id = product["id"]
+    
+    return rx.box(
+        rx.vstack(
+ 
+            rx.box(
+                rx.box(
+                    rx.image(
+                        src=product.get("image", "/images/default.png"),
+                        width="100%",
+                        height="250px",
+                        border_radius="12px",
+                        object_fit="cover",
+                    ),
+                    rx.box(
+                        rx.image(
+                            src="/images/bedroom_grey.jpg",
+                            width="100%",
+                            height="250px",
+                            border_radius="12px",
+                            object_fit="cover",
+                        ),
+                        rx.center(
+                            rx.button(
+                                "See Detail",
+                                font_size="18px",
+                                font_weight="bold",
+                                color="white",
+                                background_color="rgba(0,0,0,0.6)",
+                                padding="6px 12px",
+                                border_radius="8px",
+                                border="none",
+                                cursor="pointer",
+                            ),
+                            position="absolute",
+                            top="50%",
+                            left="50%",
+                            transform="translate(-50%, -50%)",
+                        ),
+                        position="absolute",
+                        top="0",
+                        left="0",
+                        width="100%",
+                        height="100%",
+                        opacity="0",
+                        transition="opacity 0.3s ease",
+                        _hover={"opacity": "1"},
+                        z_index="2",
+                    ),
+                    position="relative",
+                    width="100%",
+                    overflow="hidden",
+                    cursor="pointer",
+                    on_click=rx.redirect(product.get("link", "/shop")),
+                ),
+                rx.button(
+                    rx.icon("heart", color="#EF4444", fill="#EF4444", size=20),
+                    position="absolute",
+                    top="10px",
+                    right="10px",
+                    background = "white",
+                    border="none",
+                    border_radius="full",
+                    padding="8px",
+                    width="40px",
+                    height="40px",
+                    display="flex",
+                    align_items="center",
+                    justify_content="center",
+                    cursor="pointer",
+                    transition="all 0.3s ease",
+                    _hover={
+                        "background_color": "rgba(255, 255, 255, 1)",
+                        "transform": "scale(1.1)",
+                    },
+                    on_click=lambda: WishlistProductState.remove_from_wishlist_profile(product_id),
+                    z_index="10",
+                ),
+                position="relative",
+                width="100%",
+                style={
+                    "width": "100%",
+                    "height": "220px",
+                    "border_radius": "12px 12px 0 0",
+                    "margin_bottom": "40px",
+                },
+            ),
+            
+            rx.vstack(
+            
+                rx.hstack(
+                    rx.badge(
+                        product["category"],
+                        color_scheme="orange",
+                        border_radius="md",
+                    ),
+                    rx.spacer(),
+                    rx.icon("star", color="gold"),
+                    rx.text("4.5", font_weight="medium", color="#22282C"),
+                    align="center",
+                    width="100%",
+                ),
+                
+                rx.text(
+                    product["title"],
+                    font_weight="bold",
+                    font_size="1.1em",
+                    color="#22282C",
+                ),
+                
+                rx.hstack(
+                    rx.text("Physical: ", font_weight="medium", color="#22282C"),
+                    rx.text(f"${product['physical_price']}", font_weight="bold", color="#22282C"),
+                    rx.spacer(),
+                    rx.button(
+                        rx.icon("shopping-cart", color="#22282c", stroke_width=1),
+                        "Add",
+                        color="#22282C",
+                        border="1px solid #E5E7EB",
+                        background_color="white",
+                        border_radius="8px",
+                        cursor="pointer",
+                        on_click=lambda: WishlistProductState.add_to_cart_from_wishlist(product_id, "physical", 1),
+                    ),
+                    width="100%",
+                ),
+                
+                rx.hstack(
+                    rx.text("Digital: ", font_weight="medium", color="#22282C"),
+                    rx.text(f"${product['digital_price']}", font_weight="bold", color="#22282C"),
+                    rx.spacer(),
+                    rx.button(
+                        rx.icon("zap", color="#22282C", stroke_width=1),
+                        "Add",
+                        color="#22282C",
+                        border="1px solid #E5E7EB",
+                        background_color="white",
+                        border_radius="8px",
+                        cursor="pointer",
+                        on_click=lambda: WishlistProductState.add_to_cart_from_wishlist(product_id, "digital", 1),
+                    ),
+                    width="100%",
+                ),
+                
+                width="100%",
+                align="start",
+                padding="0px 20px",
+            ),
+            
+            bg="white",
+            border="1px solid #E5E7EB",
+            border_radius="16px",
+            width="280px",
+            height="450px",
+        )
+    )
+
+
+
+def wishlist_content() -> rx.Component:
+    """Display all wishlist products in profile"""
+    return rx.vstack(
+      
+        rx.hstack(
+            rx.heading("My Wishlist", size="6", color="#22282c"),
+            rx.spacer(),
+            rx.text(
+                rx.cond(
+                    WishlistProductState.wishlist_products.length() > 0,
+                    f"{WishlistProductState.wishlist_products.length()} items",
+                    "0 items"
+                ),
+                font_size="14px",
+                color="#6B7280",
+            ),
+            width="100%",
+            align_items="center",
+            margin_bottom="20px",
+        ),
+        
+        rx.cond(
+            WishlistProductState.is_loading,
+            rx.center(
+                rx.vstack(
+                    rx.spinner(size="3"),
+                    rx.text("Loading wishlist...", color="#6B7280"),
+                    spacing="3",
+                    align_items="center",
+                ),
+                padding="60px 20px",
+                width="100%",
+            ),
+            # Error State
+            rx.cond(
+                WishlistProductState.error_message != "",
+                rx.box(
+                    rx.text(
+                        WishlistProductState.error_message,
+                        color="#EF4444",
+                        font_size="14px",
+                    ),
+                    padding="16px",
+                    bg="#FEE2E2",
+                    border_radius="8px",
+                    border="1px solid #FECACA",
+                    width="100%",
+                ),
+                
+                rx.cond(
+                    WishlistProductState.wishlist_products.length() > 0,
+                    rx.grid(
+                        rx.foreach(
+                            WishlistProductState.wishlist_products,
+                            wishlist_product_card,
+                        ),
+                        columns="3",
+                        spacing="4",
+                        width="100%",
+                    ),
+                  
+                    rx.center(
+                        rx.vstack(
+                            rx.icon("heart", size=64, color="#D1D5DB"),
+                            rx.text(
+                                "Your Wishlist is Empty",
+                                font_size="20px",
+                                font_weight="600",
+                                color="#6B7280",
+                            ),
+                            rx.text(
+                                "Start adding your favorite products to your wishlist",
+                                font_size="14px",
+                                color="#9CA3AF",
+                            ),
+                            rx.button(
+                                "Continue Shopping",
+                                on_click=rx.redirect("/shop"),
+                                background_color="#22282c",
+                                cursor="pointer",
+                                font_weight="bold"
+                            ),
+                            spacing="3",
+                            align_items="center",
+                        ),
+                        padding="80px 40px",
+                        width="100%",
+                    ),
                 ),
             ),
-            width="280px",
-            height="100%",
-            background= "#E4EEF6",
-            justify="between",
-            on_mount=ProfileState.load_user_data,
-           
         ),
-  
-        rx.box(
-            rx.match(
-                ProfileState.active_section,
-                ("profile", profile_info_content()),
-                ("address", address_content()),
-                ("card", card_content() ),
-                ("wishlist", wishlist_content()),
-                #("orders", orders_content()),
-                ("reviews", reviews_content()),
-                ("notification", notification_content()),
-                profile_info_content(),
-            ),
-            flex="1",
-            padding="40px",
-            bg="white",
-        ),
-        # Password Change Modal
-        password_change_modal(),
+        
+        spacing="4",
         width="100%",
-        height="100%",
+        padding="20px",
+        on_mount=WishlistProductState.load_wishlist_products,
     )
+
+def profile_content() -> rx.Component:
+    return rx.center(
+        rx.hstack(
+        
+            rx.box(
+                rx.vstack(
+                   
+                    rx.box(
+                        rx.vstack(
+                            profile_avatar_section(),
+                            profile_upload_modal(),
+                            spacing="3",
+                            align="center",
+                            padding_y="4",
+                            background="white",
+                            border_radius="2xl",
+                            box_shadow="md",
+                            width="100%",
+                            margin_top="40px",
+                            justify="between"
+                        ),
+                        justify="center",
+                        width="100%",
+                        display="flex",
+                    ),
+
+           
+                    rx.box(
+                        rx.vstack(
+                            nav_button("👤 Personal Information", "profile", active=ProfileState.active_section == "profile"),
+                            nav_button("🏠 My Address", "address", active=ProfileState.active_section == "address"),
+                            nav_button("💳 My Payment Methods", "card", active=ProfileState.active_section == "card"),
+                            nav_button("⭐ My Reviews", "reviews", active=ProfileState.active_section == "reviews"),
+                            nav_button("♥️ My Wishlist", "wishlist", active=ProfileState.active_section == "wishlist"),
+                            
+                            spacing="2",
+                            width="100%",
+                            justify="between"
+                        ),
+                        background="white",
+                        width="100%",
+                        align="center",
+                        display="flex",
+                        justify="center",
+                        
+                    ),
+                ),
+                width="350px",
+                min_height="100vh",
+                align_items="center",
+                on_mount=ProfileState.load_user_data,
+                box_shadow= "0 3px 6px rgba(0, 120, 212, 0.2)"
+
+           
+            ),
+
+        
+            rx.box(
+                # FIX: Use rx.cond instead of rx.match with proper tuple syntax
+                rx.cond(
+                    ProfileState.active_section == "profile",
+                    profile_info_content(),
+                    rx.cond(
+                        ProfileState.active_section == "address",
+                        address_content(),
+                        rx.cond(
+                            ProfileState.active_section == "card",
+                            card_content(),
+                            rx.cond(
+                                ProfileState.active_section == "reviews",
+                                reviews_content(),
+                                rx.cond(
+                                    ProfileState.active_section == "wishlist",
+                                    wishlist_content(),
+                                    rx.cond(
+                                        ProfileState.active_section == "notification",
+                                        notification_content(),
+                                        profile_info_content()  
+                                    )
+                                )
+                            )
+                        )
+                    )
+                ),
+                flex="1",
+                padding="40px",
+                bg="white",
+                border_radius="2xl",
+                box_shadow="sm",
+                margin="4",
+                min_height="85vh",
+                width="100%",
+            ),
+
+ 
+            password_change_modal(),
+            width="100%",
+            height="100%",
+            justify="center",
+        ),
+        width="100%",
+        padding_y="6",
+      
+    )
+
 
 def profile_avatar_section() -> rx.Component:
     """Display the uploaded profile picture with styled upload button"""
@@ -1846,16 +2321,16 @@ def profile_avatar_section() -> rx.Component:
                 margin_top="12px",
             ),
             
-            spacing="0",
             align_items="center",
             width="100%",
          
         ),
         text_align="center",
         margin_bottom="20px",
+        width="100%"
+       
     )
 
-    
 
 def profile_upload_modal() -> rx.Component:
     """Modal for writing product reviews"""
@@ -1878,8 +2353,7 @@ def profile_upload_modal() -> rx.Component:
                         ProfileState.profile_image,
                         "image"
                     ),
-                
-                # Action Buttons
+                 
                 rx.hstack(
                     rx.dialog.close(
                         rx.button(
@@ -1908,10 +2382,12 @@ def profile_upload_modal() -> rx.Component:
                 width="100%"
             ),
             max_width="500px",
-            padding="30px"
+            padding="30px",
+
         ),
         open=ProfileState.show_profile_modal
     )
+
 
 def file_upload_section(
     title: str,
@@ -1922,10 +2398,12 @@ def file_upload_section(
     icon: str = "upload"
 ) -> rx.Component:
     """Reusable file upload component"""
+    upload_id = f"upload_{title.lower().replace(' ', '_')}"
+    
     return rx.vstack(
         rx.hstack(
             rx.icon(icon, size=20, color="#6366F1"),
-            rx.text(title, size="2", weight="bold"),
+            rx.text(title, size="2", weight="bold", color="#22282c"),
             spacing="2",
             align="center",
         ),
@@ -1938,6 +2416,7 @@ def file_upload_section(
                     "Select File",
                     variant="soft",
                     size="2",
+                    cursor="pointer"
                 ),
                 rx.text(
                     accepted_types,
@@ -1947,8 +2426,8 @@ def file_upload_section(
                 spacing="2",
                 align="center",
             ),
-            id=f"upload_{title.lower().replace(' ', '_')}",
-            border=f"1px dashed #CBD5E1",
+            id=upload_id,
+            border="1px dashed #CBD5E1",
             padding="16px",
             border_radius="8px",
             width="100%",
@@ -1958,16 +2437,13 @@ def file_upload_section(
             rx.button(
                 "Upload",
                 size="1",
-                on_click=upload_handler(
-                    rx.upload_files(
-                        upload_id=f"upload_{title.lower().replace(' ', '_')}"
-                    )
-                ),
+                cursor="pointer",
+                # Fixed: Pass the upload_id to get the files, then call the handler
+                on_click=upload_handler(rx.upload_files(upload_id=upload_id)),
             ),
             rx.cond(
                 current_file != "",
                 rx.hstack(
-                    rx.icon("check-circle", size=16, color="#10B981"),
                     rx.text(current_file, size="1", color="#10B981"),
                     spacing="1",
                 ),
@@ -1985,25 +2461,46 @@ def file_upload_section(
     )
 
 
-def nav_button(text: str, section: str) -> rx.Component:
+
+def nav_button(text: str, section: str, active: bool = False) -> rx.Component:
     return rx.button(
         text,
         on_click=lambda: ProfileState.set_section(section),
         style=rx.cond(
-            ProfileState.active_section == section,
-            menu_item_style(True),
-            menu_item_style(False),
+            active,
+            {
+                "background": "#22282c",
+                "color": "white",
+                "font_weight": "600",
+                "width": "100%",
+                "padding": "30px 16px",
+                "transition": "all 0.25s ease-in-out",
+                "cursor": "pointer",
+            },
+            {
+                "background": "white",
+                "color": "#22282C",
+                "font_weight": "500",
+                "width": "100%",
+                "padding": "30px 16px",
+                "transition": "all 0.25s ease-in-out",
+                "cursor": "pointer",
+                "_hover": {
+                    "background": "#D6E3EF",
+                    "color": "#0078D4",
+                },
+            },
         ),
-        color="#22282c",
-        background = "#E4EEF6"
+     
     )
+
 
 def profile_info_content() -> rx.Component:
     return rx.vstack(
         rx.center(
             rx.text(
                 "Personal Information",
-                font_size="20px",
+                size = "6",
                 font_weight="bold",
                 margin_bottom="20px",
                 color="#22282c",
@@ -2036,16 +2533,17 @@ def profile_info_content() -> rx.Component:
             on_change=ProfileState.set_phone_number,
         ),
         rx.hstack(
-            select_with_label(
-                "Gender (Optional)",
-                ["Male", "Female", "Other"],
-                value=ProfileState.gender,
-                on_change=ProfileState.set_gender,
-            ),
+           
             input_with_label_date(
                 "Birthday (Optional)",
                 ProfileState.birthday,
                 on_change=ProfileState.set_birthday,
+            ),
+             select_with_label(
+                "Gender (Optional)",
+                ["Male", "Female", "Other"],
+                value=ProfileState.gender,
+                on_change=ProfileState.set_gender,
             ),
             spacing="4",
             width="100%",
@@ -2056,8 +2554,9 @@ def profile_info_content() -> rx.Component:
             bg="#22282C",
             color="white",
             border_radius="8px",
-            padding="20px",
+            padding="20px 10px",
             cursor="pointer",
+            font_weight="bold",
             on_click=ProfileState.save_profile,
         ),
         rx.button(
@@ -2069,7 +2568,9 @@ def profile_info_content() -> rx.Component:
             margin_top="12px",
             padding="30px",
             color="#22282c",
-            border="0.5px solid #929FA7",
+            border="1px solid #E5E7EB",
+            box_shadow="0 2px 8px rgba(0, 0, 0, 0.15)",
+            cursor = "pointer"
         ),
         spacing="5",
         width="100%",
@@ -2170,7 +2671,7 @@ def password_change_modal() -> rx.Component:
                         text_align="right",
                         margin_top="-20px",
                     ),
-                    # New Password Field
+               
                     rx.vstack(
                         rx.text(
                             "New Password",
@@ -2217,7 +2718,7 @@ def password_change_modal() -> rx.Component:
                         width="100%",
                         align_items="flex-start",
                     ),
-                    # Confirm Password Field
+                  
                     rx.vstack(
                         rx.text(
                             "Confirm New Password",
@@ -2309,13 +2810,6 @@ def password_change_modal() -> rx.Component:
     )
 
 
-import json
-
-
-class Address(rx.Base):
-    id: int
-    address: str
-    is_default: bool = False
 
 def new_address_modal() -> rx.Component:
     return rx.cond(
@@ -2371,6 +2865,7 @@ def new_address_modal() -> rx.Component:
                     ),
                     # Address Input Field
                     rx.vstack(
+
                         rx.input(
                             placeholder="Enter your address...",
                             value=AddressState.new_address,
@@ -2387,6 +2882,7 @@ def new_address_modal() -> rx.Component:
                         width="100%",
                         align_items="flex-start",
                     ),
+              
                     # Submit Button (text changes based on mode)
                     rx.button(
                         rx.cond(
@@ -2396,12 +2892,12 @@ def new_address_modal() -> rx.Component:
                         ),
                         on_click=AddressState.save_address,
                         width="100%",
-                        bg="#2E6FF2",
+                        bg="#22282c",
                         color="white",
                         border_radius="12px",
-                        padding="15px",
+                        padding="20px",
                         font_size="16px",
-                        font_weight="600",
+                        font_weight="500",
                         cursor="pointer",
                         _hover={"opacity": "0.9"},
                         margin_top="20px",
@@ -2430,127 +2926,133 @@ def new_address_modal() -> rx.Component:
         ),
     )
 
-def address_card(address: dict):
+def address_card(address: dict) -> rx.Component:
+    """Display a single address card with edit/delete actions and set default."""
     return rx.box(
-        rx.vstack(
-            # Row 1: Name + Edit/Delete buttons
+        rx.hstack(
+            # Left side - Address info
             rx.hstack(
-                rx.text(
-                    f"{ProfileState.first_name} {ProfileState.last_name}",
-                    font_weight="bold",
-                    color="#22282C",
-                ),
-                rx.spacer(),
-                rx.hstack(
+                rx.box(
                     rx.icon(
-                        "pencil",
-                        size=18,
+                        "map-pin",
+                        size=32,
                         color="#2E6FF2",
-                        cursor="pointer",
-                        on_click=lambda: AddressState.start_edit_address(
-                            address["id"], address["address"]
+                    ),
+                    padding="10px",
+                    border_radius="8px",
+                    bg="#EFF6FF",
+                ),
+                rx.vstack(
+                    rx.hstack(
+                        rx.text(
+                            f"{ProfileState.first_name} {ProfileState.last_name}",
+                            font_size="16px",
+                            font_weight="600",
+                            color="#22282C",
                         ),
+                        rx.cond(
+                            address["is_default"],
+                            rx.badge(
+                                "Default",
+                                color_scheme="green",
+                                variant="soft",
+                            ),
+                            rx.fragment(),
+                        ),
+                        spacing="2",
+                        align_items="center",
                     ),
                     rx.text(
-                        "Edit",
-                        font_weight="semibold",
-                        color="#2E6FF2",
-                        cursor="pointer",
-                        on_click=lambda: AddressState.start_edit_address(
-                            address["id"], address["address"]
-                        ),
-                    ),
-                    rx.icon(
-                        "trash",
-                        size=18,
-                        color="#FF4D4D",
-                        cursor="pointer",
-                        on_click=lambda: AddressState.delete_address(address["id"]),
+                        ProfileState.phone_number,
+                        font_size="14px",
+                        color="#6B7280",
                     ),
                     rx.text(
-                        "Delete",
-                        font_weight="semibold",
-                        color="#FF4D4D",
-                        cursor="pointer",
-                        on_click=lambda: AddressState.delete_address(address["id"]),
+                        address["address"],
+                        font_size="12px",
+                        color="#9CA3AF",
                     ),
-                    spacing="3",
-                    align="center",
+                    spacing="1",
+                    align_items="start",
                 ),
-                align="center",
-                width="100%",
+                spacing="3",
+                align_items="center",
             ),
-
-  
-            # Row 2: Phone number
-            rx.text(ProfileState.phone_number, color="#555", mt="5px"),
-
+            
+            rx.spacer(),
+            
+            # Right side - Actions
             rx.hstack(
-              
-                rx.hstack(
-                    rx.icon("map-pin", color="#2E6FF2"),
-                    rx.text(address["address"], font_weight="medium", color="#22282C"),
-                    align="center",
-                    spacing="2",
-                ),
-
-        
-                # Right side: default indicator or button
                 rx.cond(
-                    address["is_default"],
-                    rx.text("Default Address", font_weight="bold", color="green"),
+                    ~address["is_default"],
                     rx.button(
-                        "Set as Default",
-                        font_weight="bold",
-                        color="white",
-                        bg="#2E6FF2",
-                        border_radius="5px",
-                        padding="6px 12px",
-                        cursor="pointer",
-                        _hover={"opacity": "0.9"},
-                        on_click=lambda: AddressState.set_default_address(
-                            address["id"]
-                        ),
-                    ),
-                ),
-                justify="between",  # Spread items left/right
-                       
+                        "Set Default",
+                        size="2",
+                        variant="soft",
+                        color_scheme="blue",
+                        cursor = "pointer",
                         on_click=lambda: AddressState.set_default_address(address["id"]),
                     ),
+                    rx.fragment(),
                 ),
-
-                justify="between",  
-                align="center",
-                width="100%",
-                mt="5px",
+                rx.icon_button(
+                    rx.icon("pencil", size=18),
+                    size="2",
+                    variant="soft",
+                    color_scheme="blue",
+                    on_click=lambda: AddressState.start_edit_address(
+                        address["id"], address["address"]
+                    ),
+                    cursor="pointer",
+                ),
+                rx.icon_button(
+                    rx.icon("trash-2", size=18),
+                    size="2",
+                    variant="soft",
+                    color_scheme="red",
+                    on_click=lambda: AddressState.delete_address(address["id"]),
+                    cursor="pointer",
+                ),
+                spacing="2",
             ),
+            
+            width="100%",
+            align_items="center",
+        ),
+        padding="20px",
+        border="1px solid #E5E7EB",
+        border_radius="12px",
+        bg="white",
+        width="100%",
+        _hover={
+            "box_shadow": "0 4px 12px rgba(46, 111, 242, 0.15)",
+            "border_color": "#2E6FF2",
+        },
+        transition="all 0.2s ease",
+    )
    
-
 def address_content() -> rx.Component:
     return rx.vstack(
-        rx.center(
-            rx.text(
-                "My Address",
-                font_size="20px",
-                font_weight="bold",
-                margin_bottom="20px",
-                color="#22282c",
+
+        rx.hstack(
+            rx.heading("My Address", size="6", color="#22282c"),
+            rx.spacer(),
+            rx.hstack(
+                rx.button(
+                    rx.icon("map-pin", size=18),
+                    "Add New Address",
+                    on_click=AddressState.toggle_form,
+                    color_scheme="blue",
+                    variant="soft",
+                    cursor = "pointer"
+                ),
             ),
             width="100%",
-        ),
-      
-        rx.button(
-            "Add New Address",
-            on_click=AddressState.toggle_form,
-            background_color="#2E6FF2",
-            color="white",
-            border_radius="5px",
-            padding="20px 10px",
+            align_items="center",
             margin_bottom="20px",
-            align_self="flex-end",
-            font_weight="bold",
-            cursor="pointer",
+            margin_top = "20px"
         ),
+        
       
         new_address_modal(),
 
@@ -2575,13 +3077,15 @@ def card_content() -> rx.Component:
                     on_click=PaymentState.toggle_card_form,
                     color_scheme="blue",
                     variant="soft",
+                    cursor = "pointer"
                 ),
                 rx.button(
                     rx.icon("landmark", size=18),
                     "Add Bank",
                     on_click=PaymentState.toggle_bank_form,
-                    color_scheme="green",
+                    color_scheme="grass",
                     variant="soft",
+                    cursor = "pointer"
                 ),
                 spacing="3",
             ),
@@ -2590,6 +3094,7 @@ def card_content() -> rx.Component:
             margin_bottom="20px",
         ),
         
+
         # Loading state
         rx.cond(
             PaymentState.is_loading_payments,
@@ -2812,15 +3317,6 @@ def new_card_modal() -> rx.Component:
                         spacing="3",
                     ),
                     
-                    # Set as default
-                    rx.hstack(
-                        rx.checkbox(
-                            checked=PaymentState.is_default,
-                            on_change=PaymentState.set_is_default,
-                        ),
-                        rx.text("Set as default payment method", font_size="14px", color="#22282c"),
-                        align_items="center",
-                    ),
                     
                     # Error message
                     rx.cond(
@@ -2838,10 +3334,10 @@ def new_card_modal() -> rx.Component:
                         "Add Card",
                         on_click=PaymentState.submit_card,
                         width="100%",
-                        bg="#2E6FF2",
+                        bg="#22282c",
                         color="white",
                         border_radius="12px",
-                        padding="15px",
+                        padding="20px",
                         font_size="16px",
                         font_weight="600",
                         cursor="pointer",
@@ -2953,15 +3449,6 @@ def new_bank_model() -> rx.Component:
                             style=input_style
                         ),
                         
-                        rx.hstack(
-                            rx.checkbox(
-                                checked=PaymentState.bank_is_default,
-                                on_change=PaymentState.set_bank_is_default
-                            ),
-                            rx.text("Set as Default", color="#22282c", font_size="14px"),
-                            align_items="center",
-                        ),
-                        
                         # Error message
                         rx.cond(
                             PaymentState.error_message != "",
@@ -2976,11 +3463,12 @@ def new_bank_model() -> rx.Component:
                         rx.button(
                             "Add Bank Account",
                             on_click=PaymentState.submit_bank,
-                            color_scheme="green",
+                            background_color = "#22282c",
                             width="100%",
-                            padding="15px",
+                            padding="20px",
                             font_size="16px",
                             font_weight="600",
+                            border_radius = "12px",
                             cursor="pointer",
                             _hover={"opacity": "0.9"},
                             margin_top="10px",
@@ -3015,23 +3503,6 @@ def new_bank_model() -> rx.Component:
         ),
     )
     
-
-def wishlist_content() -> rx.Component:
-    return rx.vstack(
-        rx.center(
-            rx.text(
-                "Wishlist",
-                font_size="20px",
-                font_weight="bold",
-                margin_bottom="20px",
-                color="#22282c",
-            ),
-            width="100%",
-        ),
-        rx.text("Your wishlist items will appear here...", color="#22282c"),
-        spacing="5",
-        width="100%",
-    )
 
 
 def orders_content() -> rx.Component:
@@ -3086,23 +3557,6 @@ def review_form_modal() -> rx.Component:
                         width="100%",
                     ),
                     
-                    # Product ID (read-only)
-                    rx.vstack(
-                        rx.text("Product ID", font_size="14px", font_weight="500", color="#22282c"),
-                        rx.input(
-                            value=ReviewState.product_id,
-                            width="100%",
-                            padding="5px",
-                            border="1px solid #D1D5DB",
-                            border_radius="12px",
-                            background_color="#F3F4F6",
-                            is_read_only=True,
-                        ),
-                        spacing="1",
-                        width="100%",
-                        align_items="start",
-                    ),
-                    
                     # Rating
                     rx.vstack(
                         rx.text("Rating", font_size="14px", font_weight="500", color="#22282c"),
@@ -3130,24 +3584,27 @@ def review_form_modal() -> rx.Component:
                             border="1px solid #D1D5DB",
                             border_radius="12px",
                             background_color="#ffffff",
+                            color="#22282c"
                         ),
                         spacing="1",
                         width="100%",
                         align_items="start",
                     ),
                     
-                    # Image Upload
+                    # Image Upload Section - FIXED
                     rx.vstack(
                         rx.text("Image (Optional)", font_size="14px", font_weight="500", color="#22282c"),
+                        # Check if image preview exists
                         rx.cond(
-                            ReviewState.review_image,
+                            ReviewState.review_image_preview != "",
                             rx.vstack(
                                 rx.image(
-                                    src=f"data:image/jpeg;base64,{ReviewState.review_image}",
+                                    src=ReviewState.review_image_preview,
                                     width="200px",
                                     height="200px",
                                     object_fit="cover",
                                     border_radius="8px",
+                                    alt="Review Image",
                                 ),
                                 rx.button(
                                     "Remove Image",
@@ -3155,24 +3612,19 @@ def review_form_modal() -> rx.Component:
                                     variant="soft",
                                     color_scheme="red",
                                     size="2",
+                                    cursor="pointer",
                                 ),
                                 spacing="2",
                                 align_items="center",
                             ),
-                            rx.upload(
-                                rx.button(
-                                    rx.icon("image", size=16),
-                                    "Upload Image",
-                                    size="2",
-                                    variant="soft",
-                                    cursor="pointer",
-                                ),
-                                accept={
-                                    "image/png": [".png"],
-                                    "image/jpeg": [".jpg", ".jpeg"],
-                                },
-                                max_files=1,
-                                on_drop=ReviewState.handle_image_upload,
+                            # Show upload form if no image
+                            file_upload_section(
+                                "Review Image",
+                                "Upload your review image",
+                                "Accepted: JPG, PNG files only",
+                                ReviewState.handle_review_image_upload,
+                                ReviewState.review_image,
+                                "image"
                             ),
                         ),
                         rx.cond(
@@ -3205,10 +3657,10 @@ def review_form_modal() -> rx.Component:
                         "Update Review",
                         on_click=ReviewState.edit_review,
                         width="100%",
-                        bg="#2E6FF2",
+                        bg="#22282c",
                         color="white",
                         border_radius="12px",
-                        padding="15px",
+                        padding="20px",
                         font_size="16px",
                         font_weight="600",
                         cursor="pointer",
@@ -3254,7 +3706,6 @@ def render_stars(rating):
         ]
     )
 
-
 def review_card(review: Review) -> rx.Component:
     """Display a single review card."""
     return rx.box(
@@ -3264,32 +3715,22 @@ def review_card(review: Review) -> rx.Component:
                 render_stars(review.rating),
                 rx.spacer(),
                 rx.hstack(
-                    rx.icon(
-                        "pencil",
-                        size=18,
-                        color="#2E6FF2",
-                        cursor="pointer",
+                
+                    rx.icon_button(
+                        rx.icon("pencil", size=18),
+                        size="2",
+                        variant="soft",
+                        color_scheme="sky",
+                        cursor = "pointer",
                         on_click=lambda: ReviewState.open_edit_form(review),
                     ),
-                    rx.text(
-                        "Edit",
-                        font_weight="semibold",
-                        color="#2E6FF2",
-                        cursor="pointer",
-                        on_click=lambda: ReviewState.open_edit_form(review),
-                    ),
-                    rx.icon(
-                        "trash",
-                        size=18,
-                        color="#FF4D4D",
-                        cursor="pointer",
-                        on_click=lambda: ReviewState.delete_review(review.id),
-                    ),
-                    rx.text(
-                        "Delete",
-                        font_weight="semibold",
-                        color="#FF4D4D",
-                        cursor="pointer",
+            
+                    rx.icon_button(
+                        rx.icon("trash-2", size=18),
+                        size="2",
+                        variant="soft",
+                        color_scheme="red",
+                        cursor = "pointer",
                         on_click=lambda: ReviewState.delete_review(review.id),
                     ),
                     spacing="3",
@@ -3320,37 +3761,24 @@ def review_card(review: Review) -> rx.Component:
                 review.image,
                 rx.image(
                     src=f"data:image/jpeg;base64,{review.image}",
-                    width="200px",
-                    height="200px",
+                    width="150px",  # Reduced from 200px
+                    height="150px",  # Reduced from 200px
                     object_fit="cover",
                     border_radius="8px",
                 ),
                 rx.fragment(),
             ),
             
-            # Dates
-            rx.hstack(
-                rx.text(
-                    f"Created: {review.created_at}",
-                    font_size="12px",
-                    color="#9CA3AF",
-                ),
-                rx.text(
-                    f"Updated: {review.updated_at}",
-                    font_size="12px",
-                    color="#9CA3AF",
-                ),
-                spacing="4",
-            ),
             
             spacing="3",
             width="100%",
             align_items="start",
         ),
-        padding="20px",
+        padding="16px",  # Reduced from 20px
         border="1px solid #E5E7EB",
         border_radius="12px",
         bg="white",
+        max_width="430px",  # Added max width constraint
         width="100%",
         _hover={
             "box_shadow": "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
@@ -3358,8 +3786,6 @@ def review_card(review: Review) -> rx.Component:
         },
         transition="all 0.2s ease",
     )
-
-
 
 def reviews_content() -> rx.Component:
     """Main reviews content component - Load, Edit, and Delete only."""
@@ -3398,8 +3824,9 @@ def reviews_content() -> rx.Component:
             ),
             rx.cond(
                 ReviewState.reviews.length() > 0,
-                rx.vstack(
+                rx.grid(  # Changed from rx.vstack to rx.grid
                     rx.foreach(ReviewState.reviews, review_card),
+                    columns="2",  # 2 columns for grid
                     spacing="4",
                     width="100%",
                 ),
@@ -3459,16 +3886,19 @@ def input_with_label(
     return rx.vstack(
         rx.text(label, font_size="14px", font_weight="500", margin_bottom="4px"),
         rx.input(
-            value=value,  # reactive binding
+            value=value, 
             placeholder=label,
             width="100%",
             style=input_style,
-            on_change=on_change,  # update state on user input
+            on_change=on_change,  
+            border="1px solid #E5E7EB",
+            padding= "0px 12px"
         ),
         spacing="1",
         width="100%",
         color="#22282c",
     )
+
 
 
 def input_with_label_date(
@@ -3478,11 +3908,12 @@ def input_with_label_date(
         rx.text(label, font_size="14px", font_weight="500", margin_bottom="4px"),
         rx.input(
             type="date",
-            value=value,  # use `value` instead of default_value
+            value=value, 
             placeholder=label,
             width="100%",
             style=input_style,
-            on_change=on_change,  # reactive binding
+            on_change=on_change, 
+            border="1px solid #E5E7EB",
         ),
         spacing="1",
         width="100%",
@@ -3499,11 +3930,13 @@ def select_with_label(
     return rx.vstack(
         rx.text(label, font_size="14px", font_weight="500", margin_bottom="4px"),
         rx.select(
-            options, value=value, placeholder=label, width="100%", on_change=on_change
+            options, value=value, placeholder=label, width="100%", on_change=on_change, variant="surface", color_scheme="cyan"
         ),
         spacing="1",
         width="100%",
         color="#22282c",
+    
+        
     )
 
 
@@ -3551,11 +3984,11 @@ def credit_card_item(card: CreditCard) -> rx.Component:
     """Display a single credit card."""
     return rx.box(
         rx.hstack(
-            # Left side - Card info
+           
             rx.hstack(
                 rx.box(
                     rx.icon(
-                        "credit-card",  # Simplified - just use one icon
+                        "credit-card",  
                         size=32,
                         color="#2E6FF2",
                     ),
@@ -3602,7 +4035,7 @@ def credit_card_item(card: CreditCard) -> rx.Component:
             
             rx.spacer(),
             
-            # Right side - Actions
+        
             rx.hstack(
                 rx.cond(
                     ~card.is_default,
@@ -3611,6 +4044,7 @@ def credit_card_item(card: CreditCard) -> rx.Component:
                         size="2",
                         variant="soft",
                         color_scheme="blue",
+                        cursor = "pointer",
                         on_click=lambda: PaymentState.set_default_card(card.id)
                     ),
                     rx.fragment(),
@@ -3620,6 +4054,7 @@ def credit_card_item(card: CreditCard) -> rx.Component:
                     size="2",
                     variant="soft",
                     color_scheme="red",
+                    cursor = "pointer",
                     on_click=lambda: PaymentState.delete_credit_card(card.id),
                 ),
                 spacing="2",
@@ -3705,6 +4140,7 @@ def bank_account_item(account: BankAccount) -> rx.Component:
                         size="2",
                         variant="soft",
                         color_scheme="green",
+                        cursor = "pointer",
                         on_click=lambda: PaymentState.set_default_bank(account.id),
                     ),
                     rx.fragment(),
@@ -3714,6 +4150,7 @@ def bank_account_item(account: BankAccount) -> rx.Component:
                     size="2",
                     variant="soft",
                     color_scheme="red",
+                    cursor = "pointer",
                     on_click=lambda: PaymentState.delete_bank_account(account.id),
                 ),
                 spacing="2",
@@ -3740,5 +4177,4 @@ def profile_page() -> rx.Component:
 
     return rx.box(
         template(profile_content),
-        on_mount=ProfileState.load_user_data  
     )
