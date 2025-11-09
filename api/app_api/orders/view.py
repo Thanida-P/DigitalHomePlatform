@@ -81,55 +81,6 @@ def checkout(request):
     customer.save()
     return JsonResponse({'message': 'Order created successfully', 'order_id': order.id}, status=201)
 
-'''@login_required
-@require_http_methods(["GET"])
-def list_orders(request):
-    connection, root = get_connection()
-    try:
-        customer = request.user.customer
-        if not customer:
-            return JsonResponse({'error': 'Only customers can view orders'}, status=403)
-        orders_data = []
-        for order in customer.orders.all().order_by('-created_at'):
-            order_items = []
-            for order_item in order.order_items_rel.all():
-                product = root.products[order_item.product_id]
-                item = product.item
-                order_items.append({
-                    'id': order_item.id,
-                    'product_id': product.get_id(),
-                    'product_name': item.get_name(),
-                    'quantity': order_item.quantity,
-                    'type': order_item.type,
-                    'added_at': order_item.added_at.isoformat(),
-                })
-            orders_data.append({
-                'order_id': order.id,
-                'order_items': order_items,
-                'total_price': str(order.total_price),
-                'status': order.status,
-                'created_at': order.created_at.isoformat(),
-                'updated_at': order.updated_at.isoformat(),
-                'payment_method': {
-                    'type': order.payment_method.type,
-                    'credit_card_last4': order.payment_method.credit_card.last4 if order.payment_method.credit_card else None,
-                    'bank_account_last4': order.payment_method.bank_account.last4 if order.payment_method.bank_account else None,
-                } if order.payment_method else None,
-                
-            })
-        transaction.commit()
-        return JsonResponse({'orders': orders_data}, status=200)
-    except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
-        return JsonResponse({"error": str(e)}, status=500)
-    finally:
-        connection.close()
-'''
-
-
 @login_required
 @require_http_methods(["GET"])
 def list_orders(request):
