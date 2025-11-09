@@ -2,11 +2,10 @@ import reflex as rx
 from ..state import AuthState
 
 class LoginState(rx.State):
-    # Form fields
+ 
     identifier: str = ""
     password: str = ""
-    
-    # UI state
+
     is_loading: bool = False
     error_message: str = ""
     
@@ -27,7 +26,7 @@ class LoginState(rx.State):
     
     async def handle_login(self):
         """Handle login form submission"""
-        # Validation
+   
         if not self.identifier.strip():
             self.error_message = "Username or email is required"
             return
@@ -36,19 +35,14 @@ class LoginState(rx.State):
             self.error_message = "Password is required"
             return
         
-        # Clear error and set loading
         self.error_message = ""
         self.is_loading = True
         
         try:
-            # Get auth state and call login
             auth_state = await self.get_state(AuthState)
             
-            # Perform login
             result = await auth_state.login(self.identifier.strip(), self.password)
             
-            # If we get here and auth is successful, redirect will happen
-            # Clear the form
             self.password = ""
             self.identifier = ""
             
@@ -58,7 +52,6 @@ class LoginState(rx.State):
             self.error_message = f"Login error: {str(e)}"
             self.is_loading = False
         finally:
-            # Reset loading state
             self.is_loading = False
 
 
@@ -78,7 +71,7 @@ def login_page() -> rx.Component:
                     )
                 ),
                 
-                # Header
+              
                 rx.center(
                     rx.heading(
                         "Sign in to your account",
@@ -93,7 +86,7 @@ def login_page() -> rx.Component:
                     width="100%",
                 ),
                 
-                # Username or Email Field
+ 
                 rx.vstack(
                     rx.text(
                         "Username or Email",
@@ -124,7 +117,7 @@ def login_page() -> rx.Component:
                     margin_bottom="-1.5rem"
                 ),
                 
-                # Password Field
+             
                 rx.vstack(
                     rx.hstack(
                         rx.text(
@@ -155,7 +148,6 @@ def login_page() -> rx.Component:
                         border_radius="8px",
                         value=LoginState.password,
                         on_change=LoginState.set_password,
-                        # Add Enter key support
                         on_key_down=lambda key: rx.cond(
                             key == "Enter",
                             LoginState.handle_login(),
@@ -167,7 +159,6 @@ def login_page() -> rx.Component:
                     margin_bottom="-1.5rem"
                 ),
                 
-                # Sign Up Link
                 rx.hstack(
                     rx.text("New here?", size="3", color="#22282C"),
                     rx.link("Sign up", href="/signup", size="3"),
@@ -176,7 +167,6 @@ def login_page() -> rx.Component:
                     width="100%",
                 ),
                 
-                # Sign In Button
                 rx.button(
                     rx.cond(
                         LoginState.is_loading,
@@ -197,7 +187,6 @@ def login_page() -> rx.Component:
                     disabled=LoginState.is_loading,
                 ),
                 
-                # Divider
                 rx.hstack(
                     rx.divider(margin="0", border_color="#E9EBEC", border_width="1px", width="100%"),
                     rx.text(
@@ -211,10 +200,9 @@ def login_page() -> rx.Component:
                     width="100%",
                 ),
                 
-                # Social Login Buttons
                 rx.center(
                     rx.icon_button(
-                        rx.icon(tag="chrome"),
+                        rx.icon(tag="chrome",stroke_width=1,),
                         variant="soft",
                         size="3",
                         border_radius="100px",
@@ -223,7 +211,7 @@ def login_page() -> rx.Component:
                         border="1px solid #929FA7",
                     ),
                     rx.icon_button(
-                        rx.icon(tag="facebook"),
+                        rx.icon(tag="facebook",stroke_width=1,),
                         variant="soft",
                         size="3",
                         radius="full",
@@ -233,7 +221,7 @@ def login_page() -> rx.Component:
                         border="1px solid #929FA7",
                     ),
                     rx.icon_button(
-                        rx.icon(tag="instagram"),
+                        rx.icon(tag="instagram",stroke_width=1,),
                         variant="soft",
                         size="3",
                         border_radius="100px",
@@ -242,7 +230,7 @@ def login_page() -> rx.Component:
                         border="1px solid #929FA7",
                     ),
                     rx.icon_button(
-                        rx.icon(tag="twitter"),
+                        rx.icon(tag="twitter",stroke_width=1,),
                         variant="soft",
                         size="3",
                         border_radius="100px",
@@ -264,7 +252,7 @@ def login_page() -> rx.Component:
             background_color="white",
         ),
         height="100vh",
-        # 👇 Reset form state when page loads
+       
         on_mount=[LoginState.reset_form, AuthState.check_auth],
     )
 

@@ -33,7 +33,7 @@ class OrdersState(rx.State):
     is_processing: bool = False
     selected_filter: str = "all"
     
-    # Review Modal State
+    
     show_review_modal: bool = False
     selected_product_id: int = 0
     selected_product_name: str = ""
@@ -41,6 +41,7 @@ class OrdersState(rx.State):
     review_comment: str = ""
     review_image: str = ""
     upload_status: str = ""
+    reviewed_products: List[int] = []
     
     def set_filter(self, filter_type: str):
         """Set the order filter"""
@@ -103,14 +104,22 @@ class OrdersState(rx.State):
         self.upload_status = f"Product image uploaded: {file.name}"
     
     async def submit_review(self):
-     
         import httpx
         self.is_processing = True
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies or {}
         
         try:
+            if not self.selected_product_id:
+                rx.toast.error("Product ID is missing")
+                return
+            
+            if not self.review_rating:
+                rx.toast.error("Please select a rating")
+                return
+            
             async with httpx.AsyncClient() as client:
+    
                 data = {
                     'product_id': str(self.selected_product_id),
                     'rating': str(self.review_rating),
@@ -123,37 +132,43 @@ class OrdersState(rx.State):
                 if self.review_image:
                     file_path = upload_dir / self.review_image
                     if file_path.exists():
-                        files['image'] = open(file_path, 'rb')
+                        with open(file_path, 'rb') as f:
+                            files['image'] = ('image.png', f.read(), 'image/png')
                     else:
                         print(f"Product image not found: {file_path}")
+                
                 
                 response = await client.post(
                     f"{API_BASE_URL}/reviews/add/",
                     data=data,
-                    files=files,
+                    files=files if files else None,
                     cookies=cookies_dict,
                 )
                 
                 if response.status_code == 201:
                     rx.toast.success("Review submitted successfully!")
-                    print("Review success")
+               
+                    if self.selected_product_id not in self.reviewed_products:
+                        self.reviewed_products.append(self.selected_product_id)
                     self.close_review_modal()
                 else:
-                    error_data = response.json()
-                    error = error_data.get('error', 'Failed to submit review')
+                    try:
+                        error_data = response.json()
+                        error = error_data.get('error', 'Failed to submit review')
+                    except:
+                        error = response.text or 'Failed to submit review'
+                  
                     rx.toast.error(f"Error: {error}")
                     
         except Exception as e:
+            print(f"DEBUG: Exception in submit_review: {str(e)}")
+            import traceback
+            traceback.print_exc()
             rx.toast.error(f"Error: {e}")
         finally:
             self.is_processing = False
-            for file in files.values():
-                    try:
-                        file.close()
-                    except:
-                        pass
     
-    async def load_orders(self):
+    '''async def load_orders(self):
         """Load orders from API"""
         import httpx
         self.is_loading = True
@@ -162,27 +177,16 @@ class OrdersState(rx.State):
             auth_state = await self.get_state(AuthState)
             cookies_dict = auth_state.session_cookies or {}
             
-            # DEBUG: Print what we're sending
-            print(f"DEBUG: Cookies available: {bool(cookies_dict)}")
-            print(f"DEBUG: Cookie keys: {list(cookies_dict.keys()) if cookies_dict else 'None'}")
-            print(f"DEBUG: API URL: {API_BASE_URL}/orders/list/")
-            
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(
                     f"{API_BASE_URL}/orders/list/",
                     cookies=cookies_dict,
                 )
                 
-                # DEBUG: Print response status and body
-                print(f"DEBUG: Response status code: {response.status_code}")
-                print(f"DEBUG: Response body: {response.text}")
-                
                 if response.status_code == 200:
                     data = response.json()
                     orders_data = data.get('orders', [])
-                    
-                    print(f"DEBUG: Number of orders received: {len(orders_data)}")
-                    
+               
                     self.orders = [
                         Order(
                             order_id=order['order_id'],
@@ -195,17 +199,120 @@ class OrdersState(rx.State):
                         )
                         for order in orders_data
                     ]
-                    
-                    print(f"DEBUG: Orders successfully loaded. Total: {len(self.orders)}")
+                    print("order item", self.orders),
+                    for order in self.orders:
+                        for item in order.order_items:
+                            print(item['product_id'])
                     
                 elif response.status_code == 401:
-                    print("DEBUG: Unauthorized - session may have expired")
                     rx.toast.error("Your session has expired. Please log in again.")
                 elif response.status_code == 403:
-                    print("DEBUG: Forbidden - check permissions")
                     rx.toast.error("You don't have permission to view orders")
                 else:
-                    print(f"DEBUG: Unexpected status code {response.status_code}")
+                    rx.toast.error(f"Failed to load orders (Status: {response.status_code})")
+                        
+        except Exception as e:
+            print(f"DEBUG: Exception occurred: {type(e).__name__}: {e}")
+            rx.toast.error(f"Error loading orders: {str(e)}")
+        finally:
+            self.is_loading = False'''
+    
+    async def load_orders(self):
+        """Load orders from API with product images"""
+        import httpx
+        self.is_loading = True
+        
+        try:
+            auth_state = await self.get_state(AuthState)
+            cookies_dict = auth_state.session_cookies or {}
+            
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    f"{API_BASE_URL}/orders/list/",
+                    cookies=cookies_dict,
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    orders_data = data.get('orders', [])
+                    
+                    orders_list = []
+                    for order in orders_data:
+                        # Fetch product details for each item in the order
+                        enriched_items = []
+                        for item in order.get('order_items', []):
+                            product_id = item.get('product_id')
+                            
+                            try:
+                                # Fetch product details
+                                product_response = await client.get(
+                                    f"{API_BASE_URL}/products/get_product_detail/{product_id}/",
+                                    cookies=cookies_dict,
+                                    timeout=10.0
+                                )
+                                
+                                if product_response.status_code == 200:
+                                    product_data = product_response.json().get('product', {})
+                                    image = product_data.get('image', '')
+                                    
+                                    # Get price based on item type
+                                    item_type = item.get('type', 'physical')
+                                    if item_type == 'digital':
+                                        price = product_data.get('digital_price', 0)
+                                    else:
+                                        price = product_data.get('physical_price', 0)
+                                    
+                                    # Enrich item with image and price
+                                    enriched_item = {
+                                        **item,
+                                        'image': f"data:image/png;base64,{image}" if image else "/placeholder.jpg",
+                                        'price': price
+                                    }
+                                    enriched_items.append(enriched_item)
+                                else:
+                                    # Fallback if product fetch fails
+                                    enriched_item = {
+                                        **item,
+                                        'image': "/placeholder.jpg"
+                                    }
+                                    enriched_items.append(enriched_item)
+                                    print(f"⚠️ Could not fetch product {product_id}: {product_response.status_code}")
+                                    
+                            except httpx.TimeoutException:
+                                print(f"⏱️ Timeout fetching product {product_id}")
+                                enriched_item = {
+                                    **item,
+                                    'image': "/placeholder.jpg"
+                                }
+                                enriched_items.append(enriched_item)
+                                
+                            except Exception as e:
+                                print(f"❌ Error fetching product {product_id}: {type(e).__name__}: {str(e)}")
+                                enriched_item = {
+                                    **item,
+                                    'image': "/placeholder.jpg"
+                                }
+                                enriched_items.append(enriched_item)
+                        
+                        # Create order with enriched items
+                        order_obj = Order(
+                            order_id=order['order_id'],
+                            order_items=enriched_items,
+                            total_price=order['total_price'],
+                            status=order['status'],
+                            created_at=order['created_at'],
+                            updated_at=order['updated_at'],
+                            payment_method=order.get('payment_method')
+                        )
+                        orders_list.append(order_obj)
+                    
+                    self.orders = orders_list
+                    
+                elif response.status_code == 401:
+                    rx.toast.error("Your session has expired. Please log in again.")
+                elif response.status_code == 403:
+                    rx.toast.error("You don't have permission to view orders")
+                else:
                     rx.toast.error(f"Failed to load orders (Status: {response.status_code})")
                         
         except Exception as e:
@@ -213,7 +320,6 @@ class OrdersState(rx.State):
             rx.toast.error(f"Error loading orders: {str(e)}")
         finally:
             self.is_loading = False
-            print(f"DEBUG: Orders state after load: {len(self.orders)} orders")
     
     async def mark_payment_completed(self, order_id: int):
         """Mark order payment as completed"""
@@ -323,34 +429,41 @@ def star_rating_item(star_num: int) -> rx.Component:
         on_click=OrdersState.set_review_rating(star_num)
     )
 
-
 def review_modal() -> rx.Component:
     """Modal for writing product reviews"""
     return rx.dialog.root(
         rx.dialog.content(
             rx.vstack(
+                
+                # Title
                 rx.dialog.title(
-                    f"Write a Review",
+                    "Write a Review",
                     font_size="24px",
                     font_weight="700",
                     color="#22282c",
-                    margin_bottom="8px"
+                    margin_bottom="4px"
                 ),
+                
+                # Product name
                 rx.text(
                     OrdersState.selected_product_name,
-                    font_size="16px",
+                    font_size="14px",
                     color="#929FA7",
-                    margin_bottom="20px"
+                    margin_bottom="20px",
+                    font_weight="500"
                 ),
                 
                 # Rating Section
                 rx.vstack(
-                    rx.text(
-                        "Rating",
-                        font_size="14px",
-                        font_weight="600",
-                        color="#22282c",
-                        margin_bottom="8px"
+                    rx.hstack(
+                        rx.icon("star", size=16, color="#FCD34D"),
+                        rx.text(
+                            "Rating",
+                            font_size="14px",
+                            font_weight="600",
+                            color="#22282c",
+                        ),
+                        spacing="2",
                     ),
                     rx.hstack(
                         star_rating_item(1),
@@ -358,21 +471,35 @@ def review_modal() -> rx.Component:
                         star_rating_item(3),
                         star_rating_item(4),
                         star_rating_item(5),
-                        spacing="2"
+                        spacing="3"
                     ),
                     align_items="start",
                     width="100%",
+                    padding="12px",
+                    background="#F8FAFC",
+                    border_radius="8px",
                     margin_bottom="20px"
                 ),
                 
-                # Comment Section
+                # Divider line
+                rx.box(
+                    height="1px",
+                    background="linear-gradient(90deg, transparent 0%, #E5E7EB 50%, transparent 100%)",
+                    width="100%",
+                    margin_y="8px",
+                ),
+                
+                # Review Comment Section
                 rx.vstack(
-                    rx.text(
-                        "Your Review",
-                        font_size="14px",
-                        font_weight="600",
-                        color="#22282c",
-                        margin_bottom="8px"
+                    rx.hstack(
+                        rx.icon("message-square", size=16, color="#2E6FF2"),
+                        rx.text(
+                            "Your Review",
+                            font_size="14px",
+                            font_weight="600",
+                            color="#22282c",
+                        ),
+                        spacing="2",
                     ),
                     rx.text_area(
                         placeholder="Share your experience with this product...",
@@ -380,15 +507,43 @@ def review_modal() -> rx.Component:
                         on_change=OrdersState.set_review_comment,
                         width="100%",
                         min_height="120px",
-                        resize="vertical"
+                        resize="vertical",
+                        padding="12px",
+                        border="1px solid #E5E7EB",
+                        border_radius="8px",
+                        background_color="white",
+                        color="#22282c",
+                        _focus={
+                            "border_color": "#2E6FF2",
+                            "box_shadow": "0 0 0 3px rgba(46, 111, 242, 0.1)",
+                        },
                     ),
                     align_items="start",
                     width="100%",
                     margin_bottom="20px"
                 ),
                 
+                # Divider line
+                rx.box(
+                    height="1px",
+                    background="linear-gradient(90deg, transparent 0%, #E5E7EB 50%, transparent 100%)",
+                    width="100%",
+                    margin_y="8px",
+                ),
+                
                 # Image Upload Section
-                file_upload_section(
+                rx.vstack(
+                    rx.hstack(
+                        rx.icon("image", size=16, color="#764ba2"),
+                        rx.text(
+                            "Add Photo (Optional)",
+                            font_size="14px",
+                            font_weight="600",
+                            color="#22282c",
+                        ),
+                        spacing="2",
+                    ),
+                    file_upload_section(
                         "Product Image",
                         "Upload product display image",
                         "Accepted: PNG files only",
@@ -396,26 +551,47 @@ def review_modal() -> rx.Component:
                         OrdersState.review_image,
                         "image"
                     ),
+                    align_items="start",
+                    width="100%",
+                    margin_bottom="20px",
+                    padding="12px",
+                    background="#F8FAFC",
+                    border_radius="8px",
+                ),
+                
                 
                 # Action Buttons
                 rx.hstack(
                     rx.dialog.close(
                         rx.button(
+                            rx.icon("x", size=16),
                             "Cancel",
-                            variant="soft",
+                            variant="outline",
                             color_scheme="gray",
                             cursor="pointer",
-                            on_click=OrdersState.close_review_modal
+                            on_click=OrdersState.close_review_modal,
+                            border="1px solid #E5E7EB",
+                            color="#22282c",
+                            _hover={
+                                "background_color": "#F3F4F6",
+                                "border_color": "#D1D5DB",
+                            },
                         )
                     ),
                     rx.button(
+                        rx.icon("send", size=16),
                         "Submit Review",
-                        bg="#2E6FF2",
+                        background="#22282c",
                         color="white",
                         cursor="pointer",
                         loading=OrdersState.is_processing,
                         on_click=OrdersState.submit_review,
-                        _hover={"bg": "#1E5FE2"}
+                        font_weight="600",
+                        _hover={
+                            "opacity": "0.9",
+                            "box_shadow": "0 8px 20px rgba(46, 111, 242, 0.3)",
+                            "transform": "translateY(-2px)",
+                        },
                     ),
                     spacing="3",
                     justify="end",
@@ -426,7 +602,13 @@ def review_modal() -> rx.Component:
                 width="100%"
             ),
             max_width="500px",
-            padding="30px"
+            padding="30px",
+            style={
+                "background": "white",
+                "border_radius": "16px",
+                "box_shadow": "0 20px 60px rgba(0, 0, 0, 0.15)",
+                "border": "1px solid rgba(229, 231, 235, 0.5)",
+            }
         ),
         open=OrdersState.show_review_modal
     )
@@ -434,16 +616,23 @@ def review_modal() -> rx.Component:
 
 def review_button(product_id: int, product_name: str) -> rx.Component:
     """Reusable review button component"""
-    return rx.button(
-        rx.icon("star", size=14),
-        "Write Review",
-        size="1",
-        variant="soft",
-        color_scheme="orange",
-        cursor="pointer",
-        on_click=OrdersState.open_review_modal(product_id, product_name)
+    return rx.cond(
+        OrdersState.reviewed_products.contains(product_id),
+        rx.hstack(
+            rx.icon("check", size=16, color="#10B981"),
+            rx.text("Review Submitted", size="1", color="#10B981", font_weight="600"),
+            spacing="1"
+        ),
+        rx.button(
+            rx.icon("star", size=14),
+            "Write Review",
+            size="1",
+            variant="soft",
+            color_scheme="orange",
+            cursor="pointer",
+            on_click=OrdersState.open_review_modal(product_id, product_name)
+        )
     )
-
 
 def file_upload_section(
     title: str,
@@ -457,7 +646,7 @@ def file_upload_section(
     return rx.vstack(
         rx.hstack(
             rx.icon(icon, size=20, color="#6366F1"),
-            rx.text(title, size="2", weight="bold"),
+            rx.text(title, size="2", weight="bold",color="#22282c"),
             spacing="2",
             align="center",
         ),
@@ -470,6 +659,7 @@ def file_upload_section(
                     "Select File",
                     variant="soft",
                     size="2",
+                    cursor = "pointer"
                 ),
                 rx.text(
                     accepted_types,
@@ -490,6 +680,7 @@ def file_upload_section(
             rx.button(
                 "Upload",
                 size="1",
+                cursor = "pointer",
                 on_click=upload_handler(
                     rx.upload_files(
                         upload_id=f"upload_{title.lower().replace(' ', '_')}"
@@ -521,209 +712,221 @@ def order_card(order: Order) -> rx.Component:
     """Individual order card with action buttons"""
     return rx.box(
         rx.vstack(
-            # Header
+
             rx.hstack(
-                rx.vstack(
-                    rx.text(
-                        f"Order #{order.order_id}",
-                        font_size="20px",
-                        font_weight="700",
-                        color="#22282c"
-                    ),
-                    rx.text(
-                        format_datetime(order.created_at),
-                        font_size="14px",
-                        color="#929FA7"
-                    ),
-                    spacing="1",
-                    align_items="start"
+                rx.text("Total Price", color = "#22282c", font_weight="bold"),
+                rx.badge(
+                    order.status.upper(),
+                    color_scheme=get_status_color(order.status),
+                    variant="soft",
+                    font_size="12px",
+                    padding="6px 12px",
+                    border_radius="20px"
                 ),
+                
                 rx.spacer(),
-                rx.vstack(
-                    rx.badge(
-                        order.status.upper(),
-                        color_scheme=get_status_color(order.status),
-                        variant="soft",
-                        font_size="12px",
-                        padding="8px 16px"
-                    ),
-                    rx.text(
-                        f"${order.total_price}",
-                        font_size="24px",
-                        font_weight="700",
-                        color="#22282c"
-                    ),
-                    spacing="2",
-                    align_items="end"
+                rx.text(
+                    f"${order.total_price}",
+                    font_size="26px",
+                    font_weight="900",
+                    color="#1a1a1a"
                 ),
                 width="100%",
-                align_items="start"
+                align_items="center"
             ),
             
-            rx.divider(margin_y="16px"),
-            
-            # Order Items with Review Buttons
-            rx.vstack(
-                rx.text(
-                    "Order Items:",
-                    font_size="16px",
-                    font_weight="600",
-                    color="#22282c",
-                    margin_bottom="8px"
-                ),
-                rx.foreach(
-                    order.order_items,
-                    lambda item: rx.hstack(
-                        rx.hstack(
-                            rx.text(
-                                f"• {item['product_name']}",
-                                font_size="14px",
-                                color="#22282c"
+            rx.box(
+                rx.hstack(
+                    rx.foreach(
+                        order.order_items,
+                        lambda item: rx.hstack(
+                          
+                            rx.image(
+                                src=item.get('image', '/placeholder.jpg'),
+                                width="100px",
+                                height="100px",
+                                border_radius="8px",
+                                object_fit="cover"
                             ),
-                            rx.badge(item['type'], variant="soft", color_scheme="purple"),
-                            rx.text(
-                                f"x{item['quantity']}",
-                                font_size="14px",
-                                font_weight="600",
-                                color="#22282c"
+                        
+                            rx.vstack(
+                                rx.text(
+                                    item['product_name'],
+                                    font_size="13px",
+                                    font_weight="600",
+                                    color="#1a1a1a",
+                                    white_space="nowrap",
+                                    overflow="hidden",
+                                    text_overflow="ellipsis",
+                                    max_width="100px"
+                                ),
+                                rx.hstack(
+                                    rx.badge(
+                                        item['type'],
+                                        variant="soft",
+                                        color_scheme="purple",
+                                        font_size="10px",
+                                        padding="2px 8px"
+                                    ),
+                                    rx.text(
+                                        f"x{item['quantity']}",
+                                        font_size="12px",
+                                        font_weight="bold",
+                                        color="#666"
+                                    ),
+                                    spacing="1",
+                                    align_items="center"
+                                ),
+                                rx.text(
+                                    f"${item.get('price', 0)}",
+                                    font_size="12px",
+                                    font_weight="600",
+                                    color="#2E6FF2"
+                                ),
+                                spacing="1",
+                                flex="1"
                             ),
-                            spacing="2"
-                        ),
-                        rx.spacer(),
-                        # Show Write Review button only for completed orders
-                        rx.cond(
-                            order.status == "complete",
-                            review_button(item['product_id'], item['product_name']),
-                            rx.fragment()
-                        ),
-                        width="100%",
-                        padding="8px 0",
-                        align_items="center"
-                    )
-                ),
-                spacing="2",
-                align_items="start",
-                width="100%"
-            ),
-            
-            rx.cond(
-                order.payment_method is not None,
-                rx.vstack(
-                    rx.divider(margin_y="16px"),
-                    rx.hstack(
-                        rx.icon("credit-card", size=18, color="#929FA7"),
-                        rx.text(
-                            "Payment Method:",
-                            font_size="14px",
-                            color="#929FA7"
-                        ),
-                        rx.text(
+                          
                             rx.cond(
-                                order.payment_method.get('type') == 'credit_card',
-                                f"Credit Card •••• {order.payment_method.get('credit_card_last4', '')}",
-                                f"Bank Account •••• {order.payment_method.get('bank_account_last4', '')}"
+                                order.status == "complete",
+                                review_button(item['product_id'], item['product_name']),
+                                rx.fragment()
                             ),
-                            font_size="14px",
-                            font_weight="600",
-                            color="#22282c"
-                        ),
-                        spacing="2",
-                        align_items="center"
+                            padding="8px 12px",
+                            bg="#F6F8FA",
+                            border_radius="10px",
+                            border="1px solid #e0e5eb",
+                            spacing="2",
+                            align_items="center",
+                            flex_shrink="0"
+                        )
                     ),
                     spacing="2",
-                    align_items="start",
-                    width="100%"
+                    width="100%",
+                    overflow_x="auto",
+                    padding_bottom="8px",
+                    
                 ),
-                rx.fragment()
+                width="100%"
             ),
-            
-            rx.divider(margin_y="16px"),
-            
-            # Action Buttons based on status
+           
             rx.hstack(
+                rx.hstack(
+                    rx.icon("credit-card", size=14, color="#666"),
+                    rx.text(
+                        rx.cond(
+                            order.payment_method is not None,
+                            rx.cond(
+                                order.payment_method.get('type') == 'credit_card',
+                                f"•••• {order.payment_method.get('credit_card_last4', '')}",
+                                f"•••• {order.payment_method.get('bank_account_last4', '')}"
+                            ),
+                            "No payment"
+                        ),
+                        font_size="12px",
+                        color="#666",
+                        font_weight="500"
+                    ),
+                    spacing="2",
+                    align_items="center"
+                ),
+                rx.spacer(),
+                
                 rx.cond(
                     order.status == "pending",
                     rx.hstack(
                         rx.button(
-                            "Mark Payment Completed",
+                            "Make a Payment",
                             on_click=OrdersState.mark_payment_completed(order.order_id),
-                            bg="#2E6FF2",
-                            color="white",
+                            color_scheme="blue",
+                            variant="soft",
                             border_radius="8px",
-                            padding="10px 20px",
+                            padding="8px 16px",
+                            font_weight="600",
+                            font_size="13px",
                             cursor="pointer",
                             loading=OrdersState.is_processing,
-                            _hover={"bg": "#1E5FE2"}
+                            _hover={"bg": "#1E5FE2",
+                                     "color": "white"},
+                            height="36px"
                         ),
                         rx.button(
-                            "Cancel Order",
+                            "Cancel",
                             on_click=OrdersState.cancel_order(order.order_id),
                             variant="outline",
                             color_scheme="red",
                             border_radius="8px",
-                            padding="10px 20px",
+                            padding="8px 16px",
+                            font_weight="600",
+                            font_size="13px",
                             cursor="pointer",
                             loading=OrdersState.is_processing,
+                            height="36px"
                         ),
-                        spacing="3"
+                        spacing="2"
                     ),
-                    rx.fragment()
+                    rx.cond(
+                        order.status == "payment completed",
+                        rx.button(
+                            "Complete Order",
+                            on_click=OrdersState.complete_order(order.order_id),
+                            color_scheme="green",
+                            variant="soft",
+                            border_radius="8px",
+                            padding="8px 16px",
+                            font_weight="600",
+                            font_size="13px",
+                            cursor="pointer",
+                            loading=OrdersState.is_processing,
+                            _hover={"bg": "#059669",
+                                    "color": "white"},
+                            height="36px"
+                        ),
+                        rx.cond(
+                            order.status == "complete",
+                            rx.hstack(
+                                rx.icon("check", size=16, color="#10B981"),
+                                rx.text(
+                                    "Completed",
+                                    font_size="13px",
+                                    font_weight="600",
+                                    color="#10B981"
+                                ),
+                                spacing="1",
+                                align_items="center"
+                            ),
+                            rx.hstack(
+                                rx.icon("x", size=16, color="#EF4444"),
+                                rx.text(
+                                    "Cancelled",
+                                    font_size="13px",
+                                    font_weight="600",
+                                    color="#EF4444"
+                                ),
+                                spacing="1",
+                                align_items="center"
+                            )
+                        )
+                    )
                 ),
-                
-                rx.cond(
-                    order.status == "payment completed",
-                    rx.button(
-                        "Complete Order",
-                        on_click=OrdersState.complete_order(order.order_id),
-                        bg="#10B981",
-                        color="white",
-                        border_radius="8px",
-                        padding="10px 20px",
-                        cursor="pointer",
-                        loading=OrdersState.is_processing,
-                        _hover={"bg": "#059669"}
-                    ),
-                    rx.fragment()
-                ),
-                
-                rx.cond(
-                    order.status == "complete",
-                    rx.text(
-                        "✓ Order Completed",
-                        font_size="14px",
-                        font_weight="600",
-                        color="#10B981"
-                    ),
-                    rx.fragment()
-                ),
-                
-                rx.cond(
-                    order.status == "cancelled",
-                    rx.text(
-                        "✗ Order Cancelled",
-                        font_size="14px",
-                        font_weight="600",
-                        color="#EF4444"
-                    ),
-                    rx.fragment()
-                ),
-                
                 width="100%",
-                justify="end"
+                align_items="center",
+                justify="between"
             ),
             
-            spacing="4",
+            spacing="3",
             width="100%"
         ),
-        padding="24px",
-        border="1px solid #e2e8f0",
-        border_radius="12px",
+        padding="16px 20px",
+        border="1px solid #e0e5eb",
+        border_radius="14px",
         bg="white",
         width="100%",
-        box_shadow="0 1px 3px rgba(0, 0, 0, 0.1)",
-        _hover={"box_shadow": "0 4px 6px rgba(0, 0, 0, 0.1)"}
+        box_shadow="0 1px 3px rgba(0, 0, 0, 0.06)",
+        _hover={"box_shadow": "0 4px 12px rgba(0, 0, 0, 0.1)", "border_color": "#d0d8e0"},
+        transition="all 0.2s ease",
+        min_height="0",
     )
-
 
 def orders_content() -> rx.Component:
     """Main orders page content with filter tabs"""
@@ -735,10 +938,11 @@ def orders_content() -> rx.Component:
                 font_size="32px",
                 font_weight="700",
                 color="#22282c",
-                margin_bottom="20px"
+                margin_bottom="20px",
+                font_family="Racing Sans One"
             ),
             
-            # Filter Tabs (Prettier Version)
+         
             rx.hstack(
                 rx.button(
                     "All Orders",
@@ -747,6 +951,7 @@ def orders_content() -> rx.Component:
                     color_scheme=rx.cond(OrdersState.selected_filter == "all", "teal", "gray"),
                     cursor="pointer",
                     border_radius="20px",
+                    border = "1px solid #E5E7EB",
                     padding="10px 22px",
                     color=rx.cond(OrdersState.selected_filter == "all", "white", "#22282c"),
                     _hover={"bg": rx.cond(OrdersState.selected_filter == "all", "#059669", "#e2e8f0")},
@@ -759,6 +964,7 @@ def orders_content() -> rx.Component:
                     cursor="pointer",
                     border_radius="20px",
                     padding="10px 22px",
+                    border = "1px solid #E5E7EB",
                     color=rx.cond(OrdersState.selected_filter == "active", "white", "#22282c"),
                     _hover={"bg": rx.cond(OrdersState.selected_filter == "active", "#06b6d4", "#e2e8f0")},
                 ),
@@ -770,6 +976,7 @@ def orders_content() -> rx.Component:
                     cursor="pointer",
                     border_radius="20px",
                     padding="10px 22px",
+                    border = "1px solid #E5E7EB",
                     color=rx.cond(OrdersState.selected_filter == "completed", "white", "#22282c"),
                     _hover={"bg": rx.cond(OrdersState.selected_filter == "completed", "#10b981", "#e2e8f0")},
                 ),
@@ -781,6 +988,7 @@ def orders_content() -> rx.Component:
                     cursor="pointer",
                     border_radius="20px",
                     padding="10px 22px",
+                    border = "1px solid #E5E7EB",
                     color=rx.cond(OrdersState.selected_filter == "cancelled", "white", "#22282c"),
                     _hover={"bg": rx.cond(OrdersState.selected_filter == "cancelled", "#ef4444", "#e2e8f0")},
                 ),

@@ -145,12 +145,82 @@ def product_spot(x: str, y: str, name: str, price: str, url: str) -> rx.Componen
             ),
             rx.hover_card.content(
                 rx.vstack(
-                    rx.text(name, font_weight="bold", color="#22282c", font_size="12px"),
-                    rx.text(price, color="black",font_size = "16px",font_weight="bold"),
-                    rx.link("View >", href=url, color="#22282c",font_size = "12px"),
+                    rx.text(
+                        name,
+                        font_weight="bold",
+                        color="#22282c",
+                        font_size="14px",
+                        letter_spacing="0.5px",
+                        margin_bottom="8px",
+                    ),
+                    
+                    # Price section with highlight
+                    rx.hstack(
+                        rx.hstack(
+                            rx.text(
+                            price,
+                            color="#22282c",
+                            font_size="22px",
+                            font_weight="700",
+                        ),
+                        rx.text("THB", font_size="13px", color="#484848"),
+                        spacing = "1",
+                        align_items="baseline",
+
+                        ),
+                        
+                        rx.box(
+                            width="2px",
+                            height="20px",
+                            background="linear-gradient(180deg, #2E6FF2 0%, #764ba2 100%)",
+                            margin_x="10px",
+                        ),
+                        rx.text(
+                            "Premium",
+                            color="#929FA7",
+                            font_size="11px",
+                            font_weight="600",
+                            text_transform="uppercase",
+                            letter_spacing="1px",
+                        ),
+                        align_items="center",
+                        justify_content="center",
+                    ),
+                    
+                    # Decorative line
+                    rx.box(
+                        height="1px",
+                        background="linear-gradient(90deg, transparent 0%, #E5E7EB 50%, transparent 100%)",
+                        width="100%",
+                        margin_y="12px",
+                    ),
+                    
+                    # Quick stats (optional elegant details)
+                    rx.hstack(
+                        rx.vstack(
+                            rx.icon("star", size=14, color="#FCD34D"),
+                            align_items="center",
+                        ),
+                        rx.text("4.9", font_size="12px", color="#22282c", font_weight="600"),
+                        rx.text("(324 reviews)", font_size="10px", color="#929FA7"),
+                        spacing="2",
+                        align_items="center",
+                    ),
+                    
+                    spacing="3",
+                    width="100%",
+                    padding="16px",
                 ),
                 side="right",
-                style={"background": "white", "padding": "10px", "border_radius": "8px"},
+                style={
+                    "background": "rgba(255, 255, 255, 0.95)",
+                    "backdrop_filter": "blur(10px)",
+                    "border": "1px solid rgba(255, 255, 255, 0.3)",
+                    "border_radius": "12px",
+                    "box_shadow": "0 20px 60px rgba(46, 111, 242, 0.15), 0 0 1px rgba(0, 0, 0, 0.1)",
+                    "padding": "0",
+                    "min_width": "250px",
+                },
             ),
         ),
         position="absolute",
@@ -180,7 +250,7 @@ def ikea_showcase_layout() -> rx.Component:
                             rx.text("MALM", font_weight="700", font_size="15px", color="#111"),
                             rx.text("Bed frame, high", font_size="12px", color="#484848"),
                             rx.hstack(
-                                rx.text("7,290", font_weight="700", font_size="22px", color="#111"),
+                                rx.text("7,290", font_weight="700", font_size="22px", color="#22282c"),
                                 rx.text("THB", font_size="13px", color="#484848"),
                                 spacing="1",
                                 align_items="baseline",
@@ -188,11 +258,7 @@ def ikea_showcase_layout() -> rx.Component:
                             align_items="start",
                             spacing="0",
                         ),
-                        rx.box(
-                            rx.text("›", font_size="24px", color="#484848",on_click=rx.redirect("/product_detail")),
-                            display="flex",
-                            align_items="center",
-                        ),
+                      
                         justify_content="space-between",
                         align_items="center",
                         width="100%",
@@ -203,7 +269,7 @@ def ikea_showcase_layout() -> rx.Component:
                     bg="white",
                     padding="14px 16px",
                     box_shadow="0 2px 8px rgba(0,0,0,0.12)",
-                    width="190px",
+                    width="150px",
                     cursor="pointer",
                     transition="all 0.2s ease",
                     _hover={
@@ -211,7 +277,7 @@ def ikea_showcase_layout() -> rx.Component:
                         "transform": "translateY(-1px)",
                     },
                 ),
-                product_spot("20%", "80%", "Modern Sofa", "299 THB", "/product_detail"),
+                product_spot("20%", "80%", "Modern Sofa", "299", "/product_detail"),
                 
                 position="relative",
                 width="40%",
@@ -229,7 +295,7 @@ def ikea_showcase_layout() -> rx.Component:
                         object_fit="cover",
                     ),
                     
-                    product_spot("60%", "35%", "Modern Chair", "569 THB", "/product_detail"),
+                    product_spot("60%", "35%", "Modern Chair", "569", "/product_detail"),
                 
                     position="relative",
                     height="300px",
@@ -245,8 +311,8 @@ def ikea_showcase_layout() -> rx.Component:
                         height="100%",
                         object_fit="cover",
                     ),
-                    product_spot("30%", "30%", "Bedside Table", "799 THB", "/product_detail"),
-                    product_spot("60%", "70%", "Modern Sofa", "299 THB", "/product_detail"),
+                    product_spot("30%", "30%", "Bedside Table", "799", "/product_detail"),
+                    product_spot("60%", "70%", "Modern Sofa", "299", "/product_detail"),
                     position="relative",
                     height="500px",
                     overflow="hidden",
@@ -268,8 +334,8 @@ def ikea_showcase_layout() -> rx.Component:
                         height="100%",
                         object_fit="cover",
                     ),
-                    product_spot("48%", "30%", "Wooden Wardrobe", "1909 THB", "/product_detail"),
-                    product_spot("70%", "80%", "Bedside Table", "249 THB", "/product_detail"),
+                    product_spot("48%", "30%", "Wooden Wardrobe", "1909", "/product_detail"),
+                    product_spot("70%", "80%", "Bedside Table", "249", "/product_detail"),
                    
                     position="relative",
                     height="550px",
@@ -285,7 +351,7 @@ def ikea_showcase_layout() -> rx.Component:
                         height="100%",
                         object_fit="cover",
                     ),
-                    product_spot("40%", "25%", "Book Shelf", "799 THB", "/product_detail"),
+                    product_spot("40%", "25%", "Book Shelf", "799", "/product_detail"),
                     position="relative",
                     height="250px",
                     overflow="hidden",
@@ -383,7 +449,7 @@ def home_content() -> rx.Component:
             ),
             rx.text("that Inspire everyday",font_size="1.5rem"),
             rx.text("Explore your dream furniture in stunning 3D AR/VR and see exactly how it fits your space before you buy",margin_bottom="2rem",font_size="14px"),
-            rx.button("Explore More",style=button_style, ),
+            rx.button(rx.icon("circle-chevron-right"),"Explore More",style=button_style, ),
             color="#22282C",
             width="50%",    
         ),
@@ -423,7 +489,7 @@ def home_content() -> rx.Component:
                 line_height="1.5",
             ),
             rx.text("Discover the perfect sofa for your home and enjoy amazing savings while this promotion lasts.",margin_bottom="2rem"),
-            rx.button("Shop Now",style=button_style, on_click = rx.redirect("/shop")),
+            rx.button(rx.icon("shopping-bag"),"Shop Now",style=button_style, on_click = rx.redirect("/shop")),
             color="#22282C",
             width="40%",    
         ),

@@ -530,7 +530,7 @@ def signup_page() -> rx.Component:
                 # Social Login Buttons
                 rx.center(
                     rx.icon_button(
-                        rx.icon(tag="chrome"),
+                        rx.icon(tag="chrome",stroke_width=1,),
                         variant="soft",
                         size="3",
                         border_radius="100px",
@@ -539,7 +539,7 @@ def signup_page() -> rx.Component:
                         border="1px solid #929FA7",
                     ),
                     rx.icon_button(
-                        rx.icon(tag="facebook"),
+                        rx.icon(tag="facebook",stroke_width=1,),
                         variant="soft",
                         size="3",
                         radius="full",
@@ -549,7 +549,7 @@ def signup_page() -> rx.Component:
                         border="1px solid #929FA7",
                     ),
                     rx.icon_button(
-                        rx.icon(tag="instagram"),
+                        rx.icon(tag="instagram",stroke_width=1,),
                         variant="soft",
                         size="3",
                         border_radius="100px",
@@ -558,7 +558,7 @@ def signup_page() -> rx.Component:
                         border="1px solid #929FA7",
                     ),
                     rx.icon_button(
-                        rx.icon(tag="twitter"),
+                        rx.icon(tag="twitter",stroke_width=1,),
                         variant="soft",
                         size="3",
                         border_radius="100px",

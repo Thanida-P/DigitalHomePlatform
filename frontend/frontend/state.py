@@ -3,7 +3,6 @@ import httpx
 import os
 from typing import Optional, List, Dict
 from .config import API_BASE_URL
-\
 
 SCENE_CREATOR_URL = os.getenv("SCENE_CREATOR_URL", "http://localhost:5173")
 
@@ -34,7 +33,6 @@ class AuthState(rx.State):
                     self.is_admin = data.get("is_admin", False)
                     self.is_staff = data.get("is_staff", False)
                     
-                    print(f"✅ Auth check: logged_in={self.is_logged_in}, username={self.username}")
                     
                     if not self.is_logged_in:
                         self.session_cookies = {}
@@ -65,15 +63,12 @@ class AuthState(rx.State):
                     # 👈 SAVE ALL COOKIES FROM LOGIN RESPONSE
                     self.session_cookies = dict(response.cookies)
                     
-                    print(f"🍪 Saved cookies: {list(self.session_cookies.keys())}")
-                    
                     # Update auth state 
                     self.is_logged_in = True
                     self.username = data.get("username", identifier)
                     self.is_admin = data.get("is_admin", False)
                     self.is_staff = data.get("is_staff", False)
                     
-                    print(f"✅ Login successful: {self.username}")
 
                     if self.is_admin:
                         return rx.redirect("/admin_dashboard")
@@ -108,8 +103,7 @@ class AuthState(rx.State):
         self.is_admin = False
         self.is_staff = False
         self.session_cookies = {}
-        
-        print("✅ Logged out, cookies cleared")
+    
         
         return rx.redirect("/")
     
@@ -143,7 +137,7 @@ class AuthState(rx.State):
                 if response.status_code == 200:
                     data = response.json()
                     token = data.get("token")
-                    print(f"🎟️ Got login token for user: {self.username}")
+                  
                     return token
                 else:
                     print(f"❌ Failed to get token: {response.status_code}")
@@ -261,8 +255,7 @@ class DynamicState(rx.State):
                 if response.status_code == 200:
                     data = response.json()
                     self.room_products = data.get("products", [])
-                    print(f"✅ Fetched {len(self.room_products)} products for category: {display_name}")
-                    print(self.room_products)
+        
                 else:
                     
                     self.room_products = []

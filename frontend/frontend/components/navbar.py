@@ -37,11 +37,11 @@ class NavCartState(rx.State):
                     
                     self.cart_quantity = total_quantity
 
-                    print(f"ðŸ›’ Cart quantity: {total_quantity}")
+                 
                 
                 elif response.status_code == 404:
                     self.cart_quantity = 0
-                    print("Cart is empty.")
+                 
                 
                 else:
                     error = response.json().get('error', 'Failed to load cart quantity')
@@ -55,7 +55,6 @@ class NavCartState(rx.State):
             self.is_loading = False
 
 
-
 def nav_link(label: str, href: str):
     """Create a nav link with active state styling"""
     return rx.link(
@@ -66,8 +65,8 @@ def nav_link(label: str, href: str):
             "font_size": "16px",
             "color": rx.cond(
                 NavCartState.current_url == href,
-                "#22282c",  # Active color
-                "#22282C"   # Inactive color
+                "#22282c",  
+                "#22282C"   
             ),
             "font_weight": rx.cond(
                 NavCartState.current_url == href,
@@ -98,11 +97,11 @@ def navbar_page():
                     "font_size": "16px", 
                     "font_weight": "bold",
                     "font_style": " italic",
-                    "color": "#22282c"
+                    "color": "#22282c",
+                    "text_decoration": "none",
                 },
             ),
             nav_link("Shop", "/shop"),
-            # nav_link("My Home", "/my_home"),
             rx.cond(
                 AuthState.is_logged_in,
                 rx.link(
@@ -116,6 +115,7 @@ def navbar_page():
                         "font_family": "Lato, sans-serif",
                         "font_size": "16px",
                         "align-item": "center",
+                        "text_decoration": "none",
                         "_hover": {
                             "cursor": "pointer",
                             "color": "#E0E6EA",
@@ -124,7 +124,7 @@ def navbar_page():
                     },
                     on_click=AuthState.open_scene_creator,
                 ),
-                rx.fragment(),  # HIDDEN if not logged in
+                rx.fragment(),  
             ),
    
             spacing="6",
@@ -138,16 +138,22 @@ def navbar_page():
             rx.box(
                 rx.button(
                     rx.icon("shopping-cart"),
+                    cursor = "pointer",
                     aria_label="Cart",
                     variant="ghost",
                     style={
                         "color": rx.cond(
                             NavCartState.current_url == "/cart",
-                            "#299FCA",  # Color when on cart page
-                            "#22282C"   # Default color
+                            "#299FCA",  
+                            "#22282C"  
                         ),
                         "width": "40px",
                         "height": "40px",
+                        "_hover": {
+                                    "background_color": "white",
+                                    "varient": "ghost",
+                                    "color": "#299FCA"
+                                },
                     },
                     on_click=rx.redirect("/cart"),
                     
@@ -196,10 +202,11 @@ def navbar_page():
                                 "color": rx.cond(
                                     NavCartState.current_url == "/profile",
                                     "#299FCA",
-                                    "#22282c",   # Inactive color
+                                    "#22282c",   
                                 ),
                                 "padding": "10px 5px",
                                 "border_radius": "8px",
+                                "text_decoration": "none",
                                 "_hover": {
                                     "background_color": "#F3F4F6",
                                 },
@@ -234,6 +241,8 @@ def navbar_page():
                     color="white",
                     background_color="#22282C",
                     border_radius="8px",
+                    cursor = "pointer",
+                    text_decoration =  "none",
                     _hover={
                         "background_color": "#3A4248",
                     },

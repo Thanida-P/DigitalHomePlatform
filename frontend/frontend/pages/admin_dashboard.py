@@ -422,7 +422,7 @@ class AdminDashboardState(rx.State):
                 
                 if response.status_code == 201:
                     self.upload_status = "Product saved successfully!"
-                    print("product_data" , data)
+               
                     self.close_add_modal()
                     await self.load_products()
                 elif response.status_code == 400:
@@ -1066,7 +1066,7 @@ def admin_dashboard() -> rx.Component:
                         border="2px solid #E5E7EB",
                         border_radius="12px",
                         color="#22282C",
-                        padding="12px 16px",
+                        padding="5px",
                         font_size="14px",
                         _focus={
                             "border_color": "#2E6FF2",

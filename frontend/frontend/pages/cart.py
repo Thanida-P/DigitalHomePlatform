@@ -174,14 +174,12 @@ class CartState(rx.State):
                 
                 if response.status_code == 200:
                     data = response.json()
-                    print(f"📦 Cart data: {data}")
                     
                     self.cart_id = data.get('cart_id')
-                    print(f"🛒 Cart ID: {self.cart_id}")
                     
                     items = []
                     for item in data.get('items', []):
-                        print(f"\n🔍 Processing item: {item}")
+                     
                         product_id = item.get('product_id')
                         
                         try:
@@ -229,11 +227,9 @@ class CartState(rx.State):
                                 
                             else:
                                
-                                print(f"❌ Failed to fetch product {product_id}")
-                                print(f"   Status: {product_response.status_code}")
                                 try:
                                     error_data = product_response.json()
-                                    print(f"   Error data: {error_data}")
+                                   
                                 except:
                                     print(f"   Response text: {product_response.text}")
                                 
@@ -283,7 +279,6 @@ class CartState(rx.State):
                             items.append(cart_item)
                     
                     self.cart_items = items
-                    print(f"✅ Total items loaded: {len(items)}")
                     await self.update_navbar_cart_quantity(len(items))
                     
                 elif response.status_code == 404:
@@ -413,7 +408,7 @@ class CartState(rx.State):
                     )
                     for card in cards_data
                 ]
-                print(f"Loaded {len(self.credit_cards)} credit cards")
+               
             else:
                 print(f"Failed to load credit cards: {res.status_code}")
                 self.credit_cards = []
@@ -452,7 +447,7 @@ class CartState(rx.State):
                     )
                     for account in accounts_data
                 ]
-                print(f"Loaded {len(self.bank_accounts)} bank accounts")
+              
             else:
                 print(f"Failed to load bank accounts: {res.status_code}")
                 self.bank_accounts = []
@@ -525,11 +520,7 @@ class CartState(rx.State):
                 
                 if response.status_code == 201:
                     data = response.json()
-                    order_id = data.get('order_id')
                     rx.toast.success("Order created successfully!")
-                    print("order successfully added,", order_id)
-                    # Redirect to orders list page
-                    #await self.update_navbar_cart_quantity(0)
                     orders_state = await self.get_state(OrdersState)
                     await orders_state.load_orders()
                     return rx.redirect("/orders")
@@ -547,10 +538,7 @@ def cart_item(item: CartItem) -> rx.Component:
     print(f"🎨 Rendering cart item with image: {item.image}") 
     return rx.box(
         rx.hstack(
-          
-            rx.checkbox(size="2"),
             
-       
             rx.box(
                 rx.image(
                     src=item.image,
@@ -601,6 +589,7 @@ def cart_item(item: CartItem) -> rx.Component:
                         variant="outline",
                         size="1",
                         border_radius="md",
+                        cursor="pointer"
                     ),
                     rx.text(item.quantity, font_weight="600",color="#22282c", min_width="30px", text_align="center"),
                     rx.button(
@@ -609,6 +598,7 @@ def cart_item(item: CartItem) -> rx.Component:
                         variant="outline",
                         size="1",
                         border_radius="md",
+                        cursor = "pointer",
                     ),
                     spacing="2",
                 ),
@@ -624,6 +614,7 @@ def cart_item(item: CartItem) -> rx.Component:
                     on_click=lambda: CartState.remove_item(item.id),
                     variant="ghost",
                     color_scheme="red",
+                    cursor = "pointer"
                 ),
                 rx.text(
                     f"$ {item.price * item.quantity}",
@@ -1343,7 +1334,7 @@ def cart_content() -> rx.Component:
                 text_align="center",
                 font_size="32px",
                 color="#22282c",
-                font_family="Poppins"
+                font_family="Racing Sans One"
             ),
             
             rx.box(

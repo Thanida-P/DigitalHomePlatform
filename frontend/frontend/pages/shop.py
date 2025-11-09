@@ -142,12 +142,10 @@ class ShopState(rx.State):
                 rx.toast.success("✅ Item added to cart successfully!")
                 nav_state = await self.get_state(NavCartState)
                 await nav_state.load_cart_quantity()
-                print("item added ")
 
             else:
                 error = response.json().get("error", response.text)
                 rx.toast.error(f"❌ Failed: {error}")
-    
 
         except Exception as e:
             rx.toast.error(f"⚠️ Network error: {e}")
@@ -171,8 +169,6 @@ class ShopState(rx.State):
                 if product_id not in self.wishlist_items:
                     self.wishlist_items.append(product_id)
                 rx.toast.success("❤️ Added to wishlist!")
-                print("add")
-                print(self.wishlist_items)
                 await self.fetch_wishlist()
             else:
                 error = response.json().get("error", "Failed to add to wishlist")
@@ -199,7 +195,7 @@ class ShopState(rx.State):
                     self.wishlist_items.remove(product_id)
                 rx.toast.success("💔 Removed from wishlist")
                 await self.fetch_wishlist()
-                print("remove")
+              
             else:
                 error = response.json().get("error", "Failed to remove from wishlist")
                 rx.toast.error(f"❌ {error}")
@@ -222,7 +218,6 @@ class ShopState(rx.State):
             if response.status_code == 200:
                 data = response.json()
                 self.wishlist_items = [item["id"] for item in data.get("wishlist", [])]
-                print("✅ Wishlist loaded:", self.wishlist_items)
                 
             else:
                 print("⚠️ Failed to fetch wishlist")
@@ -239,26 +234,6 @@ class ShopState(rx.State):
             await self.remove_from_wishlist(product_id)
         else:
             await self.add_to_wishlist(product_id)
-
-    
-    product_detail: dict = {}
-    async def fetch_product_detail(self, product_id:int):
-
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(f"{API_BASE_URL}/products/get_product_detail/{product_id}/")
-
-            if response.status_code == 200:
-                data = response.json()
-                self.product_detail = data.get("product", {})
-
-            elif response.status_code == 404:
-                self.product_detail = {}
-            else:
-                self.product_detail = {}
-
-        except Exception as e:
-            self.product_detail = {}
        
        
     async def fetch_3d_model(self, model_id: str):
@@ -291,7 +266,8 @@ def search_and_filters() -> rx.Component:
             placeholder="Search...",
             value=ShopState.search_query,
             on_change=lambda e: ShopState.set_search_query(e.to(str)),
-            radius = "full", size ="2", width ="20%"
+            radius = "full", size ="2", width ="20%",
+            
         ),
  
         rx.select(
@@ -320,7 +296,7 @@ def search_and_filters() -> rx.Component:
             width ="20%" , 
             height="40px", radius = "full"
         ),
-        rx.button("Search", on_click=ShopState.load_products,radius="full",color_scheme="blue",width="8%",font_weight="bold"),
+        rx.button("Search", on_click=ShopState.load_products,radius="full",background_color = "#22282c",width="8%",font_weight="bold",cursor = "pointer"),
         spacing="2",
         justify="center",
         width="100%",
@@ -457,6 +433,7 @@ def product_card(product: Dict) -> rx.Component:
                             cursor = "pointer",
                             on_click=ShopState.add_to_cart(product["id"],"physical",quantity=1),
                             
+                            
                         ),
                         width="100%",
                     ),
@@ -498,7 +475,7 @@ def shop_content() -> rx.Component:
                 font_size="2em",
                 font_weight="bold",
                 color="#22282C",
-                font_family="Poppins"
+                font_family="Racing Sans One"
             ),
             rx.text(
                 "Explore our full range of AR & VR-ready furniture models",

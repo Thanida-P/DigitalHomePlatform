@@ -30,8 +30,8 @@ def add_review(request):
         if not rating:
             return JsonResponse({'error': 'Rating is required'}, status=400)
         
-        #if Review.objects.filter(product_id=product_id, customer=customer).first():
-        #   return JsonResponse({'error': 'You have already reviewed this product'}, status=400)
+        if Review.objects.filter(product_id=product_id, customer=customer).first():
+           return JsonResponse({'error': 'You have already reviewed this product'}, status=400)
 
         if image:
             image_base64 = base64.b64encode(image.read()).decode('utf-8')
