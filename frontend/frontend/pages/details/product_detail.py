@@ -667,7 +667,7 @@ def vertical_3d_scenes(model_urls, scene_height: int = 250) -> rx.Component:
                                 ),
                                 CameraControls.create()
                             ),
-                            camera={"position": [3, 3, 3], "fov": 50},
+                            camera={"position": [5, 6, 8], "fov": 50},
                             style={
                                 "background": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                                 "border_radius": "10px",

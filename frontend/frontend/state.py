@@ -4,7 +4,7 @@ import os
 from typing import Optional, List, Dict
 from .config import API_BASE_URL
 
-SCENE_CREATOR_URL = os.getenv("SCENE_CREATOR_URL", "http://localhost:5173")
+SCENE_CREATOR_URL = os.getenv("SCENE_CREATOR_URL", "http://localhost:5175")
 
 class AuthState(rx.State):
     is_logged_in: bool = False
