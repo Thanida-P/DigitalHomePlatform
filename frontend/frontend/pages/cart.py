@@ -535,7 +535,6 @@ class CartState(rx.State):
 
 
 def cart_item(item: CartItem) -> rx.Component:
-    print(f"🎨 Rendering cart item with image: {item.image}") 
     return rx.box(
         rx.hstack(
             
