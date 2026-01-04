@@ -42,6 +42,7 @@ class AdminDashboardState(rx.State):
     digital_available: bool = True
     physical_available: bool = True
     is_container: bool = False
+    wall_mountable: bool = False
 
     total_products: int = 0
     total_sold: int = 0
@@ -177,6 +178,9 @@ class AdminDashboardState(rx.State):
 
     def toggle_is_container(self, value: bool):
         self.is_container = value
+    
+    def toggle_wall_mountable(self, value: bool):
+        self.wall_mountable = value
 
     
     async def load_products(self):
@@ -295,6 +299,7 @@ class AdminDashboardState(rx.State):
         self.digital_available = product.get("digital_available", False)
         self.physical_available = product.get("physical_available", False)
         self.is_container = product.get("is_container", False)
+        self.wall_mountable = product.get("wall_mountable", False)
 
     
     def close_edit_modal(self):
@@ -317,6 +322,7 @@ class AdminDashboardState(rx.State):
         self.digital_available = True
         self.physical_available = True
         self.is_container = False
+        self.wall_mountable = False
         self.upload_status = ""
     
   
@@ -363,6 +369,7 @@ class AdminDashboardState(rx.State):
                 "digital_available": "true" if self.digital_available else "false",
                 "physical_available": "true" if self.physical_available else "false",
                 "is_container": "true" if self.is_container else "false",
+                "wall_mountable": "true" if self.wall_mountable else "false",
             }
             
             files = {}
@@ -510,6 +517,7 @@ class AdminDashboardState(rx.State):
                 "digital_available": str(self.digital_available).lower(),
                 "physical_available": str(self.physical_available).lower(),
                 "is_container": str(self.is_container).lower(),
+                "wall_mountable": str(self.wall_mountable).lower(),
             }
 
             files = {}
@@ -890,6 +898,15 @@ def product_form_modal(is_edit: bool = False) -> rx.Component:
                                 on_change=AdminDashboardState.toggle_is_container,
                             ),
                             rx.text("Is Container", size="2", weight="medium"),
+                            spacing="2",
+                            align="center",
+                        ),
+                        rx.hstack(
+                            rx.switch(
+                                checked=AdminDashboardState.wall_mountable,
+                                on_change=AdminDashboardState.toggle_wall_mountable,
+                            ),
+                            rx.text("Wall Mountable?", size="2", weight="medium"),
                             spacing="2",
                             align="center",
                         ),
