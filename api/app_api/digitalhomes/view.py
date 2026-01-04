@@ -41,6 +41,7 @@ def list_available_items(request):
                     'category': item.get_category(),
                     'type': item.get_type(),
                     'is_container': is_container,
+                    'wall_mountable': item.is_wall_mountable(),
                     'created_at': item.created_at.isoformat(),
                     
                 })
@@ -92,6 +93,7 @@ def get_specific_item(request):
             'is_container': is_container,
             'created_at': item.created_at.isoformat(),
             'image': item.get_image(),
+            'wall_mountable': item.is_wall_mountable(),
         }
         return JsonResponse({'item': item_data}, status=200)
     except Exception as e:
@@ -351,6 +353,7 @@ def add_custom_item(request):
         model_files = request.FILES.get('model_file')
         texture_files = request.FILES.getlist('texture_files')
         image = request.FILES.get('image')
+        wall_mountable = request.POST.get('wall_mountable', 'false').lower() == 'true'
         
         image_base64 = None
         if image:
@@ -377,7 +380,8 @@ def add_custom_item(request):
                 spatial_id=spatial_id,
                 texture_id=None,
                 contained_item=[],
-                created_at=current_time
+                created_at=current_time,
+                wall_mountable=wall_mountable
             )
             root.containerOwnedItems[str(container_id)] = categorizedItem
         else:
@@ -395,7 +399,8 @@ def add_custom_item(request):
                 spatial_id=spatial_id,
                 texture_id=None,
                 composition=[],
-                created_at=current_time
+                created_at=current_time,
+                wall_mountable=wall_mountable
             )
             root.nonContainerOwnedItems[str(noncontainer_id)] = categorizedItem
         transaction.commit()
@@ -481,6 +486,7 @@ def get_deployed_item_details(request, id):
                 'category': item.get_category(),
                 'type': item.get_type(),
                 'is_container': is_container,
+                'wall_mountable': item.is_wall_mountable(),
                 'spatialData': {
                     'id': spatial_data.id,
                     'positions': position,
@@ -533,6 +539,7 @@ def get_deployed_item_detail(request, id):
             'texture_id': item.get_texture_id(),
             'type': item.get_type(),
             'is_container': is_container,
+            'wall_mountable': item.is_wall_mountable(),
             'spatialData': {
                 'id': spatial_data.id,
                 'positions': position,
