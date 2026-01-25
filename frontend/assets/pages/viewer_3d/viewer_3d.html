@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>3D Product Viewer</title>
+    <link rel="stylesheet" href="viewer_3d.css">
+</head>
+<body>
+    <div class="container">
+        <div class="product-layout">
+            <!-- Viewer Section -->
+            <div class="viewer-section">
+                <!-- Scene Thumbnails -->
+                <div class="scene-thumbnails">
+                    <div id="thumbnails-container"></div>
+                    <div class="scene-navigation">
+                        <button class="nav-btn" id="scene-down">↑</button>
+                        <button class="nav-btn" id="scene-up">↓</button>
+                    </div>
+                </div>
+
+                <!-- Main 3D Viewer -->
+                <div class="main-viewer">
+                    <div id="main-canvas"></div>
+                    
+                    <!-- Furniture Controls -->
+                    <div class="controls-panel">
+                        <h3>Furniture Controls</h3>
+                        
+                        <div class="control-row">
+                            <label>Size:</label>
+                            <button class="control-btn" id="scale-down">−</button>
+                            <span class="control-value" id="scale-value">1.0</span>
+                            <button class="control-btn" id="scale-up">+</button>
+                        </div>
+
+                        <div class="control-row">
+                            <label>Left/Right:</label>
+                            <button class="control-btn" id="move-left">←</button>
+                            <button class="control-btn" id="move-right">→</button>
+                        </div>
+
+                        <div class="control-row">
+                            <label>Up/Down:</label>
+                            <button class="control-btn" id="move-up">↑</button>
+                            <button class="control-btn" id="move-down">↓</button>
+                        </div>
+
+                        <div class="control-row">
+                            <label>Forward/Back:</label>
+                            <button class="control-btn" id="move-forward">▲</button>
+                            <button class="control-btn" id="move-back">▼</button>
+                        </div>
+
+                        <div class="control-row">
+                            <label>Rotate:</label>
+                            <button class="control-btn" id="rotate-left">↺</button>
+                            <button class="control-btn" id="rotate-right">↻</button>
+                        </div>
+
+                        <button class="reset-btn" id="reset">Reset Position</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Product Info -->
+            <div class="product-info">
+                <h1 class="product-title" id="product-name">Loading...</h1>
+
+                <div class="colors-section">
+                    <h3>Colors</h3>
+                    <div class="color-options">
+                        <div class="color-option">
+                            <div class="color-swatch" style="background-color: black;"></div>
+                            <span>Black</span>
+                        </div>
+                        <div class="color-option">
+                            <div class="color-swatch" style="background-color: pink;"></div>
+                            <span>Pink</span>
+                        </div>
+                        <div class="color-option">
+                            <div class="color-swatch" style="background-color: red;"></div>
+                            <span>Red</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="price-section">
+                    <h3>Price</h3>
+                    <div class="price-row">
+                        <span class="price-label">Physical:</span>
+                        <span class="price-value" id="physical-price">$0</span>
+                        <button class="add-btn" id="add-physical">
+                            🛒 Add
+                        </button>
+                    </div>
+                    <div class="price-row">
+                        <span class="price-label">Digital:</span>
+                        <span class="price-value" id="digital-price">$0</span>
+                        <button class="add-btn" id="add-digital">
+                            ⚡ Add
+                        </button>
+                    </div>
+                </div>
+
+                <button class="action-btn browse-btn" id="browse-more">Browse More Products</button>
+                <button class="action-btn vr-btn" id="preview-vr">Preview in VR/AR</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="viewer_3d.js"></script>
+</body>
+</html>
