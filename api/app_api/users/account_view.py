@@ -174,7 +174,7 @@ def is_logged_in(request):
 def get_login_token(request):
     user = request.user
 
-    expires_at = (timezone.now() + timedelta(minutes=1)).timestamp()
+    expires_at = (timezone.now() + timedelta(minutes=10)).timestamp()
 
     data = {
         "user_id": user.id,
