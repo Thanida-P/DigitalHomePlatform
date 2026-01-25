@@ -674,13 +674,10 @@ function setupControls() {
         
         const apiBase = getApiBase();
         
-        // *** NEW: Generate a fresh token each time ***
-        console.log('🔐 Generating fresh authentication token...');
-        
         try {
           const tokenResponse = await fetch(`${apiBase}/users/get_login_token/`, {
             method: 'GET',
-            credentials: 'include', // Send session cookies
+            credentials: 'include',
           });
 
           if (!tokenResponse.ok) {
@@ -691,14 +688,10 @@ function setupControls() {
 
           const tokenData = await tokenResponse.json();
           const freshToken = tokenData.token;
-          
-          console.log('✅ Fresh token generated');
 
-          // Product Demo URL
-          const PRODUCT_DEMO_URL = getProductDemoBaseUrl();
+          const PRODUCT_DEMO_URL = "http://localhost:5174";
           
-          // Build URL with fresh token
-          const demoUrl = new URL(`${PRODUCT_DEMO_URL}/login`);
+          const demoUrl = new URL(`${PRODUCT_DEMO_URL}`);
           demoUrl.searchParams.set('token', freshToken);
           demoUrl.searchParams.set('productId', productId);
           
@@ -711,8 +704,6 @@ function setupControls() {
           if (state.productData.name) {
             demoUrl.searchParams.set('productName', state.productData.name);
           }
-          
-          console.log('🚀 Opening Product Demo with fresh token');
           
           const newWindow = window.open(demoUrl.toString(), '_blank');
           
@@ -730,26 +721,6 @@ function setupControls() {
         alert("Failed to open VR/AR preview. Please try again.");
       }
     });
-  }
-
-  // Helper function to get Product Demo base URL
-  function getProductDemoBaseUrl() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const configuredUrl = urlParams.get('productDemoUrl');
-    
-    if (configuredUrl) {
-      return configuredUrl;
-    }
-    
-    const currentHost = window.location.hostname;
-    
-    if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
-      // Development
-      return 'http://localhost:5174/digitalhome/productdemo';
-    } else {
-      // Production
-      return 'https://yourdomain.com/digitalhome/productdemo';
-    }
   }
 }
 
