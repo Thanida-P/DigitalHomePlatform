@@ -1,13 +1,14 @@
 import reflex as rx 
 from ...template import template 
 from ...state import AuthState
-from ...config import API_BASE_URL
+from ...config import API_BASE_URL, PRODUCT_DEMO_URL
 import httpx
 
 
 class ProductDetailState(rx.State):
     product_id: str = ""
     api_base_url: str = API_BASE_URL
+    product_demo_url: str = PRODUCT_DEMO_URL
     login_token: str = ""
 
     async def on_load(self):
@@ -39,6 +40,7 @@ def product_viewer_iframe() -> rx.Component:
         f"?productId={ProductDetailState.product_id}"
         f"&token={ProductDetailState.login_token}"
         f"&api={ProductDetailState.api_base_url}"
+        f"&demoUrl={ProductDetailState.product_demo_url}"
     )
 
     return rx.fragment(
