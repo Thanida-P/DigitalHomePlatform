@@ -235,7 +235,8 @@ def complete_order(request, order_id):
                             spatial_id=spatial_id,
                             texture_id=None,
                             contained_item=[],
-                            created_at=current_time
+                            created_at=current_time,
+                            wall_mountable=item.is_wall_mountable()
                         )
                         root.containerOwnedItems[str(container_id)] = categorizedItem
                     else:
@@ -253,7 +254,8 @@ def complete_order(request, order_id):
                             spatial_id=spatial_id,
                             texture_id=None,
                             composition=[],
-                            created_at=current_time
+                            created_at=current_time,
+                            wall_mountable=item.wall_mountable
                         )
                         root.nonContainerOwnedItems[str(noncontainer_id)] = categorizedItem
                     transaction.commit()

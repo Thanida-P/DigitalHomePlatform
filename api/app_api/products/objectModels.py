@@ -50,7 +50,7 @@ class DisplayScene(persistent.Persistent):
         return self.filename
     
 class Item(persistent.Persistent):
-    def __init__(self, id, name, description, image, model_id, category, type, is_container, created_at):
+    def __init__(self, id, name, description, image, model_id, category, type, is_container, created_at, wall_mountable=False):
         self.id = id
         self.name = name
         self.description = description
@@ -61,6 +61,7 @@ class Item(persistent.Persistent):
         self.is_container = is_container
         self.created_at = created_at
         self.updated_at = created_at
+        self.wall_mountable = wall_mountable
     
     def get_id(self):
         return self.id
@@ -91,6 +92,9 @@ class Item(persistent.Persistent):
     
     def get_updated_at(self):
         return self.updated_at
+    
+    def is_wall_mountable(self):
+        return self.wall_mountable
     
 class Product(persistent.Persistent):
     def __init__(self, id, item, digital_price, physical_price, stock, digital_available, physical_available, display_scenes):
@@ -148,8 +152,8 @@ class Product(persistent.Persistent):
         self.rating = rating
     
 class OwnedItem(Item):
-    def __init__(self, id, owner_id, name, description, model_id, image, category, type, is_container, spatial_id, texture_id, created_at):
-        super().__init__(id=id, name=name, description=description, model_id=model_id, image=image, category=category, type=type, is_container=is_container, created_at=created_at)
+    def __init__(self, id, owner_id, name, description, model_id, image, category, type, is_container, spatial_id, texture_id, created_at, wall_mountable=False):
+        super().__init__(id=id, name=name, description=description, model_id=model_id, image=image, category=category, type=type, is_container=is_container, created_at=created_at, wall_mountable=wall_mountable)
         self.spatial_id = spatial_id
         self.texture_id = texture_id
         self.owner_id = owner_id
@@ -169,8 +173,8 @@ class OwnedItem(Item):
     def set_spatial_id(self, spatial_id):
         self.spatial_id = spatial_id    
 class ContainerOwnedItem(OwnedItem):
-    def __init__(self, id, owner_id, name, description, model_id, image, category, type, is_container, spatial_id, texture_id, contained_item, created_at):
-        super().__init__(id=id, owner_id=owner_id, name=name, description=description, model_id=model_id, image=image, category=category, type=type, is_container=is_container, spatial_id=spatial_id, texture_id=texture_id, created_at=created_at)
+    def __init__(self, id, owner_id, name, description, model_id, image, category, type, is_container, spatial_id, texture_id, contained_item, created_at, wall_mountable=False):
+        super().__init__(id=id, owner_id=owner_id, name=name, description=description, model_id=model_id, image=image, category=category, type=type, is_container=is_container, spatial_id=spatial_id, texture_id=texture_id, created_at=created_at, wall_mountable=wall_mountable)
         self.contained_item = contained_item
 
     def get_contained_item(self):
@@ -180,8 +184,8 @@ class ContainerOwnedItem(OwnedItem):
         self.contained_item = contained_item
 
 class NonContainerOwnedItem(OwnedItem):
-    def __init__(self, id, owner_id, name, description, model_id, image, category, type, is_container, spatial_id, texture_id, composition, created_at):
-        super().__init__(id=id, owner_id=owner_id, name=name, description=description, model_id=model_id, image=image, category=category, type=type, is_container=is_container, spatial_id=spatial_id, texture_id=texture_id, created_at=created_at)
+    def __init__(self, id, owner_id, name, description, model_id, image, category, type, is_container, spatial_id, texture_id, composition, created_at, wall_mountable=False):
+        super().__init__(id=id, owner_id=owner_id, name=name, description=description, model_id=model_id, image=image, category=category, type=type, is_container=is_container, spatial_id=spatial_id, texture_id=texture_id, created_at=created_at, wall_mountable=wall_mountable)
         self.composition = composition
     
     def get_composition(self):

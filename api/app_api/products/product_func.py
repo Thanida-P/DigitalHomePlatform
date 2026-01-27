@@ -23,7 +23,7 @@ def get_product_id(root):
     ]
     return max(existing_ids) + 1
 
-def create_product(name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, is_container, texture_files=None):
+def create_product(name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, is_container, texture_files=None, wall_mountable=False):
     connection, root = get_connection()
     try:
         if digital_available and digital_price is None:
@@ -51,6 +51,7 @@ def create_product(name, description, digital_price, physical_price, category, i
             type=product_type,
             is_container=is_container,
             created_at=current_datetime,
+            wall_mountable=wall_mountable
         )
         root.objectItems[item_id] = item
 
@@ -76,7 +77,7 @@ def create_product(name, description, digital_price, physical_price, category, i
     finally:
         connection.close()
 
-def update_existing_product(product_id, name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, is_container, texture_files):
+def update_existing_product(product_id, name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, is_container, texture_files, wall_mountable=False):
     connection, root = get_connection()
     try:
         product_id = int(product_id)
@@ -127,6 +128,8 @@ def update_existing_product(product_id, name, description, digital_price, physic
             product.physical_available = physical_available
         if is_container is not None:
             item.is_container = is_container
+        if wall_mountable is not None:
+            item.wall_mountable = wall_mountable
 
 
         current_datetime = datetime.now()
