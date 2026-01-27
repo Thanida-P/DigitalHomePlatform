@@ -40,6 +40,11 @@ function getApiBase() {
   return params.get("api") || "http://localhost:8001";
 }
 
+function getDemoUrl() {
+  const params = getUrlParams();
+  return params.get("demoUrl") || "http://localhost:5174";
+}
+
 function getTokenFromUrl() {
   const params = getUrlParams();
   return params.get("token");
@@ -689,7 +694,7 @@ function setupControls() {
           const tokenData = await tokenResponse.json();
           const freshToken = tokenData.token;
 
-          const PRODUCT_DEMO_URL = "http://localhost:5174";
+          const PRODUCT_DEMO_URL = getDemoUrl();
           
           const demoUrl = new URL(`${PRODUCT_DEMO_URL}`);
           demoUrl.searchParams.set('token', freshToken);
