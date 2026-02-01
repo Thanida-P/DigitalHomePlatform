@@ -1,3 +1,4 @@
+import os
 import reflex as rx
 from typing import List, Optional
 from ..template import template
@@ -6,6 +7,7 @@ from ..config import API_BASE_URL
 from ..pages.orders import OrdersState
 from ..components.navbar import NavCartState
 
+PRODUCT_DEMO_URL = os.getenv("PRODUCT_DEMO_URL", "http://localhost:5174")
 
 class CreditCard(rx.Base):
     id: int = 0
@@ -60,6 +62,7 @@ class CartState(rx.State):
 
     username: str = ""
     phone_number: str = ""
+    login_token: str = ""
 
     credit_cards: list[CreditCard] = []
     bank_accounts: list[BankAccount] = []
@@ -116,7 +119,30 @@ class CartState(rx.State):
 
         except Exception as e:
             print(f"Error loading user data: {str(e)}")
-    
+
+    async def get_login_token(self):
+        """Fetch a fresh login token for opening the Product Demo app."""
+        import httpx
+
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{API_BASE_URL}/users/get_login_token/",
+                    cookies=cookies_dict,
+                    timeout=5.0
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    self.login_token = data.get("token", "")
+                else:
+                    print(f"❌ Failed to get token: {response.status_code}")
+                    self.login_token = ""
+        except Exception as e:
+            print(f"Error getting login token: {str(e)}")
+            self.login_token = ""
+
     async def load_addresses(self):
         import httpx
        
@@ -366,11 +392,6 @@ class CartState(rx.State):
             rx.toast.error(f"Failed to clear cart: {e}")
             print(f"Exception in remove_all: {e}")
 
-                    
-        except Exception as e:
-            rx.toast.error(f"Failed to clear cart: {e}")
-            print(f"Exception in remove_all: {e}")
-
     async def load_payment_methods(self):
         """Load all payment methods (credit cards and bank accounts)."""
         self.is_loading_payments = True
@@ -605,7 +626,6 @@ def cart_item(item: CartItem) -> rx.Component:
                 align_items="start",
                 flex="1",
             ),
-            
            
             rx.vstack(
                 rx.button(
@@ -621,7 +641,32 @@ def cart_item(item: CartItem) -> rx.Component:
                     font_weight="700",
                     color="#22282c"
                 ),
-                spacing="4",
+
+                rx.link(
+                    rx.button(
+                        "🥽 VR/AR Demo",
+                        variant="outline",
+                        size="2",
+                        cursor="pointer",
+                        color="#22282c",
+                        border_color="#22282c",
+                        _hover={
+                            "bg": "#22282c",
+                            "color": "white",
+                        },
+                        width="100%",
+                    ),
+                    href=(
+                        f"{PRODUCT_DEMO_URL}"
+                        f"?token={CartState.login_token}"
+                        f"&productId={item.product_id}"
+                        f"&api={API_BASE_URL}"
+                    ),
+                    target="_blank",
+                    text_decoration="none",
+                    width="100%",
+                ),
+                spacing="3",
                 align_items="end",
             ),
             
@@ -1405,7 +1450,6 @@ def cart_content() -> rx.Component:
         
     )
 
-@rx.page(route="/cart", on_load=[CartState.load_cart, CartState.load_user_data, CartState.load_payment_methods])
+@rx.page(route="/cart", on_load=[CartState.load_cart, CartState.load_user_data, CartState.load_payment_methods, CartState.get_login_token])
 def cart_page() -> rx.Component:
     return template(cart_content)
-
