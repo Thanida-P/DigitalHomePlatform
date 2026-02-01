@@ -118,7 +118,7 @@ class CartState(rx.State):
                 self.phone_number = user.get("phone_no", "")
 
         except Exception as e:
-            console.log(f"Error loading user data: {str(e)}")
+            rx.toast.error(f"Error loading user data: {str(e)}")
 
     async def get_login_token(self):
         auth_state = await self.get_state(AuthState)
