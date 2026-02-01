@@ -610,6 +610,8 @@ def cart_item(item: CartItem) -> rx.Component:
                     color="#22282c"
                 ),
 
+                rx.spacer(),
+                
                 rx.link(
                     rx.button(
                         "VR/AR Demo",
