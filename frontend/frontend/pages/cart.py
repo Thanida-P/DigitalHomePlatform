@@ -120,7 +120,7 @@ class CartState(rx.State):
         except Exception as e:
             rx.toast.error(f"Error loading user data: {str(e)}")
 
-    async def get_login_token(self):
+    async def get_fresh_login_token(self) -> str:
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
         try:
@@ -132,13 +132,26 @@ class CartState(rx.State):
                 )
                 if response.status_code == 200:
                     data = response.json()
-                    self.login_token = data.get("token", "")
+                    return data.get("token", "")
                 else:
                     rx.toast.error(f"Failed to get token: {response.status_code}")
-                    self.login_token = ""
+                    return ""
         except Exception as e:
             rx.toast.error(f"Error getting login token: {str(e)}")
-            self.login_token = ""
+            return ""
+
+    async def open_vr_demo(self, product_id: int):
+        token = await self.get_fresh_login_token()
+        if token:
+            demo_url = (
+                f"{PRODUCT_DEMO_URL}"
+                f"?token={token}"
+                f"&productId={product_id}"
+                f"&api={API_BASE_URL}"
+            )
+            return rx.call_script(f"window.open('{demo_url}', '_blank')")
+        else:
+            rx.toast.error("Failed to generate access token")
 
     async def load_addresses(self):
         auth_state = await self.get_state(AuthState)
@@ -322,7 +335,6 @@ class CartState(rx.State):
                 )
                 
                 if response.status_code == 200:
-                    # Remove item from local state
                     self.cart_items = [item for item in self.cart_items if item.id != item_id]
                     rx.toast.success("Item removed from cart")
                     await self.update_navbar_cart_quantity(len(self.cart_items))
@@ -526,7 +538,6 @@ class CartState(rx.State):
 def cart_item(item: CartItem) -> rx.Component:
     return rx.box(
         rx.hstack(
-            
             rx.box(
                 rx.image(
                     src=item.image,
@@ -537,8 +548,6 @@ def cart_item(item: CartItem) -> rx.Component:
                     bg="gray.100",
                 ),
             ),
-            
-         
             rx.vstack(
                 rx.hstack(
                     rx.text(
@@ -552,7 +561,7 @@ def cart_item(item: CartItem) -> rx.Component:
                     align="center",
                 ),
                 rx.hstack(
-                    rx.text("Colors:", font_size="14px",color="#22282c"),
+                    rx.text("Colors:", font_size="14px", color="#22282c"),
                     rx.foreach(
                         item.colors,
                         lambda color: rx.box(
@@ -579,14 +588,20 @@ def cart_item(item: CartItem) -> rx.Component:
                         border_radius="md",
                         cursor="pointer"
                     ),
-                    rx.text(item.quantity, font_weight="600",color="#22282c", min_width="30px", text_align="center"),
+                    rx.text(
+                        item.quantity, 
+                        font_weight="600",
+                        color="#22282c", 
+                        min_width="30px", 
+                        text_align="center"
+                    ),
                     rx.button(
                         "+",
                         on_click=lambda: CartState.increment_quantity(item.id),
                         variant="outline",
                         size="1",
                         border_radius="md",
-                        cursor = "pointer",
+                        cursor="pointer",
                     ),
                     spacing="2",
                 ),
@@ -601,7 +616,7 @@ def cart_item(item: CartItem) -> rx.Component:
                     on_click=lambda: CartState.remove_item(item.id),
                     variant="ghost",
                     color_scheme="red",
-                    cursor = "pointer"
+                    cursor="pointer"
                 ),
                 rx.text(
                     f"$ {item.price * item.quantity}",
@@ -609,33 +624,23 @@ def cart_item(item: CartItem) -> rx.Component:
                     font_weight="700",
                     color="#22282c"
                 ),
-
                 rx.spacer(),
                 
-                rx.link(
-                    rx.button(
-                        "VR/AR Demo",
-                        variant="outline",
-                        size="2",
-                        cursor="pointer",
-                        color="#22282c",
-                        border_color="#22282c",
-                        _hover={
-                            "bg": "#22282c",
-                            "color": "white",
-                        },
-                        width="100%",
-                    ),
-                    href=(
-                        f"{PRODUCT_DEMO_URL}"
-                        f"?token={CartState.login_token}"
-                        f"&productId={item.product_id}"
-                        f"&api={API_BASE_URL}"
-                    ),
-                    target="_blank",
-                    text_decoration="none",
+                rx.button(
+                    "VR/AR Demo",
+                    on_click=lambda: CartState.open_vr_demo(item.product_id),
+                    variant="outline",
+                    size="2",
+                    cursor="pointer",
+                    color="#22282c",
+                    border_color="#22282c",
+                    _hover={
+                        "bg": "#22282c",
+                        "color": "white",
+                    },
                     width="100%",
                 ),
+                
                 spacing="3",
                 align_items="end",
             ),
@@ -1420,6 +1425,6 @@ def cart_content() -> rx.Component:
         
     )
 
-@rx.page(route="/cart", on_load=[CartState.load_cart, CartState.load_user_data, CartState.load_payment_methods, CartState.get_login_token])
+@rx.page(route="/cart", on_load=[CartState.load_cart, CartState.load_user_data, CartState.load_payment_methods])
 def cart_page() -> rx.Component:
     return template(cart_content)
