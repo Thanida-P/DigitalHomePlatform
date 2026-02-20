@@ -12,12 +12,11 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 import sys
-
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-
+load_dotenv(os.path.join(BASE_DIR.parent, 'local.env'))
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -63,14 +62,17 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
-    os.environ.get("BASE_URL", ""),
+    os.environ.get("DIGITAL_HOME_PLATFORM_URL", "http://localhost:3000"),
+    os.environ.get("SCENE_CREATOR_URL", "http://localhost:5173"),
+    os.environ.get("PRODUCT_DEMO_URL", "http://localhost:5174"),
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = ["*"]
+CORS_ALLOW_METHODS = ["*"]
 
 SESSION_COOKIE_SECURE = False 
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_AGE = 60*60*24*30
 CSRF_COOKIE_SECURE = False
 
@@ -110,10 +112,10 @@ DATABASES = {
 
 # ZODB settings and GDAL library path
 if sys.platform == "win32":
-    GEOS_LIBRARY_PATH = r"C:/OSGeo4W/bin/geos_c.dll"
-    GDAL_LIBRARY_PATH = r"C:/OSGeo4W/bin/gdal311.dll"
-    # GEOS_LIBRARY_PATH = r"C:/Program Files/GDAL/bin/geos_c.dll"
-    # GDAL_LIBRARY_PATH = r"C:/Program Files/GDAL/bin/gdal.dll"
+    # GEOS_LIBRARY_PATH = r"C:/OSGeo4W/bin/geos_c.dll"
+    # GDAL_LIBRARY_PATH = r"C:/OSGeo4W/bin/gdal311.dll"
+    GEOS_LIBRARY_PATH = r"C:/Program Files/GDAL/bin/geos_c.dll"
+    GDAL_LIBRARY_PATH = r"C:/Program Files/GDAL/bin/gdal.dll"
 elif sys.platform == "darwin":  # macOS
     GEOS_LIBRARY_PATH = "/opt/homebrew/opt/geos/lib/libgeos_c.dylib"
     GDAL_LIBRARY_PATH = "/opt/homebrew/opt/gdal/lib/libgdal.dylib"
