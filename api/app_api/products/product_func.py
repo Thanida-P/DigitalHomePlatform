@@ -34,7 +34,13 @@ def create_product(name, description, digital_price, physical_price, category, i
         display_scenes = []
         model_id = None
         if digital_available:
-            model_id = create_3d_model(root, model_files, texture_files)
+            if model_files is not None and category.lower() != "widget":
+                model_id = create_3d_model(root, model_files, texture_files)
+            elif category.lower() == "widget" and (name.lower() in ["clock", "whiteboard", "weather"]):
+                model_id = -1
+                wall_mountable = True
+            else: 
+                raise ValueError("Model file is required for digital products unless it's a widget of type clock, whiteboard, or weather")
             for scene_file in scene_files:
                 scene_id = create_display_scene(root, scene_file)
                 display_scenes.append(scene_id)
