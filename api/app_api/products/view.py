@@ -30,16 +30,19 @@ def add_product(request):
         is_container = request.POST.get('is_container', 'false').lower() == 'true'
         wall_mountable = request.POST.get('wall_mountable', 'false').lower() == 'true'
         
-        if not all([name, description, category, product_type, image]) or stock < 0 or not model_files:
+        if not all([name, description, category, product_type, image]) or stock < 0:
             return JsonResponse({'error': 'Invalid input data'}, status=400)
-
+        
+        if not model_files and (category.lower() != 'widget' or product_type.lower() != 'widget'):
+            return JsonResponse({'error': 'Model file is required'}, status=400)
+        
         if digital_price < 0 or physical_price < 0:
             return JsonResponse({'error': 'Prices must be non-negative'}, status=400)
 
         if not digital_available and not physical_available:
             return JsonResponse({'error': 'At least one of digital or physical availability must be true'}, status=400)
 
-        product_id = create_product(name, description, digital_price, physical_price, category, image, product_type, stock, model_files, scene_files, digital_available, physical_available, is_container, texture_files, wall_mountable)
+        product_id = create_product(name, description, digital_price, physical_price, category, image, product_type, stock, model_files = None, scene_files = scene_files, digital_available = digital_available, physical_available = physical_available, is_container = is_container, texture_files = texture_files, wall_mountable = wall_mountable)
 
         return JsonResponse({'message': 'Product created successfully', 'product_id': product_id}, status=201)
     except Exception as e:
@@ -71,9 +74,10 @@ def update_product(request):
         
         if not product_id:
             return JsonResponse({'error': 'Product ID is required'}, status=400)
-        if not all([name, description, category, product_type, image]) or stock < 0 or not model_files:
+        if not all([name, description, category, product_type, image]) or stock < 0:
             return JsonResponse({'error': 'Invalid input data'}, status=400)
-
+        if not model_files and (category.lower() != 'widget' or product_type.lower() != 'widget'):
+            return JsonResponse({'error': 'Model file is required'}, status=400)
         if digital_price < 0 or physical_price < 0:
             return JsonResponse({'error': 'Prices must be non-negative'}, status=400)
 
@@ -286,7 +290,8 @@ def get_all_categories(request):
         categories = set()
         for obj in root.objectItems.values():
             try:
-                categories.add(obj.get_category())
+                if obj.get_category().lower() != "widget":
+                    categories.add(obj.get_category())
             except Exception:
                 continue
         return JsonResponse({'categories': list(categories)}, status=200)
