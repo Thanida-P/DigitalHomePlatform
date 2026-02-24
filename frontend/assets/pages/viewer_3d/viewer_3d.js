@@ -764,6 +764,7 @@ async function fetchProductData(productId) {
       }
     } else {
       await fetch3DModel(modelId);
+      await fetchAndRenderTextures(modelId);
     }
     if (state.productData.display_scenes_ids)
       await fetchDisplayScenes(state.productData.display_scenes_ids);
@@ -1014,6 +1015,143 @@ function setupControls() {
       }
     });
   }
+}
+
+//texture
+function applyTextureToModel(imageUrl) {
+  if (!state.furnitureModel) return;
+  const textureLoader = new THREE.TextureLoader();
+  textureLoader.load(
+    imageUrl,
+    (texture) => {
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.needsUpdate = true;
+      state.furnitureModel.traverse((obj) => {
+        if (!obj.isMesh) return;
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        mats.forEach((m) => {
+          if (m) { m.map = texture; m.needsUpdate = true; }
+        });
+      });
+    },
+    undefined,
+    (err) => console.warn("[Texture] Failed to apply texture:", err)
+  );
+}
+
+async function fetchAndRenderTextures(modelId) {
+  const api = getApiBase();
+  const section = document.getElementById("textures-section");
+  const container = document.getElementById("texture-options");
+  if (!section || !container) return;
+
+  section.style.display = "block";
+  container.innerHTML = '<span class="texture-loading">Loading textures…</span>';
+
+  try {
+    
+    const res = await fetch(`${api}/products/get_texture/${modelId}/`, {
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      console.warn(`[Textures] API returned ${res.status} for model ${modelId}`);
+      section.style.display = "none";
+      return;
+    }
+
+    const data = await res.json();
+    const entries = data.textures || [];
+
+    if (entries.length === 0) {
+      console.info("[Textures] No textures found for this model.");
+      section.style.display = "none";
+      return;
+    }
+
+    console.info(`[Textures] Found ${entries.length} texture(s) for model ${modelId}`);
+
+    const textures = [];
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      try {
+        // Decode base64 → Uint8Array → Blob → Object URL
+        const binaryString = atob(entry.file);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let j = 0; j < binaryString.length; j++) {
+          bytes[j] = binaryString.charCodeAt(j);
+        }
+        const blob = new Blob([bytes], { type: "image/jpeg" });
+        const objectUrl = URL.createObjectURL(blob);
+
+        textures.push({
+          name: entry.name || `Texture ${i + 1}`,
+          imageUrl: objectUrl,
+        });
+      } catch (err) {
+        console.warn(`[Textures] Failed to decode texture_id=${entry.texture_id}:`, err);
+      }
+    }
+
+    renderTextureSwatches(textures);
+
+  } catch (err) {
+    console.error("[Textures] Fetch error:", err);
+    section.style.display = "none";
+  }
+}
+
+function renderTextureSwatches(textures) {
+  const section = document.getElementById("textures-section");
+  const container = document.getElementById("texture-options");
+  if (!section || !container) return;
+
+  if (!textures || textures.length === 0) {
+    section.style.display = "none";
+    return;
+  }
+
+  section.style.display = "block";
+  container.innerHTML = "";
+
+  textures.forEach(({ name, imageUrl }) => {
+    const option = document.createElement("div");
+    option.className = "texture-option";
+    option.title = name;
+
+    const img = document.createElement("img");
+    img.src = imageUrl;
+    img.alt = name;
+    img.className = "texture-swatch-img";
+    img.draggable = false;
+
+    img.onerror = () => {
+      img.style.display = "none";
+      const fallback = document.createElement("div");
+      fallback.className = "texture-swatch-fallback";
+      fallback.textContent = name.charAt(0).toUpperCase();
+      option.insertBefore(fallback, img);
+    };
+
+    const label = document.createElement("span");
+    label.textContent = name;
+
+    option.appendChild(img);
+    option.appendChild(label);
+
+    option.addEventListener("click", () => {
+      document.querySelectorAll(".texture-option").forEach((el) => el.classList.remove("selected"));
+      option.classList.add("selected");
+      state.selectedTextureUrl = imageUrl;
+      applyTextureToModel(imageUrl);
+    });
+
+    container.appendChild(option);
+  });
+
+  // Auto-select first texture
+  container.querySelector(".texture-option")?.click();
 }
 
 async function init() {
