@@ -749,6 +749,10 @@ class ProfileState(rx.State):
             "gender": self.gender,
             "date_of_birth": self.birthday,
         }
+        
+        if any(value == "" for value in payload.values()):
+            alert_message = "Please fill in all fields before saving your profile."
+            return rx.toast.error(alert_message)
 
         try:
             async with httpx.AsyncClient() as client:
@@ -761,9 +765,8 @@ class ProfileState(rx.State):
 
             if response.status_code == 200:
                 data = response.json()
-                print(f"Profile updated: {data}")
-            
                 await self.load_user_data()
+                return rx.toast.success("Profile updated successfully!")
             else:
                 print(f"Failed to update profile: {response.text}")
 
