@@ -621,9 +621,6 @@ class ProfileState(rx.State):
 
     
     async def submit_password_change(self):
-        """Submit password change request to backend"""
-        print("=== PASSWORD CHANGE STARTED ===")
-
         self.is_submitting = True
 
         self.password_error = ""
@@ -632,50 +629,38 @@ class ProfileState(rx.State):
         if not self.current_password:
             self.password_error = "Please enter your current password"
             self.is_submitting = False
-            print(f"Validation error: {self.password_error}")
-            return
+            return rx.toast.error(self.password_error)
 
         if not self.new_password:
             self.password_error = "Please enter a new password"
             self.is_submitting = False
-            print(f"Validation error: {self.password_error}")
-            return
+            return rx.toast.error(self.password_error)
 
         if len(self.new_password) < 6:
             self.password_error = "New password must be at least 6 characters"
             self.is_submitting = False
-            print(f"Validation error: {self.password_error}")
-            return
+            return rx.toast.error(self.password_error)
 
         if not self.confirm_password:
             self.password_error = "Please confirm your new password"
             self.is_submitting = False
-            print(f"Validation error: {self.password_error}")
-            return
+            return rx.toast.error(self.password_error)
 
         if self.new_password != self.confirm_password:
             self.password_error = "New passwords do not match"
             self.is_submitting = False
-            print(f"Validation error: {self.password_error}")
-            return
+            return  rx.toast.error(self.password_error)
 
         if self.current_password == self.new_password:
             self.password_error = "New password must be different from current password"
             self.is_submitting = False
-            print(f"Validation error: {self.password_error}")
-            return
-
-        print("Validation passed, getting auth state...")
+            return rx.toast.error(self.password_error)
 
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
 
-        print(f"Cookies available: {bool(cookies_dict)}")
-        print(f"API URL: {API_BASE_URL}/users/change_password/")
-
         try:
             async with httpx.AsyncClient() as client:
-                print("Sending request to backend...")
                 response = await client.put(
                     f"{API_BASE_URL}/users/change_password/",
                     json={
@@ -685,9 +670,6 @@ class ProfileState(rx.State):
                     cookies=cookies_dict,
                     timeout=10.0,
                 )
-
-                print(f"Response status: {response.status_code}")
-                print(f"Response body: {response.text}")
 
                 if response.status_code == 200:
                     self.password_success = (
@@ -702,18 +684,17 @@ class ProfileState(rx.State):
 
                 elif response.status_code == 403:
                     self.password_error = "Current password is incorrect"
-                    print(f"Error: {self.password_error}")
+                    return rx.toast.error(self.password_error)
 
                 elif response.status_code == 400:
                     data = response.json()
                     self.password_error = data.get("error", "Invalid request")
-                    print(f"Error: {self.password_error}")
+                    return rx.toast.error(self.password_error)
 
                 elif response.status_code == 401:
                     self.password_error = (
                         "Authentication required. Please log in again."
                     )
-                    print(f"Error: {self.password_error}")
                     self.is_submitting = False
                     return rx.redirect("/login")
 
@@ -721,7 +702,7 @@ class ProfileState(rx.State):
                     self.password_error = (
                         f"Server error (Status: {response.status_code})"
                     )
-                    print(f"Error: {self.password_error}")
+                    return rx.toast.error(self.password_error)
 
         except httpx.TimeoutException as e:
             self.password_error = "Request timeout. Please check your connection."
