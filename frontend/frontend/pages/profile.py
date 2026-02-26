@@ -753,7 +753,13 @@ class ProfileState(rx.State):
         if any(value == "" for value in payload.values()):
             alert_message = "Please fill in all fields before saving your profile."
             return rx.toast.error(alert_message)
-
+        
+        if "@" not in payload["email"] or "." not in payload["email"]:
+            return rx.toast.error("Please enter a valid email address.")
+        
+        if not payload["phone_no"].isdigit() or len(payload["phone_no"]) < 8:
+            return rx.toast.error("Please enter a valid phone number.")
+        
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.put(
