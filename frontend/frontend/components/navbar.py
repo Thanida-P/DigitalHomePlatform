@@ -237,7 +237,7 @@ def navbar_page():
                 ),
             
                 rx.button(
-                    "Sign Up",
+                    "Sign In",
                     color="white",
                     background_color="#22282C",
                     border_radius="8px",
