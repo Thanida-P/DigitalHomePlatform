@@ -9,8 +9,6 @@ import traceback
 class AdminDashboardState(rx.State):
   
     UPLOAD_DIR = "uploading_models"
-
-    products: List[Dict] = []
     filtered_products: List[Dict] = []
     
     search_query: str = ""
@@ -199,12 +197,14 @@ class AdminDashboardState(rx.State):
                     json=filter_body,               
                     cookies=cookies_dict,
                 )
-                
+                print(f"🔍 Load products status: {response.status_code}")
+                print(f"🔍 Raw response: {response.text}")  # ADD THIS 
 
             if response.status_code != 200:
                 return
 
             data = response.json()
+            print(f"🔍 Total products in response: {len(data.get('products', []))}")
 
             if "products" not in data:
                 print("⚠️ No products returned:", data)
@@ -420,18 +420,21 @@ class AdminDashboardState(rx.State):
                                 flattened_files.append((key, item))
                         else:
                             flattened_files.append((key, value))
+
+                 
                     response = await client.post(
                         f"{API_BASE_URL}/products/add/",
                         data=data,
                         files=flattened_files,
                         cookies=cookies_dict,
                     )
+                    
                 
                 if response.status_code == 201:
-                    self.upload_status = "Product saved successfully!"
-               
                     self.close_add_modal()
                     await self.load_products()
+                    return rx.toast.success(f"Product added successfully!")
+                    
                 elif response.status_code == 400:
                     try:
                         error_data = response.json()
@@ -448,27 +451,30 @@ class AdminDashboardState(rx.State):
                     self.upload_status = f"Error: {error_msg}"
                     
             finally:
-        
                 for file in files.values():
                     try:
-                        file.close()
+                        if isinstance(file, list):
+                            for item in file:
+                                # item is a tuple: (filename, file_obj, content_type)
+                                if hasattr(item[1], "close"):
+                                    item[1].close()
+                        elif hasattr(file, "close"):
+                            file.close()
                     except:
                         pass
                 
         except httpx.TimeoutException:
             self.upload_status = "Request timeout - please try again"
-            print("Timeout exception occurred")
+          
         except Exception as e:
             self.upload_status = f"Connection error: {str(e)}"
-            print(f"Exception during product creation: {str(e)}")
-            print(f"Full traceback: {traceback.format_exc()}")
+   
         except httpx.ReadError:
             self.upload_status = "Connection closed unexpectedly. Try again or check backend logs."
-            print("httpx.ReadError occurred during product upload.")
-        
+           
         finally:
             self.is_uploading = False
-    
+            
     
     async def delete_product(self, product_id: int):
         auth_state = await self.get_state(AuthState)
@@ -1236,7 +1242,6 @@ def product_card(product: Dict) -> rx.Component:
                             weight="bold",
                             color="#22282C",
                         ),
-                        spacing="1",
                         width="100%",
                     ),
                     
