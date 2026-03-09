@@ -5,6 +5,7 @@ const state = {
   modelUrl: null, // furniture model data URL
   sceneUrls: [], // list of room/scene data URLs
   selectedSceneIndex: 0,
+  isWallpaperMode: false,
 
   // transforms
   modelScale: 1.0,
@@ -204,6 +205,26 @@ function getWidgetType(product) {
   if (name.includes("whiteboard") || type === "whiteboard") return "whiteboard";
   if (name.includes("weather") || type === "weather_widget") return "weather";
   return null;
+}
+
+function isWallpaper(product) {
+  if (!product) return false;
+  const cat = (product.category || "").toLowerCase();
+  return cat === "wallpaper";
+}
+
+function normalizeImageUrl(imageValue) {
+  if (imageValue == null || typeof imageValue !== "string") return null;
+  const s = imageValue.trim();
+  if (!s) return null;
+  if (s.startsWith("data:")) return s;
+  if (s.startsWith("http://") || s.startsWith("https://")) return s;
+  if (s.startsWith("/") && (s.startsWith("/media") || s.startsWith("/api") || s.startsWith("/static") || s.startsWith("/images"))) {
+    const api = getApiBase();
+    return api.replace(/\/$/, "") + s;
+  }
+  const mime = s.startsWith("iVBORw") ? "image/png" : "image/jpeg";
+  return "data:" + mime + ";base64," + s;
 }
 
 function createClockWidgetPreview() {
@@ -423,6 +444,43 @@ function createWeatherWidgetPreview() {
   return group;
 }
 
+function createWallpaperPlane(imageUrl) {
+  return new Promise((resolve, reject) => {
+    const loader = new THREE.TextureLoader();
+    loader.load(
+      imageUrl,
+      (texture) => {
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.wrapS = THREE.ClampToEdgeWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+
+        const aspect = texture.image
+          ? texture.image.width / texture.image.height
+          : 4 / 3;
+        const width = Math.max(aspect, 1) * 2;
+        const height = (1 / Math.max(aspect, 1)) * 2;
+
+        const geometry = new THREE.PlaneGeometry(width, height);
+        const material = new THREE.MeshBasicMaterial({
+          map: texture,
+          side: THREE.DoubleSide,
+          toneMapped: false,
+        });
+        const plane = new THREE.Mesh(geometry, material);
+        plane.name = "wallpaper_plane";
+
+        const group = new THREE.Group();
+        group.add(plane);
+        group.name = "furniture_model";
+        resolve(group);
+      },
+      undefined,
+      (err) => reject(err)
+    );
+  });
+}
+
 function createWidgetPreview(widgetType) {
   switch (widgetType) {
     case "clock":
@@ -471,6 +529,48 @@ function showWidgetPreview(widgetType) {
     !state.mainScene.children.includes(state.roomModel)
   ) {
     state.mainScene.add(state.roomModel);
+  }
+}
+
+async function showWallpaperPreview(imageUrl) {
+  state.isWallpaperMode = true;
+
+  if (state.roomModel) {
+    try {
+      state.mainScene.remove(state.roomModel);
+      disposeGltfScene(state.roomModel);
+    } catch (e) {
+      console.warn("Error removing room model:", e);
+    }
+    state.roomModel = null;
+  }
+
+  if (state.furnitureModel) {
+    try {
+      state.mainScene.remove(state.furnitureModel);
+      disposeGltfScene(state.furnitureModel);
+    } catch (e) {
+      console.warn("Error removing previous furniture/wallpaper:", e);
+    }
+    state.furnitureModel = null;
+  }
+
+  try {
+    const group = await createWallpaperPlane(imageUrl);
+    state.furnitureModel = group;
+    state.modelUrl = null;
+    state.furnitureModel.scale.set(
+      state.modelScale,
+      state.modelScale,
+      state.modelScale
+    );
+    state.furnitureModel.position.set(state.modelX, state.modelY, state.modelZ);
+    state.furnitureModel.rotation.y = state.modelRotationY;
+    state.mainScene.add(state.furnitureModel);
+  } catch (err) {
+    console.error("Error creating wallpaper preview:", err);
+    state.isWallpaperMode = false;
+    return;
   }
 }
 
@@ -747,6 +847,8 @@ async function fetchProductData(productId) {
     const data = await res.json();
     state.productData = data.product || {};
 
+    state.isWallpaperMode = false;
+
     const nameElem = document.getElementById("product-name");
     if (nameElem) nameElem.textContent = state.productData.name || "Product";
     const physElem = document.getElementById("physical-price");
@@ -755,6 +857,16 @@ async function fetchProductData(productId) {
       physElem.textContent = `$${state.productData.physical_price ?? 0}`;
     if (digiElem)
       digiElem.textContent = `$${state.productData.digital_price ?? 0}`;
+
+    if (isWallpaper(state.productData)) {
+      const imageUrl = normalizeImageUrl(state.productData.image);
+      if (imageUrl) {
+        await showWallpaperPreview(imageUrl);
+      } else {
+        console.warn("Wallpaper product has no image.");
+      }
+      return;
+    }
 
     const modelId = state.productData.model_id;
     const widgetType = getWidgetType(state.productData);
