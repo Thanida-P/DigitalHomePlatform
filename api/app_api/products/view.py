@@ -33,7 +33,7 @@ def add_product(request):
         if not all([name, description, category, product_type, image]) or stock < 0:
             return JsonResponse({'error': 'Invalid input data'}, status=400)
         
-        if not model_files and (category.lower() != 'widget' or product_type.lower() != 'widget'):
+        if not model_files and (category.lower() not in ['widget', 'wallpaper'] or product_type.lower() not in ['widget', 'wallpaper']):
             return JsonResponse({'error': 'Model file is required'}, status=400)
         
         if digital_price < 0 or physical_price < 0:
@@ -76,7 +76,7 @@ def update_product(request):
             return JsonResponse({'error': 'Product ID is required'}, status=400)
         if not all([name, description, category, product_type, image]) or stock < 0:
             return JsonResponse({'error': 'Invalid input data'}, status=400)
-        if not model_files and (category.lower() != 'widget' or product_type.lower() != 'widget'):
+        if not model_files and (category.lower() not in ['widget', 'wallpaper'] or product_type.lower() not in ['widget', 'wallpaper']):
             return JsonResponse({'error': 'Model file is required'}, status=400)
         if digital_price < 0 or physical_price < 0:
             return JsonResponse({'error': 'Prices must be non-negative'}, status=400)

@@ -359,12 +359,19 @@ def add_custom_item(request):
         if image:
             image_base64 = base64.b64encode(image.read()).decode('utf-8')
         
-        if not name or not model_files:
-            return JsonResponse({'error': 'Name and model_file are required'}, status=400)
+        if not name:
+            return JsonResponse({'error': 'Name is required'}, status=400)
+        
+        if not model_files and (category.lower() != 'wallpaper'):
+            return JsonResponse({'error': 'Model file is required'}, status=400)
         
         spatial_id = create_spatial_instance()
         current_time = datetime.now()
-        model_id = create_3d_model(root, model_files, texture_files)
+        if model_files:
+            model_id = create_3d_model(root, model_files, texture_files)
+        elif category.lower() == 'wallpaper':
+            model_id = -2
+            wall_mountable = 'true'
         if is_container:
             container_id = get_container_owned_item_id(root)
             categorizedItem = ContainerOwnedItem(
