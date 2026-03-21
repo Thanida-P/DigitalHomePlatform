@@ -485,7 +485,7 @@ def get_deployed_item_details(request, id):
             scale = parse_coordinates(spatial_data.scale)
             position_history = spatial_data.position_history
 
-            deployed_items_details.append({item_id: {
+            payload = {
                 'name': item.get_name(),
                 'description': item.get_description(),
                 'model_id': item.get_model_id(),
@@ -504,7 +504,15 @@ def get_deployed_item_details(request, id):
                 'containered_item': item.get_contained_item() if is_container else None,
                 'composite': item.get_composition() if not is_container else None,
                 'created_at': item.created_at.isoformat(),
-            }})
+                'image': item.get_image(),
+            }
+            extra = getattr(item, 'wallpaper_scene_json', None)
+            if extra:
+                try:
+                    payload.update(json.loads(extra))
+                except json.JSONDecodeError:
+                    pass
+            deployed_items_details.append({item_id: payload})
         return JsonResponse({'deployed_items': deployed_items_details}, status=200)
     except Exception as e:
         try:
@@ -557,7 +565,14 @@ def get_deployed_item_detail(request, id):
             'containered_item': item.get_contained_item() if is_container else None,
             'composite': item.get_composition() if not is_container else None,
             'created_at': item.created_at.isoformat(),
+            'image': item.get_image(),
         }
+        extra = getattr(item, 'wallpaper_scene_json', None)
+        if extra:
+            try:
+                item_detail.update(json.loads(extra))
+            except json.JSONDecodeError:
+                pass
         return JsonResponse({'item_detail': item_detail}, status=200)
     except Exception as e:
         try:
