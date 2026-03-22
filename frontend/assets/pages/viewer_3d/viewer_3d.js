@@ -87,6 +87,24 @@ async function authenticateIframe() {
   }
 }
 
+function resizeMainViewer() {
+  const container = document.getElementById("main-canvas");
+  if (!container || !state.mainRenderer || !state.mainCamera) return;
+  const w = container.clientWidth || 800;
+  const h = container.clientHeight || 600;
+  state.mainCamera.aspect = w / h;
+  state.mainCamera.updateProjectionMatrix();
+  state.mainRenderer.setSize(w, h);
+}
+
+function scheduleMainViewerResize() {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      resizeMainViewer();
+    });
+  });
+}
+
 async function initMainViewer() {
   const container = document.getElementById("main-canvas");
   if (!container) throw new Error("#main-canvas not found in DOM");
@@ -147,11 +165,7 @@ async function initMainViewer() {
 
   // Resize handling
   window.addEventListener("resize", () => {
-    const w = container.clientWidth || 800;
-    const h = container.clientHeight || 600;
-    state.mainCamera.aspect = w / h;
-    state.mainCamera.updateProjectionMatrix();
-    state.mainRenderer.setSize(w, h);
+    resizeMainViewer();
   });
 
   // Render loop
@@ -173,9 +187,14 @@ function disposeGltfScene(gltfScene) {
         }
         if (obj.material) {
           if (Array.isArray(obj.material)) {
+            const seenMat = new Set();
+            const seenMap = new Set();
             obj.material.forEach((m) => {
-              if (m.map) m.map.dispose();
-              if (m.materials) {
+              if (!m || seenMat.has(m.uuid)) return;
+              seenMat.add(m.uuid);
+              if (m.map && !seenMap.has(m.map.uuid)) {
+                seenMap.add(m.map.uuid);
+                m.map.dispose();
               }
               try {
                 m.dispose();
@@ -205,6 +224,20 @@ function getWidgetType(product) {
   if (name.includes("whiteboard") || type === "whiteboard") return "whiteboard";
   if (name.includes("weather") || type === "weather_widget") return "weather";
   return null;
+}
+
+function setFurnitureControlsPanelVisible(visible) {
+  const panel = document.getElementById("furniture-controls-panel");
+  if (!panel) return;
+  panel.style.display = visible ? "" : "none";
+  scheduleMainViewerResize();
+}
+
+function setSceneThumbnailsPanelVisible(visible) {
+  const panel = document.getElementById("scene-thumbnails-panel");
+  if (!panel) return;
+  panel.style.display = visible ? "" : "none";
+  scheduleMainViewerResize();
 }
 
 function isWallpaper(product) {
@@ -460,14 +493,23 @@ function createWallpaperPlane(imageUrl) {
           : 4 / 3;
         const width = Math.max(aspect, 1) * 2;
         const height = (1 / Math.max(aspect, 1)) * 2;
+        const thickness = 0.1;
 
-        const geometry = new THREE.PlaneGeometry(width, height);
-        const material = new THREE.MeshBasicMaterial({
+        const geometry = new THREE.BoxGeometry(width, height, thickness);
+        const edgeMaterial = new THREE.MeshBasicMaterial({ color: 0xd0d0d0 });
+        const faceMaterial = new THREE.MeshBasicMaterial({
           map: texture,
-          side: THREE.DoubleSide,
           toneMapped: false,
         });
-        const plane = new THREE.Mesh(geometry, material);
+        const materials = [
+          edgeMaterial,
+          edgeMaterial,
+          edgeMaterial,
+          edgeMaterial,
+          faceMaterial,
+          faceMaterial,
+        ];
+        const plane = new THREE.Mesh(geometry, materials);
         plane.name = "wallpaper_plane";
 
         const group = new THREE.Group();
@@ -848,6 +890,8 @@ async function fetchProductData(productId) {
     state.productData = data.product || {};
 
     state.isWallpaperMode = false;
+    setFurnitureControlsPanelVisible(true);
+    setSceneThumbnailsPanelVisible(true);
 
     const nameElem = document.getElementById("product-name");
     if (nameElem) nameElem.textContent = state.productData.name || "Product";
@@ -862,6 +906,10 @@ async function fetchProductData(productId) {
       const imageUrl = normalizeImageUrl(state.productData.image);
       if (imageUrl) {
         await showWallpaperPreview(imageUrl);
+        if (state.isWallpaperMode) {
+          setFurnitureControlsPanelVisible(false);
+          setSceneThumbnailsPanelVisible(false);
+        }
       } else {
         console.warn("Wallpaper product has no image.");
       }
