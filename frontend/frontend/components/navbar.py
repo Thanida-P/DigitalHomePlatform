@@ -41,11 +41,9 @@ class NavCartState(rx.State):
                 
                 elif response.status_code == 404:
                     self.cart_quantity = 0
-                 
-                
+
                 else:
-                    error = response.json().get('error', 'Failed to load cart quantity')
-                    rx.toast.error(f"Error: {error}")
+                    self.cart_quantity = 0
 
         except Exception as e:
             rx.toast.error(f"Network error: {e}")

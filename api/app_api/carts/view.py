@@ -68,12 +68,9 @@ def add_to_cart(request):
 
         return JsonResponse({'message': 'Item added to cart successfully'}, status=201)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
 
 @csrf_exempt
@@ -109,12 +106,9 @@ def decrease_cart_item_quantity(request, cart_item_id):
 
         return JsonResponse({'message': 'Cart item quantity decreased successfully'}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
         
 @csrf_exempt
@@ -151,12 +145,9 @@ def increase_cart_item_quantity(request, cart_item_id):
 
         return JsonResponse({'message': 'Cart item quantity increased successfully'}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
 
 @csrf_exempt
@@ -187,12 +178,9 @@ def remove_from_cart(request, cart_item_id):
 
         return JsonResponse({'message': 'Item removed from cart successfully'}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
 
 @login_required
@@ -230,12 +218,9 @@ def view_cart(request):
 
         return JsonResponse(response_data, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
 
 @csrf_exempt
@@ -294,10 +279,7 @@ def get_cart_summary(request):
         }
         return JsonResponse(response_data, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
