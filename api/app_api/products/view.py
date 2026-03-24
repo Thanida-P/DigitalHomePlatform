@@ -42,7 +42,7 @@ def add_product(request):
         if not digital_available and not physical_available:
             return JsonResponse({'error': 'At least one of digital or physical availability must be true'}, status=400)
 
-        product_id = create_product(name, description, digital_price, physical_price, category, image, product_type, stock, model_files = None, scene_files = scene_files, digital_available = digital_available, physical_available = physical_available, is_container = is_container, texture_files = texture_files, wall_mountable = wall_mountable)
+        product_id = create_product(name, description, digital_price, physical_price, category, image, product_type, stock, model_files = model_files, scene_files = scene_files, digital_available = digital_available, physical_available = physical_available, is_container = is_container, texture_files = texture_files, wall_mountable = wall_mountable)
 
         return JsonResponse({'message': 'Product created successfully', 'product_id': product_id}, status=201)
     except Exception as e:
@@ -167,12 +167,9 @@ def get_products(request):
     
         return JsonResponse({'products': product_list}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
 
 @require_http_methods(["GET"])

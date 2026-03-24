@@ -79,10 +79,8 @@ def create_product(name, description, digital_price, physical_price, category, i
         transaction.commit()
         return product_id
     except Exception:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
+        transaction.abort()
+        raise
     finally:
         connection.close()
 
@@ -145,10 +143,8 @@ def update_existing_product(product_id, name, description, digital_price, physic
         item.updated_at = current_datetime
         transaction.commit()
     except Exception:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
+        transaction.abort()
+        raise
     finally:
         connection.close()
 
@@ -169,10 +165,8 @@ def delete_existing_product(product_id):
     except Product.DoesNotExist:
         return False
     except Exception:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
+        transaction.abort()
+        raise
     finally:
         connection.close()
     
@@ -191,12 +185,9 @@ def direct_create_Texture(texture_file):
         transaction.commit()
         return texture_id
     except Exception:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         raise
     finally:
+        transaction.abort()
         connection.close()
 
 def get_next_texture_id(root):
@@ -451,9 +442,7 @@ def fetch_texture(texture_id: int):
             return None
         return textures[f"texture_{texture_id}"].get_file()
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
+        pass
     finally:
+        transaction.abort()
         connection.close()

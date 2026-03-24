@@ -38,12 +38,9 @@ def add_to_wishlist(request):
 
         return JsonResponse({'message': 'Item added to wishlist successfully'}, status=201)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
 
 @csrf_exempt
@@ -95,10 +92,7 @@ def get_wishlist(request):
 
         return JsonResponse({'wishlist': products}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()

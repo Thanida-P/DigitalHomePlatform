@@ -49,12 +49,9 @@ def list_available_items(request):
                 continue
         return JsonResponse({'available_items': available_items}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
 
 @csrf_exempt
@@ -97,12 +94,9 @@ def get_specific_item(request):
         }
         return JsonResponse({'item': item_data}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
         
 @csrf_exempt
@@ -141,12 +135,9 @@ def add_digital_home(request):
         transaction.commit()
         return JsonResponse({'message': 'Digital home added successfully'}, status=201)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
         
 @login_required
@@ -191,6 +182,7 @@ def get_digital_homes(request):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
 @login_required
 @require_http_methods(["GET"])
@@ -231,12 +223,9 @@ def get_digital_home(request, id):
         except (KeyError, TypeError):
             return JsonResponse({'error': 'Digital home not found'}, status=404)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
         
 @require_http_methods(["GET"])
@@ -301,12 +290,9 @@ def delete_digital_home(request, id):
         except (KeyError, TypeError):
             return JsonResponse({'error': 'Digital home not found'}, status=404)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
         
 @csrf_exempt
@@ -326,12 +312,9 @@ def update_texture(request):
         update_Texture(root, home_id, texture_files)
         return JsonResponse({'message': 'Home texture updated successfully'}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
         
 @csrf_exempt
@@ -415,12 +398,9 @@ def add_custom_item(request):
         customer.save()
         return JsonResponse({'message': 'Custom item added successfully'}, status=201)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
         
 @csrf_exempt
@@ -454,12 +434,9 @@ def update_home_design(request):
 
         return JsonResponse({'message': 'Home design updated successfully'}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
 
 @csrf_exempt
@@ -515,12 +492,9 @@ def get_deployed_item_details(request, id):
             deployed_items_details.append({item_id: payload})
         return JsonResponse({'deployed_items': deployed_items_details}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
 
 @csrf_exempt
@@ -575,12 +549,9 @@ def get_deployed_item_detail(request, id):
                 pass
         return JsonResponse({'item_detail': item_detail}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
         
 
