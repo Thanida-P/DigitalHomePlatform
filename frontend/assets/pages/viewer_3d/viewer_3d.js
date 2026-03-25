@@ -1117,60 +1117,47 @@ function setupControls() {
     previewVr.addEventListener("click", async () => {
       try {
         const productId = state.productId;
-        const displaySceneId = state.productData.display_scenes_ids?.[state.selectedSceneIndex] 
-                            || state.productData.display_scenes_ids?.[0];
-        
+        const displaySceneId =
+          state.productData.display_scenes_ids?.[state.selectedSceneIndex] ||
+          state.productData.display_scenes_ids?.[0];
+
         if (!productId) {
           alert("Product information not available. Please refresh the page.");
           return;
         }
         
-        const apiBase = getApiBase();
-        
-        try {
-          const tokenResponse = await fetch(`${apiBase}/users/get_login_token/`, {
-            method: 'GET',
-            credentials: 'include',
-          });
+        const freshToken = getTokenFromUrl();
 
-          if (!tokenResponse.ok) {
-            console.error('Failed to get token:', tokenResponse.status);
-            alert("Authentication failed. Please make sure you're logged in.");
-            return;
-          }
-
-          const tokenData = await tokenResponse.json();
-          const freshToken = tokenData.token;
-
-          const PRODUCT_DEMO_URL = getDemoUrl();
-          
-          const demoUrl = new URL(`${PRODUCT_DEMO_URL}`);
-          demoUrl.searchParams.set('token', freshToken);
-          demoUrl.searchParams.set('productId', productId);
-          
-          if (displaySceneId) {
-            demoUrl.searchParams.set('sceneId', displaySceneId);
-          }
-          
-          demoUrl.searchParams.set('api', apiBase);
-          
-          if (state.productData.name) {
-            demoUrl.searchParams.set('productName', state.productData.name);
-          }
-          
-          const newWindow = window.open(demoUrl.toString(), '_blank');
-          
-          if (!newWindow) {
-            alert("Please allow pop-ups for this site to use VR/AR preview.");
-          }
-          
-        } catch (tokenError) {
-          console.error('Error getting authentication token:', tokenError);
-          alert("Failed to authenticate. Please make sure you're logged in and try again.");
+        if (!freshToken) {
+          alert("Authentication token not found. Please refresh the page.");
+          return;
         }
-        
+
+        const apiBase = getApiBase();
+        const PRODUCT_DEMO_URL = getDemoUrl();
+
+        const demoUrl = new URL(`${PRODUCT_DEMO_URL}`);
+        demoUrl.searchParams.set("token", freshToken);
+        demoUrl.searchParams.set("productId", productId);
+
+        if (displaySceneId) {
+          demoUrl.searchParams.set("sceneId", displaySceneId);
+        }
+
+        demoUrl.searchParams.set("api", apiBase);
+
+        if (state.productData.name) {
+          demoUrl.searchParams.set("productName", state.productData.name);
+        }
+
+        const newWindow = window.open(demoUrl.toString(), "_blank");
+
+        if (!newWindow) {
+          alert("Please allow pop-ups for this site to use VR/AR preview.");
+        }
+
       } catch (error) {
-        console.error('Error opening VR/AR preview:', error);
+        console.error("Error opening VR/AR preview:", error);
         alert("Failed to open VR/AR preview. Please try again.");
       }
     });
