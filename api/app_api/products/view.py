@@ -93,7 +93,6 @@ def update_product(request):
 
 @csrf_exempt
 @require_http_methods(["POST"])
-@login_required
 def get_products(request):
     connection, root = get_connection()
     try:
@@ -173,7 +172,6 @@ def get_products(request):
         connection.close()
 
 @require_http_methods(["GET"])
-@login_required
 def get_product_detail(request, product_id):
     connection, root = get_connection()
     try:
@@ -229,7 +227,6 @@ def delete_product(request, product_id):
     
     
 @require_http_methods(["GET"])
-@login_required
 def get_3d_model(request, model_id):
     try:
         model = fetch_3d_model(model_id)
@@ -246,7 +243,6 @@ def get_3d_model(request, model_id):
         return JsonResponse({'error': str(e)}, status=500)
     
 @require_http_methods(["GET"])
-@login_required
 def get_display_scene(request, display_scene_id):
     try:
         scene = fetch_display_scene(display_scene_id)
@@ -263,7 +259,6 @@ def get_display_scene(request, display_scene_id):
         return JsonResponse({'error': str(e)}, status=500)
     
 @require_http_methods(["GET"])
-@login_required
 def get_textures(request, model_id):
     try:
         model = fetch_3d_model(model_id)
@@ -280,7 +275,6 @@ def get_textures(request, model_id):
         return JsonResponse({'error': str(e)}, status=500)
     
 @require_http_methods(["GET"])
-@login_required
 def get_all_categories(request):
     connection, root = get_connection()
     try:
@@ -303,7 +297,6 @@ def get_all_categories(request):
         
 @csrf_exempt
 @require_http_methods(["POST"])
-@login_required
 def get_all_product_types(request):
     connection, root = get_connection()
     try:
