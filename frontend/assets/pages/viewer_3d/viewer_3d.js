@@ -8,7 +8,7 @@ const state = {
   isWallpaperMode: false,
 
   // transforms
-  modelScale: 1.0,
+  modelScale: 2.0,
   modelX: 0,
   modelY: 0,
   modelZ: 0,
@@ -30,6 +30,8 @@ const state = {
 
   // loader instances
   gltfLoader: null,
+
+  sceneTransforms: {}, 
 };
 
 function getUrlParams() {
@@ -114,10 +116,11 @@ async function initMainViewer() {
 
   // Scene + camera + renderer
   state.mainScene = new THREE.Scene();
-  state.mainScene.background = new THREE.Color(0x87ceeb);
+  state.mainScene.background = new THREE.Color(0xffffff);
 
   state.mainCamera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
-  state.mainCamera.position.set(3, 3, 3);
+  state.mainCamera.position.set(0, 6, 7);
+  state.mainCamera.lookAt(0, 2.2, 0);
 
   state.mainRenderer = new THREE.WebGLRenderer({
     antialias: true,
@@ -128,7 +131,7 @@ async function initMainViewer() {
   container.appendChild(state.mainRenderer.domElement);
 
   // Lights
-  const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+  const ambient = new THREE.AmbientLight(0xffffff, 0.7);
   ambient.name = "ambient_light";
   state.mainScene.add(ambient);
 
@@ -143,11 +146,13 @@ async function initMainViewer() {
       state.mainCamera,
       state.mainRenderer.domElement
     );
+    state.mainControls.target.set(0, 1.2, 0);
+    state.mainControls.update();
     state.mainControls.enableDamping = true;
     state.mainControls.dampingFactor = 0.08;
     state.mainControls.screenSpacePanning = false;
-    state.mainControls.minDistance = 0.5;
-    state.mainControls.maxDistance = Infinity;
+    state.mainControls.minDistance = 0.3;
+    state.mainControls.maxDistance = 18;
   } else {
     console.warn(
       "OrbitControls not available. Make sure examples/js/controls/OrbitControls.js is included."
@@ -779,10 +784,11 @@ async function createThumbnail(url, index) {
   container.appendChild(canvas);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x87ceeb);
+  scene.background = new THREE.Color(0xffffff);
 
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
-  camera.position.set(3, 3, 3);
+  camera.position.set(0, 8, 20);
+  
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setSize(200, 200);
@@ -848,13 +854,35 @@ async function renderThumbnails() {
 
 async function selectScene(index) {
   if (index < 0 || index >= state.sceneUrls.length) return;
+
+  // Save current scene's transform before leaving
+  state.sceneTransforms[state.selectedSceneIndex] = {
+    modelScale: state.modelScale,
+    modelX: state.modelX,
+    modelY: state.modelY,
+    modelZ: state.modelZ,
+    modelRotationY: state.modelRotationY,
+  };
+
   state.selectedSceneIndex = index;
+
+  // Restore saved transform for new scene, or use defaults
+  const saved = state.sceneTransforms[index];
+  state.modelScale = saved?.modelScale ?? 2.0;
+  state.modelX = saved?.modelX ?? 0;
+  state.modelY = saved?.modelY ?? 0;
+  state.modelZ = saved?.modelZ ?? 0;
+  state.modelRotationY = saved?.modelRotationY ?? 0;
+
+  const scaleElem = document.getElementById("scale-value");
+  if (scaleElem) scaleElem.textContent = state.modelScale.toFixed(1);
 
   document.querySelectorAll(".scene-thumbnail").forEach((thumb, i) => {
     thumb.classList.toggle("active", i === index);
   });
 
   await updateRoomModel();
+  updateFurnitureTransform();
 }
 
 function blobToBase64(blob) {

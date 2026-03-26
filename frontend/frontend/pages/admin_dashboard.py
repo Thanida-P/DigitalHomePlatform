@@ -9,8 +9,6 @@ import traceback
 class AdminDashboardState(rx.State):
   
     UPLOAD_DIR = "uploading_models"
-
-    products: List[Dict] = []
     filtered_products: List[Dict] = []
     
     search_query: str = ""
@@ -199,7 +197,6 @@ class AdminDashboardState(rx.State):
                     json=filter_body,               
                     cookies=cookies_dict,
                 )
-                
 
             if response.status_code != 200:
                 return
@@ -420,18 +417,21 @@ class AdminDashboardState(rx.State):
                                 flattened_files.append((key, item))
                         else:
                             flattened_files.append((key, value))
+
+                 
                     response = await client.post(
                         f"{API_BASE_URL}/products/add/",
                         data=data,
                         files=flattened_files,
                         cookies=cookies_dict,
                     )
+                    
                 
                 if response.status_code == 201:
-                    self.upload_status = "Product saved successfully!"
-               
                     self.close_add_modal()
                     await self.load_products()
+                    return rx.toast.success(f"Product added successfully!")
+                    
                 elif response.status_code == 400:
                     try:
                         error_data = response.json()
@@ -448,27 +448,30 @@ class AdminDashboardState(rx.State):
                     self.upload_status = f"Error: {error_msg}"
                     
             finally:
-        
                 for file in files.values():
                     try:
-                        file.close()
+                        if isinstance(file, list):
+                            for item in file:
+                                # item is a tuple: (filename, file_obj, content_type)
+                                if hasattr(item[1], "close"):
+                                    item[1].close()
+                        elif hasattr(file, "close"):
+                            file.close()
                     except:
                         pass
                 
         except httpx.TimeoutException:
             self.upload_status = "Request timeout - please try again"
-            print("Timeout exception occurred")
+          
         except Exception as e:
             self.upload_status = f"Connection error: {str(e)}"
-            print(f"Exception during product creation: {str(e)}")
-            print(f"Full traceback: {traceback.format_exc()}")
+   
         except httpx.ReadError:
             self.upload_status = "Connection closed unexpectedly. Try again or check backend logs."
-            print("httpx.ReadError occurred during product upload.")
-        
+           
         finally:
             self.is_uploading = False
-    
+            
     
     async def delete_product(self, product_id: int):
         auth_state = await self.get_state(AuthState)
@@ -487,11 +490,9 @@ class AdminDashboardState(rx.State):
                 await self.load_products()
                 return rx.toast.success(f"Product deleted successfully!")
             else:
-                print(f"❌ Failed to delete product: {response.status_code} {response.text}")
                 return rx.toast.error(f"Failed to delete product")
                 
         except Exception as e:
-            print(f"❌ Error deleting product: {e}")
             return rx.toast.error(f"Error: {str(e)}")
         
         
@@ -586,7 +587,6 @@ class AdminDashboardState(rx.State):
                         self.upload_status = f"Validation error: {response.text}"
                     return rx.toast.error(self.upload_status)
                 else:
-                    print(f"❌ Failed to update product: {response.status_code} {response.text}")
                     self.upload_status = f"Error: {response.text}"
                     return rx.toast.error("Failed to update product")
 
@@ -603,7 +603,6 @@ class AdminDashboardState(rx.State):
                         print(f"Error closing file: {e}")
 
         except Exception as e:
-            print(f"❌ Error updating product: {e}")
             self.upload_status = f"Error: {e}"
             return rx.toast.error(f"Error: {str(e)}")
         finally:
@@ -1236,7 +1235,6 @@ def product_card(product: Dict) -> rx.Component:
                             weight="bold",
                             color="#22282C",
                         ),
-                        spacing="1",
                         width="100%",
                     ),
                     

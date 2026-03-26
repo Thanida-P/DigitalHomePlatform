@@ -87,7 +87,7 @@ def product_detail_content() -> rx.Component:
             rx.heading(
                 "Product Details",
                 size="7",
-                margin_bottom="20px",
+                margin_bottom="2px",
                 color="#22282c"
             ),
             
