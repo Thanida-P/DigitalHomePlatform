@@ -29,7 +29,7 @@ class AuthState(rx.State):
                 if response.status_code == 200:
                     data = response.json()
                     self.is_logged_in = data.get("logged_in", False)
-                    self.username = data.get("username", "")
+                    self.username = data.get("username") or ""
                     self.is_admin = data.get("is_admin", False)
                     self.is_staff = data.get("is_staff", False)
                     

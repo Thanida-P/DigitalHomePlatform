@@ -200,6 +200,26 @@ def parse_coordinates(coor):
     coords = [float(c) for c in coor.split('(')[1].rstrip(')').split()]
     return coords
 
+def _persist_wallpaper_scene_from_payload(item, item_data):
+    cat = (item.get_category() or '').lower()
+    if cat != 'wallpaper':
+        return
+    keys = ('wall_width', 'wall_height', 'wallpaper_cutouts')
+    if not any(k in item_data for k in keys):
+        return
+    prev = {}
+    raw = getattr(item, 'wallpaper_scene_json', None)
+    if raw:
+        try:
+            prev = json.loads(raw)
+        except json.JSONDecodeError:
+            pass
+    for key in keys:
+        if key in item_data:
+            prev[key] = item_data[key]
+    item.wallpaper_scene_json = json.dumps(prev) if prev else None
+
+
 def update_deployed_item(root, item_id, id, item_data):
     key_item = f'item_{int(item_id)}_home_{int(id)}'
     if key_item in root.containerOwnedItems or key_item in root.nonContainerOwnedItems:
@@ -215,13 +235,14 @@ def update_deployed_item(root, item_id, id, item_data):
         if item_data.get('is_container'):
             containerId = get_container_owned_item_id(root)
             copy_item = root.containerOwnedItems.get(str(item_id))
+            deploy_image = item_data.get('image') or copy_item.get_image()
             root.containerOwnedItems[key_item] = ContainerOwnedItem(
                 id=containerId,
                 owner_id=copy_item.get_owner_id(),
                 name=copy_item.get_name(),
                 description=copy_item.get_description(),
                 model_id=copy_item.get_model_id(),
-                image=copy_item.get_image(),
+                image=deploy_image,
                 category=copy_item.get_category(),
                 type=copy_item.get_type(),
                 is_container=True,
@@ -235,13 +256,14 @@ def update_deployed_item(root, item_id, id, item_data):
         else:
             copy_item = root.nonContainerOwnedItems.get(str(item_id))
             nonContainerId = get_noncontainer_owned_item_id(root)
+            deploy_image = item_data.get('image') or copy_item.get_image()
             root.nonContainerOwnedItems[key_item] = NonContainerOwnedItem(
                 id=nonContainerId,
                 owner_id=copy_item.get_owner_id(),
                 name=copy_item.get_name(),
                 description=copy_item.get_description(),
                 model_id=copy_item.get_model_id(),
-                image=copy_item.get_image(),
+                image=deploy_image,
                 category=copy_item.get_category(),
                 type=copy_item.get_type(),
                 is_container=False,
@@ -279,7 +301,11 @@ def update_deployed_item(root, item_id, id, item_data):
         if item_data.get('texture_id') not in model.get_textures():
             raise ValueError("Texture does not belong to the item's 3D model")
         item.set_texture_id(item_data.get('texture_id'))
-        
+
+    if item_data.get('image'):
+        item.set_image(item_data['image'])
+    _persist_wallpaper_scene_from_payload(item, item_data)
+
 def apply_transform_simple(mesh, pos, rot, scale):
     # Apply scale
     if isinstance(scale, (int, float)):

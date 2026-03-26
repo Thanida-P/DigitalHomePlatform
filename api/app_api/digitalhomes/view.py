@@ -49,12 +49,9 @@ def list_available_items(request):
                 continue
         return JsonResponse({'available_items': available_items}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
 
 @csrf_exempt
@@ -97,12 +94,9 @@ def get_specific_item(request):
         }
         return JsonResponse({'item': item_data}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
         
 @csrf_exempt
@@ -141,12 +135,9 @@ def add_digital_home(request):
         transaction.commit()
         return JsonResponse({'message': 'Digital home added successfully'}, status=201)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
         
 @login_required
@@ -191,6 +182,7 @@ def get_digital_homes(request):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
 @login_required
 @require_http_methods(["GET"])
@@ -231,12 +223,9 @@ def get_digital_home(request, id):
         except (KeyError, TypeError):
             return JsonResponse({'error': 'Digital home not found'}, status=404)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
         
 @require_http_methods(["GET"])
@@ -301,12 +290,9 @@ def delete_digital_home(request, id):
         except (KeyError, TypeError):
             return JsonResponse({'error': 'Digital home not found'}, status=404)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
         
 @csrf_exempt
@@ -326,12 +312,9 @@ def update_texture(request):
         update_Texture(root, home_id, texture_files)
         return JsonResponse({'message': 'Home texture updated successfully'}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
         
 @csrf_exempt
@@ -359,12 +342,19 @@ def add_custom_item(request):
         if image:
             image_base64 = base64.b64encode(image.read()).decode('utf-8')
         
-        if not name or not model_files:
-            return JsonResponse({'error': 'Name and model_file are required'}, status=400)
+        if not name:
+            return JsonResponse({'error': 'Name is required'}, status=400)
+        
+        if not model_files and (category.lower() != 'wallpaper'):
+            return JsonResponse({'error': 'Model file is required'}, status=400)
         
         spatial_id = create_spatial_instance()
         current_time = datetime.now()
-        model_id = create_3d_model(root, model_files, texture_files)
+        if model_files:
+            model_id = create_3d_model(root, model_files, texture_files)
+        elif category.lower() == 'wallpaper':
+            model_id = -2
+            wall_mountable = 'true'
         if is_container:
             container_id = get_container_owned_item_id(root)
             categorizedItem = ContainerOwnedItem(
@@ -408,12 +398,9 @@ def add_custom_item(request):
         customer.save()
         return JsonResponse({'message': 'Custom item added successfully'}, status=201)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
         
 @csrf_exempt
@@ -447,12 +434,9 @@ def update_home_design(request):
 
         return JsonResponse({'message': 'Home design updated successfully'}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
 
 @csrf_exempt
@@ -478,7 +462,7 @@ def get_deployed_item_details(request, id):
             scale = parse_coordinates(spatial_data.scale)
             position_history = spatial_data.position_history
 
-            deployed_items_details.append({item_id: {
+            payload = {
                 'name': item.get_name(),
                 'description': item.get_description(),
                 'model_id': item.get_model_id(),
@@ -497,15 +481,20 @@ def get_deployed_item_details(request, id):
                 'containered_item': item.get_contained_item() if is_container else None,
                 'composite': item.get_composition() if not is_container else None,
                 'created_at': item.created_at.isoformat(),
-            }})
+                'image': item.get_image(),
+            }
+            extra = getattr(item, 'wallpaper_scene_json', None)
+            if extra:
+                try:
+                    payload.update(json.loads(extra))
+                except json.JSONDecodeError:
+                    pass
+            deployed_items_details.append({item_id: payload})
         return JsonResponse({'deployed_items': deployed_items_details}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
 
 @csrf_exempt
@@ -550,15 +539,19 @@ def get_deployed_item_detail(request, id):
             'containered_item': item.get_contained_item() if is_container else None,
             'composite': item.get_composition() if not is_container else None,
             'created_at': item.created_at.isoformat(),
+            'image': item.get_image(),
         }
+        extra = getattr(item, 'wallpaper_scene_json', None)
+        if extra:
+            try:
+                item_detail.update(json.loads(extra))
+            except json.JSONDecodeError:
+                pass
         return JsonResponse({'item_detail': item_detail}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
         
 

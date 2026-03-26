@@ -74,6 +74,9 @@ class Item(persistent.Persistent):
     
     def get_image(self):
         return self.image
+
+    def set_image(self, image):
+        self.image = image
     
     def get_model_id(self):
         return self.model_id

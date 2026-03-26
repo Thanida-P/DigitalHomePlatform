@@ -56,12 +56,9 @@ def add_review(request):
 
         return JsonResponse({'message': 'Review added successfully'}, status=201)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
 
 @csrf_exempt
@@ -113,12 +110,9 @@ def edit_review(request):
         
         return JsonResponse({'message': 'Review updated successfully'}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
 
 @csrf_exempt
@@ -154,12 +148,9 @@ def delete_review(request, review_id):
         
         return JsonResponse({'message': 'Review deleted successfully'}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
 
 @login_required

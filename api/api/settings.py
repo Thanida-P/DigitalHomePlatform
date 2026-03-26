@@ -64,6 +64,7 @@ MIDDLEWARE = [
 
 CORS_ALLOWED_ORIGINS = [
     os.environ.get("BASE_URL", ""),
+    "http://turing.se.kmitl.ac.th:3001",
 ]
 
 CORS_ALLOW_CREDENTIALS = True

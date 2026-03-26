@@ -148,17 +148,14 @@ def list_orders(request):
         transaction.commit()
         print(f"DEBUG: Successfully loaded {len(orders_data)} orders for user {request.user.id}")
         return JsonResponse({'orders': orders_data}, status=200)
-        
+
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         print(f"DEBUG: Error in list_orders: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
 
 
@@ -264,10 +261,7 @@ def complete_order(request, order_id):
 
         return JsonResponse({'message': 'Order status updated to complete and products granted'}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()

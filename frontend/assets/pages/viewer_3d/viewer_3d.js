@@ -5,6 +5,7 @@ const state = {
   modelUrl: null, // furniture model data URL
   sceneUrls: [], // list of room/scene data URLs
   selectedSceneIndex: 0,
+  isWallpaperMode: false,
 
   // transforms
   modelScale: 2.0,
@@ -39,7 +40,7 @@ function getUrlParams() {
 
 function getApiBase() {
   const params = getUrlParams();
-  return params.get("api") || "http://localhost:8001";
+  return "https://turing.se.kmitl.ac.th/digitalhome/api" || "http://localhost:8001";
 }
 
 function getDemoUrl() {
@@ -86,6 +87,24 @@ async function authenticateIframe() {
   } catch (err) {
     console.error("Authentication error:", err);
   }
+}
+
+function resizeMainViewer() {
+  const container = document.getElementById("main-canvas");
+  if (!container || !state.mainRenderer || !state.mainCamera) return;
+  const w = container.clientWidth || 800;
+  const h = container.clientHeight || 600;
+  state.mainCamera.aspect = w / h;
+  state.mainCamera.updateProjectionMatrix();
+  state.mainRenderer.setSize(w, h);
+}
+
+function scheduleMainViewerResize() {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      resizeMainViewer();
+    });
+  });
 }
 
 async function initMainViewer() {
@@ -151,11 +170,7 @@ async function initMainViewer() {
 
   // Resize handling
   window.addEventListener("resize", () => {
-    const w = container.clientWidth || 800;
-    const h = container.clientHeight || 600;
-    state.mainCamera.aspect = w / h;
-    state.mainCamera.updateProjectionMatrix();
-    state.mainRenderer.setSize(w, h);
+    resizeMainViewer();
   });
 
   // Render loop
@@ -177,9 +192,14 @@ function disposeGltfScene(gltfScene) {
         }
         if (obj.material) {
           if (Array.isArray(obj.material)) {
+            const seenMat = new Set();
+            const seenMap = new Set();
             obj.material.forEach((m) => {
-              if (m.map) m.map.dispose();
-              if (m.materials) {
+              if (!m || seenMat.has(m.uuid)) return;
+              seenMat.add(m.uuid);
+              if (m.map && !seenMap.has(m.map.uuid)) {
+                seenMap.add(m.map.uuid);
+                m.map.dispose();
               }
               try {
                 m.dispose();
@@ -209,6 +229,40 @@ function getWidgetType(product) {
   if (name.includes("whiteboard") || type === "whiteboard") return "whiteboard";
   if (name.includes("weather") || type === "weather_widget") return "weather";
   return null;
+}
+
+function setFurnitureControlsPanelVisible(visible) {
+  const panel = document.getElementById("furniture-controls-panel");
+  if (!panel) return;
+  panel.style.display = visible ? "" : "none";
+  scheduleMainViewerResize();
+}
+
+function setSceneThumbnailsPanelVisible(visible) {
+  const panel = document.getElementById("scene-thumbnails-panel");
+  if (!panel) return;
+  panel.style.display = visible ? "" : "none";
+  scheduleMainViewerResize();
+}
+
+function isWallpaper(product) {
+  if (!product) return false;
+  const cat = (product.category || "").toLowerCase();
+  return cat === "wallpaper";
+}
+
+function normalizeImageUrl(imageValue) {
+  if (imageValue == null || typeof imageValue !== "string") return null;
+  const s = imageValue.trim();
+  if (!s) return null;
+  if (s.startsWith("data:")) return s;
+  if (s.startsWith("http://") || s.startsWith("https://")) return s;
+  if (s.startsWith("/") && (s.startsWith("/media") || s.startsWith("/api") || s.startsWith("/static") || s.startsWith("/images"))) {
+    const api = getApiBase();
+    return api.replace(/\/$/, "") + s;
+  }
+  const mime = s.startsWith("iVBORw") ? "image/png" : "image/jpeg";
+  return "data:" + mime + ";base64," + s;
 }
 
 function createClockWidgetPreview() {
@@ -428,6 +482,52 @@ function createWeatherWidgetPreview() {
   return group;
 }
 
+function createWallpaperPlane(imageUrl) {
+  return new Promise((resolve, reject) => {
+    const loader = new THREE.TextureLoader();
+    loader.load(
+      imageUrl,
+      (texture) => {
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.wrapS = THREE.ClampToEdgeWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+
+        const aspect = texture.image
+          ? texture.image.width / texture.image.height
+          : 4 / 3;
+        const width = Math.max(aspect, 1) * 2;
+        const height = (1 / Math.max(aspect, 1)) * 2;
+        const thickness = 0.1;
+
+        const geometry = new THREE.BoxGeometry(width, height, thickness);
+        const edgeMaterial = new THREE.MeshBasicMaterial({ color: 0xd0d0d0 });
+        const faceMaterial = new THREE.MeshBasicMaterial({
+          map: texture,
+          toneMapped: false,
+        });
+        const materials = [
+          edgeMaterial,
+          edgeMaterial,
+          edgeMaterial,
+          edgeMaterial,
+          faceMaterial,
+          faceMaterial,
+        ];
+        const plane = new THREE.Mesh(geometry, materials);
+        plane.name = "wallpaper_plane";
+
+        const group = new THREE.Group();
+        group.add(plane);
+        group.name = "furniture_model";
+        resolve(group);
+      },
+      undefined,
+      (err) => reject(err)
+    );
+  });
+}
+
 function createWidgetPreview(widgetType) {
   switch (widgetType) {
     case "clock":
@@ -476,6 +576,48 @@ function showWidgetPreview(widgetType) {
     !state.mainScene.children.includes(state.roomModel)
   ) {
     state.mainScene.add(state.roomModel);
+  }
+}
+
+async function showWallpaperPreview(imageUrl) {
+  state.isWallpaperMode = true;
+
+  if (state.roomModel) {
+    try {
+      state.mainScene.remove(state.roomModel);
+      disposeGltfScene(state.roomModel);
+    } catch (e) {
+      console.warn("Error removing room model:", e);
+    }
+    state.roomModel = null;
+  }
+
+  if (state.furnitureModel) {
+    try {
+      state.mainScene.remove(state.furnitureModel);
+      disposeGltfScene(state.furnitureModel);
+    } catch (e) {
+      console.warn("Error removing previous furniture/wallpaper:", e);
+    }
+    state.furnitureModel = null;
+  }
+
+  try {
+    const group = await createWallpaperPlane(imageUrl);
+    state.furnitureModel = group;
+    state.modelUrl = null;
+    state.furnitureModel.scale.set(
+      state.modelScale,
+      state.modelScale,
+      state.modelScale
+    );
+    state.furnitureModel.position.set(state.modelX, state.modelY, state.modelZ);
+    state.furnitureModel.rotation.y = state.modelRotationY;
+    state.mainScene.add(state.furnitureModel);
+  } catch (err) {
+    console.error("Error creating wallpaper preview:", err);
+    state.isWallpaperMode = false;
+    return;
   }
 }
 
@@ -775,6 +917,10 @@ async function fetchProductData(productId) {
     const data = await res.json();
     state.productData = data.product || {};
 
+    state.isWallpaperMode = false;
+    setFurnitureControlsPanelVisible(true);
+    setSceneThumbnailsPanelVisible(true);
+
     const nameElem = document.getElementById("product-name");
     if (nameElem) nameElem.textContent = state.productData.name || "Product";
     const physElem = document.getElementById("physical-price");
@@ -783,6 +929,20 @@ async function fetchProductData(productId) {
       physElem.textContent = `$${state.productData.physical_price ?? 0}`;
     if (digiElem)
       digiElem.textContent = `$${state.productData.digital_price ?? 0}`;
+
+    if (isWallpaper(state.productData)) {
+      const imageUrl = normalizeImageUrl(state.productData.image);
+      if (imageUrl) {
+        await showWallpaperPreview(imageUrl);
+        if (state.isWallpaperMode) {
+          setFurnitureControlsPanelVisible(false);
+          setSceneThumbnailsPanelVisible(false);
+        }
+      } else {
+        console.warn("Wallpaper product has no image.");
+      }
+      return;
+    }
 
     const modelId = state.productData.model_id;
     const widgetType = getWidgetType(state.productData);
@@ -985,60 +1145,47 @@ function setupControls() {
     previewVr.addEventListener("click", async () => {
       try {
         const productId = state.productId;
-        const displaySceneId = state.productData.display_scenes_ids?.[state.selectedSceneIndex] 
-                            || state.productData.display_scenes_ids?.[0];
-        
+        const displaySceneId =
+          state.productData.display_scenes_ids?.[state.selectedSceneIndex] ||
+          state.productData.display_scenes_ids?.[0];
+
         if (!productId) {
           alert("Product information not available. Please refresh the page.");
           return;
         }
         
-        const apiBase = getApiBase();
-        
-        try {
-          const tokenResponse = await fetch(`${apiBase}/users/get_login_token/`, {
-            method: 'GET',
-            credentials: 'include',
-          });
+        const freshToken = getTokenFromUrl();
 
-          if (!tokenResponse.ok) {
-            console.error('Failed to get token:', tokenResponse.status);
-            alert("Authentication failed. Please make sure you're logged in.");
-            return;
-          }
-
-          const tokenData = await tokenResponse.json();
-          const freshToken = tokenData.token;
-
-          const PRODUCT_DEMO_URL = getDemoUrl();
-          
-          const demoUrl = new URL(`${PRODUCT_DEMO_URL}`);
-          demoUrl.searchParams.set('token', freshToken);
-          demoUrl.searchParams.set('productId', productId);
-          
-          if (displaySceneId) {
-            demoUrl.searchParams.set('sceneId', displaySceneId);
-          }
-          
-          demoUrl.searchParams.set('api', apiBase);
-          
-          if (state.productData.name) {
-            demoUrl.searchParams.set('productName', state.productData.name);
-          }
-          
-          const newWindow = window.open(demoUrl.toString(), '_blank');
-          
-          if (!newWindow) {
-            alert("Please allow pop-ups for this site to use VR/AR preview.");
-          }
-          
-        } catch (tokenError) {
-          console.error('Error getting authentication token:', tokenError);
-          alert("Failed to authenticate. Please make sure you're logged in and try again.");
+        if (!freshToken) {
+          alert("Authentication token not found. Please refresh the page.");
+          return;
         }
-        
+
+        const apiBase = getApiBase();
+        const PRODUCT_DEMO_URL = getDemoUrl();
+
+        const demoUrl = new URL(`${PRODUCT_DEMO_URL}`);
+        demoUrl.searchParams.set("token", freshToken);
+        demoUrl.searchParams.set("productId", productId);
+
+        if (displaySceneId) {
+          demoUrl.searchParams.set("sceneId", displaySceneId);
+        }
+
+        demoUrl.searchParams.set("api", apiBase);
+
+        if (state.productData.name) {
+          demoUrl.searchParams.set("productName", state.productData.name);
+        }
+
+        const newWindow = window.open(demoUrl.toString(), "_blank");
+
+        if (!newWindow) {
+          alert("Please allow pop-ups for this site to use VR/AR preview.");
+        }
+
       } catch (error) {
-        console.error('Error opening VR/AR preview:', error);
+        console.error("Error opening VR/AR preview:", error);
         alert("Failed to open VR/AR preview. Please try again.");
       }
     });

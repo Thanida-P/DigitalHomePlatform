@@ -271,7 +271,7 @@ def search_and_filters() -> rx.Component:
         ),
  
         rx.select(
-            ["All Categories", "Living Room", "Bedroom", "Office Room", "Kitchen", "Widget"],
+            ["All Categories", "Living Room", "Bedroom", "Office Room", "Kitchen", "Widget", "Wallpaper"],
             value=ShopState.category,
             on_change=lambda e: ShopState.set_category(e.to(str)),
             width ="20%", radius = "full"

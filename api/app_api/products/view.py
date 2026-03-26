@@ -33,7 +33,7 @@ def add_product(request):
         if not all([name, description, category, product_type, image]) or stock < 0:
             return JsonResponse({'error': 'Invalid input data'}, status=400)
         
-        if not model_files and (category.lower() != 'widget' or product_type.lower() != 'widget'):
+        if not model_files and (category.lower() not in ['widget', 'wallpaper'] or product_type.lower() not in ['widget', 'wallpaper']):
             return JsonResponse({'error': 'Model file is required'}, status=400)
         
         if digital_price < 0 or physical_price < 0:
@@ -76,7 +76,7 @@ def update_product(request):
             return JsonResponse({'error': 'Product ID is required'}, status=400)
         if not all([name, description, category, product_type, image]) or stock < 0:
             return JsonResponse({'error': 'Invalid input data'}, status=400)
-        if not model_files and (category.lower() != 'widget' or product_type.lower() != 'widget'):
+        if not model_files and (category.lower() not in ['widget', 'wallpaper'] or product_type.lower() not in ['widget', 'wallpaper']):
             return JsonResponse({'error': 'Model file is required'}, status=400)
         if digital_price < 0 or physical_price < 0:
             return JsonResponse({'error': 'Prices must be non-negative'}, status=400)
@@ -93,7 +93,6 @@ def update_product(request):
 
 @csrf_exempt
 @require_http_methods(["POST"])
-@login_required
 def get_products(request):
     connection, root = get_connection()
     try:
@@ -167,16 +166,12 @@ def get_products(request):
     
         return JsonResponse({'products': product_list}, status=200)
     except Exception as e:
-        try:
-            transaction.abort()
-        except Exception:
-            pass
         return JsonResponse({"error": str(e)}, status=500)
     finally:
+        transaction.abort()
         connection.close()
 
 @require_http_methods(["GET"])
-@login_required
 def get_product_detail(request, product_id):
     connection, root = get_connection()
     try:
@@ -232,7 +227,6 @@ def delete_product(request, product_id):
     
     
 @require_http_methods(["GET"])
-@login_required
 def get_3d_model(request, model_id):
     try:
         model = fetch_3d_model(model_id)
@@ -249,7 +243,6 @@ def get_3d_model(request, model_id):
         return JsonResponse({'error': str(e)}, status=500)
     
 @require_http_methods(["GET"])
-@login_required
 def get_display_scene(request, display_scene_id):
     try:
         scene = fetch_display_scene(display_scene_id)
@@ -266,7 +259,6 @@ def get_display_scene(request, display_scene_id):
         return JsonResponse({'error': str(e)}, status=500)
     
 @require_http_methods(["GET"])
-@login_required
 def get_textures(request, model_id):
     try:
         model = fetch_3d_model(model_id)
@@ -283,7 +275,6 @@ def get_textures(request, model_id):
         return JsonResponse({'error': str(e)}, status=500)
     
 @require_http_methods(["GET"])
-@login_required
 def get_all_categories(request):
     connection, root = get_connection()
     try:
@@ -306,7 +297,6 @@ def get_all_categories(request):
         
 @csrf_exempt
 @require_http_methods(["POST"])
-@login_required
 def get_all_product_types(request):
     connection, root = get_connection()
     try:
