@@ -197,14 +197,11 @@ class AdminDashboardState(rx.State):
                     json=filter_body,               
                     cookies=cookies_dict,
                 )
-                print(f"🔍 Load products status: {response.status_code}")
-                print(f"🔍 Raw response: {response.text}")  # ADD THIS 
 
             if response.status_code != 200:
                 return
 
             data = response.json()
-            print(f"🔍 Total products in response: {len(data.get('products', []))}")
 
             if "products" not in data:
                 print("⚠️ No products returned:", data)
@@ -493,11 +490,9 @@ class AdminDashboardState(rx.State):
                 await self.load_products()
                 return rx.toast.success(f"Product deleted successfully!")
             else:
-                print(f"❌ Failed to delete product: {response.status_code} {response.text}")
                 return rx.toast.error(f"Failed to delete product")
                 
         except Exception as e:
-            print(f"❌ Error deleting product: {e}")
             return rx.toast.error(f"Error: {str(e)}")
         
         
@@ -592,7 +587,6 @@ class AdminDashboardState(rx.State):
                         self.upload_status = f"Validation error: {response.text}"
                     return rx.toast.error(self.upload_status)
                 else:
-                    print(f"❌ Failed to update product: {response.status_code} {response.text}")
                     self.upload_status = f"Error: {response.text}"
                     return rx.toast.error("Failed to update product")
 
@@ -609,7 +603,6 @@ class AdminDashboardState(rx.State):
                         print(f"Error closing file: {e}")
 
         except Exception as e:
-            print(f"❌ Error updating product: {e}")
             self.upload_status = f"Error: {e}"
             return rx.toast.error(f"Error: {str(e)}")
         finally:
