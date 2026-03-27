@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 import reflex as rx
 from ..template import template
@@ -1010,8 +1011,15 @@ class PaymentState(rx.State):
             return False
         
         year = int(self.exp_year)
+        current_year = datetime.now().year
         if year < 2024 or year > 2050:
             self.error_message = "Please enter a valid expiration year"
+            return False
+        
+        month = int(self.exp_month)
+        current_month = datetime.now().month
+        if year < current_year or (year == current_year and month < current_month):
+            self.error_message = "Card has already expired"
             return False
         
         if not self.cvv or not self.cvv.isdigit() or len(self.cvv) < 3 or len(self.cvv) > 4:
@@ -1086,10 +1094,6 @@ class PaymentState(rx.State):
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
         
-        print(f"=== SUBMIT BANK ACCOUNT DEBUG ===")
-        print(f"Cookies: {cookies_dict}")
-        print(f"API URL: {API_BASE_URL}/users/payment_methods/add_bank_account/")
-        
         try:
             async with httpx.AsyncClient() as client:
                 # Prepare the form data
@@ -1102,8 +1106,6 @@ class PaymentState(rx.State):
                     "is_default": str(self.bank_is_default).lower()
                 }
                 
-                print("Sending bank account data:", form_data)
-                
                 res = await client.post(
                     f"{API_BASE_URL}/users/payment_methods/add_bank_account/",
                     data=form_data,
@@ -1114,7 +1116,6 @@ class PaymentState(rx.State):
                 if res.status_code == 201:
                     try:
                         response_data = res.json()
-                        print("Bank account added successfully:", response_data)
                     except Exception as json_err:
                         print(f"JSON parse error on success: {json_err}")
                         print("Bank account might have been added despite JSON error")
@@ -1125,7 +1126,7 @@ class PaymentState(rx.State):
                     self.show_bank_form = False
 
                     await self.load_bank_accounts() 
-                    return rx.toast.success("🏦 Bank account added successfully!")
+                    return rx.toast.success("Bank account added successfully!")
                     
                 elif res.status_code == 302 or res.status_code == 301:
                     print("REDIRECT DETECTED - Authentication issue")
@@ -1186,10 +1187,6 @@ class PaymentState(rx.State):
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
         
-        print(f"=== SUBMIT CARD DEBUG ===")
-        print(f"Cookies: {cookies_dict}")
-        print(f"API URL: {API_BASE_URL}/users/credit-card/")
-        
         try:
             async with httpx.AsyncClient() as client:
                 # Prepare the form data with mock provider info
@@ -1202,8 +1199,6 @@ class PaymentState(rx.State):
                     "exp_year": self.exp_year,
                     "is_default": str(self.is_default).lower()
                 }
-                
-                print("Sending mock payment data:", form_data)
                 
                 res = await client.post(
                     f"{API_BASE_URL}/users/payment_methods/add_credit_card/",
@@ -1227,18 +1222,15 @@ class PaymentState(rx.State):
 
                     await self.load_credit_cards()
                     
-                    return rx.toast.success("✅ Credit card added successfully!")
+                    return rx.toast.success("Credit card added successfully!")
                     
                 elif res.status_code == 302 or res.status_code == 301:
-                    print("REDIRECT DETECTED - Authentication issue")
                     self.error_message = "Authentication error. Please log in again."
                     
                 elif res.status_code == 403:
-                    print("FORBIDDEN - CSRF or permission issue")
                     self.error_message = "Permission denied. Please check authentication."
                     
                 elif res.status_code == 404:
-                    print("NOT FOUND - Check your endpoint URL")
                     self.error_message = "API endpoint not found. Check URL configuration."
                     
                 else:
@@ -1246,7 +1238,6 @@ class PaymentState(rx.State):
                         error_data = res.json()
                         self.error_message = error_data.get("error", f"Error: {res.status_code}")
                     except Exception as json_err:
-                        print(f"JSON parse error: {json_err}")
                         self.error_message = f"Server error: {res.status_code} - {res.text[:200]}"
                     
                     self.success_message = ""
@@ -1358,14 +1349,12 @@ class PaymentState(rx.State):
         try:
             async with httpx.AsyncClient() as client:
                 res = await client.delete(
-                    f"{API_BASE_URL}/users/payment_methods/remove_credit_card/{card_id}/",  # ✅ Add trailing slash
+                    f"{API_BASE_URL}/users/payment_methods/remove_credit_card/{card_id}/",
                     cookies=cookies_dict,
                     timeout=10.0
-                    # ✅ REMOVE json={"card_id": card_id} - not needed since ID is in URL
                 )
             
             if res.status_code == 200:
-                print(f"Credit card {card_id} deleted successfully")
                 await self.load_credit_cards()
                 return rx.toast.success("Credit card deleted successfully!")
             else:
@@ -1394,7 +1383,6 @@ class PaymentState(rx.State):
                 )
             
             if res.status_code == 200:
-                print(f"Bank account {account_id} deleted successfully")
                 await self.load_bank_accounts()
                 return rx.toast.success("Bank account deleted successfully!")
             else:
