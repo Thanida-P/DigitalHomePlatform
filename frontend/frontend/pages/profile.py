@@ -32,7 +32,6 @@ class AddressState(rx.State):
         self.editing_address_id = address_id
         self.show_form = True  
         self.new_address = current_address  
-        print(f"Starting edit for address ID {address_id}: {current_address}")
 
 
     def toggle_form(self):
@@ -40,7 +39,6 @@ class AddressState(rx.State):
         self.show_form = True
         self.editing_address_id = 0  
         self.new_address = "" 
-        print("Opening address form.")
 
     def close_form(self):
         """Close the address form and clear input."""
@@ -59,16 +57,17 @@ class AddressState(rx.State):
             return
         
         if self.editing_address_id == 0:
-            await self.add_address()
+            async for event in self.add_address():
+                yield event
         else:
-            await self.edit_address(self.editing_address_id, self.new_address)
+            async for event in self.edit_address(self.editing_address_id, self.new_address):
+                yield event
 
     async def add_address(self):
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
 
         data = {"address": self.new_address.strip(), "is_default": False}
-        print("Sending new address to backend:", data)
 
         try:
             async with httpx.AsyncClient() as client:
@@ -77,7 +76,6 @@ class AddressState(rx.State):
                     data=data,
                     cookies=cookies_dict,
                 )
-            print("POST response status:", response.status_code)
 
             if response.status_code == 201:
         
@@ -85,11 +83,13 @@ class AddressState(rx.State):
                 self.new_address = ""
                 self.show_form = False
                 self.editing_address_id = 0
-                print("Address added successfully.")
+                yield rx.toast.success("Address added successfully.")
             else:
-                print("Error adding address:", response.text)
+                error_data = response.json()
+                error_message = error_data.get("error", "Failed to add address")
+                yield rx.toast.error(f"Error: {error_message}")
         except Exception as e:
-            print("Request failed:", e)
+            yield rx.toast.error(f"Request failed: {str(e)}")
 
 
 
@@ -140,17 +140,14 @@ class AddressState(rx.State):
             
             new_addresses = [addr for addr in self.addresses if addr.id != address_id]
             self.addresses = new_addresses
+            yield rx.toast.success("Address deleted successfully.")
         else:
-            print("Failed to delete address:", response.text)
+            yield rx.toast.error("Failed to delete address. Please try again.")
 
 
     async def edit_address(self, address_id: int, new_address: str):
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies or {}
-
-        if not new_address.strip():
-            print("No address entered. Skipping.")
-            return
 
         try:
             async with httpx.AsyncClient() as client:
@@ -168,11 +165,13 @@ class AddressState(rx.State):
                 self.new_address = ""
                 self.show_form = False
                 self.editing_address_id = 0
-                print("Address updated successfully.")
+                yield rx.toast.success("Address updated successfully.")
             else:
-                print("Failed to edit address:", response.text)
+                error_data = response.json()
+                error_message = error_data.get("error", "Failed to edit address")
+                yield rx.toast.error(f"Error: {error_message}")
         except Exception as e:
-            print("Request failed:", e)
+            yield rx.toast.error(f"Request failed: {str(e)}")
 
 
 
@@ -197,16 +196,14 @@ class AddressState(rx.State):
                 if response.status_code == 200:
                     self.success_message = "Default address updated successfully"
                     
-                    # ✅ FIX: Create a new list with Address objects instead of dict copies
                     updated_addresses = []
                     for addr in self.addresses:
                         if addr.id == address_id:
-                            # Create new Address object with is_default=True
                             updated_addresses.append(
                                 Address(
                                     id=addr.id,
                                     address=addr.address,
-                                    is_default=True  # ✅ Set to True for this address
+                                    is_default=True
                                 )
                             )
                         else:
@@ -221,16 +218,21 @@ class AddressState(rx.State):
                             )
                 
                     self.addresses = updated_addresses
+                    yield rx.toast.success("Default address updated successfully.")
                     
                 elif response.status_code == 401:
                     self.error_message = "Authentication required"
+                    yield rx.toast.error(self.error_message)
                 elif response.status_code == 403:
                     self.error_message = "Only customers can manage addresses"
+                    yield rx.toast.error(self.error_message)
                 elif response.status_code == 404:
                     self.error_message = "Address not found"
+                    yield rx.toast.error(self.error_message)
                 else:
                     data = response.json()
                     self.error_message = data.get("error", "Failed to set default address")
+                    yield rx.toast.error(self.error_message)
                     
         except httpx.TimeoutException:
             self.error_message = "Request timed out. Please try again."
@@ -267,7 +269,6 @@ class BankAccount(rx.Base):
         self.editing_address_id = address_id
         self.show_form = True  
         self.new_address = current_address  
-        print(f"Starting edit for address ID {address_id}: {current_address}")
 
 
     def toggle_form(self):
