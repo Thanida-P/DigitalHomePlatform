@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 import reflex as rx
 from ..template import template
@@ -32,7 +33,6 @@ class AddressState(rx.State):
         self.editing_address_id = address_id
         self.show_form = True  
         self.new_address = current_address  
-        print(f"Starting edit for address ID {address_id}: {current_address}")
 
 
     def toggle_form(self):
@@ -40,7 +40,6 @@ class AddressState(rx.State):
         self.show_form = True
         self.editing_address_id = 0  
         self.new_address = "" 
-        print("Opening address form.")
 
     def close_form(self):
         """Close the address form and clear input."""
@@ -54,21 +53,22 @@ class AddressState(rx.State):
 
     async def save_address(self):
         """Save address (add new or update existing)."""
+        if not self.new_address.strip():
+            yield rx.toast.error("No address entered. Please enter an address.")
+            return
+        
         if self.editing_address_id == 0:
-            await self.add_address()
+            async for event in self.add_address():
+                yield event
         else:
-            await self.edit_address(self.editing_address_id, self.new_address)
+            async for event in self.edit_address(self.editing_address_id, self.new_address):
+                yield event
 
     async def add_address(self):
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
 
-        if not self.new_address.strip():
-            print("No address entered. Skipping.")
-            return
-
         data = {"address": self.new_address.strip(), "is_default": False}
-        print("Sending new address to backend:", data)
 
         try:
             async with httpx.AsyncClient() as client:
@@ -77,7 +77,6 @@ class AddressState(rx.State):
                     data=data,
                     cookies=cookies_dict,
                 )
-            print("POST response status:", response.status_code)
 
             if response.status_code == 201:
         
@@ -85,11 +84,13 @@ class AddressState(rx.State):
                 self.new_address = ""
                 self.show_form = False
                 self.editing_address_id = 0
-                print("Address added successfully.")
+                yield rx.toast.success("Address added successfully.")
             else:
-                print("Error adding address:", response.text)
+                error_data = response.json()
+                error_message = error_data.get("error", "Failed to add address")
+                yield rx.toast.error(f"Error: {error_message}")
         except Exception as e:
-            print("Request failed:", e)
+            yield rx.toast.error(f"Request failed: {str(e)}")
 
 
 
@@ -140,17 +141,14 @@ class AddressState(rx.State):
             
             new_addresses = [addr for addr in self.addresses if addr.id != address_id]
             self.addresses = new_addresses
+            yield rx.toast.success("Address deleted successfully.")
         else:
-            print("Failed to delete address:", response.text)
+            yield rx.toast.error("Failed to delete address. Please try again.")
 
 
     async def edit_address(self, address_id: int, new_address: str):
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies or {}
-
-        if not new_address.strip():
-            print("No address entered. Skipping.")
-            return
 
         try:
             async with httpx.AsyncClient() as client:
@@ -168,11 +166,13 @@ class AddressState(rx.State):
                 self.new_address = ""
                 self.show_form = False
                 self.editing_address_id = 0
-                print("Address updated successfully.")
+                yield rx.toast.success("Address updated successfully.")
             else:
-                print("Failed to edit address:", response.text)
+                error_data = response.json()
+                error_message = error_data.get("error", "Failed to edit address")
+                yield rx.toast.error(f"Error: {error_message}")
         except Exception as e:
-            print("Request failed:", e)
+            yield rx.toast.error(f"Request failed: {str(e)}")
 
 
 
@@ -197,16 +197,14 @@ class AddressState(rx.State):
                 if response.status_code == 200:
                     self.success_message = "Default address updated successfully"
                     
-                    # ✅ FIX: Create a new list with Address objects instead of dict copies
                     updated_addresses = []
                     for addr in self.addresses:
                         if addr.id == address_id:
-                            # Create new Address object with is_default=True
                             updated_addresses.append(
                                 Address(
                                     id=addr.id,
                                     address=addr.address,
-                                    is_default=True  # ✅ Set to True for this address
+                                    is_default=True
                                 )
                             )
                         else:
@@ -221,16 +219,21 @@ class AddressState(rx.State):
                             )
                 
                     self.addresses = updated_addresses
+                    yield rx.toast.success("Default address updated successfully.")
                     
                 elif response.status_code == 401:
                     self.error_message = "Authentication required"
+                    yield rx.toast.error(self.error_message)
                 elif response.status_code == 403:
                     self.error_message = "Only customers can manage addresses"
+                    yield rx.toast.error(self.error_message)
                 elif response.status_code == 404:
                     self.error_message = "Address not found"
+                    yield rx.toast.error(self.error_message)
                 else:
                     data = response.json()
                     self.error_message = data.get("error", "Failed to set default address")
+                    yield rx.toast.error(self.error_message)
                     
         except httpx.TimeoutException:
             self.error_message = "Request timed out. Please try again."
@@ -267,7 +270,6 @@ class BankAccount(rx.Base):
         self.editing_address_id = address_id
         self.show_form = True  
         self.new_address = current_address  
-        print(f"Starting edit for address ID {address_id}: {current_address}")
 
 
     def toggle_form(self):
@@ -855,9 +857,8 @@ class ProfileState(rx.State):
                     cookies=cookies_dict,
                 )
                 
-                if response.status_code == 200:  # FIXED: Changed from 201 to 200 (backend returns 200)
+                if response.status_code == 200:
                     rx.toast.success("Profile submitted successfully!")
-                    print("Profile success")
                     await self.load_user_profile()
                     self.close_profile_modal()
                 else:
@@ -1010,8 +1011,15 @@ class PaymentState(rx.State):
             return False
         
         year = int(self.exp_year)
+        current_year = datetime.now().year
         if year < 2024 or year > 2050:
             self.error_message = "Please enter a valid expiration year"
+            return False
+        
+        month = int(self.exp_month)
+        current_month = datetime.now().month
+        if year < current_year or (year == current_year and month < current_month):
+            self.error_message = "Card has already expired"
             return False
         
         if not self.cvv or not self.cvv.isdigit() or len(self.cvv) < 3 or len(self.cvv) > 4:
@@ -1086,10 +1094,6 @@ class PaymentState(rx.State):
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
         
-        print(f"=== SUBMIT BANK ACCOUNT DEBUG ===")
-        print(f"Cookies: {cookies_dict}")
-        print(f"API URL: {API_BASE_URL}/users/payment_methods/add_bank_account/")
-        
         try:
             async with httpx.AsyncClient() as client:
                 # Prepare the form data
@@ -1102,8 +1106,6 @@ class PaymentState(rx.State):
                     "is_default": str(self.bank_is_default).lower()
                 }
                 
-                print("Sending bank account data:", form_data)
-                
                 res = await client.post(
                     f"{API_BASE_URL}/users/payment_methods/add_bank_account/",
                     data=form_data,
@@ -1114,7 +1116,6 @@ class PaymentState(rx.State):
                 if res.status_code == 201:
                     try:
                         response_data = res.json()
-                        print("Bank account added successfully:", response_data)
                     except Exception as json_err:
                         print(f"JSON parse error on success: {json_err}")
                         print("Bank account might have been added despite JSON error")
@@ -1125,7 +1126,7 @@ class PaymentState(rx.State):
                     self.show_bank_form = False
 
                     await self.load_bank_accounts() 
-                    return rx.toast.success("🏦 Bank account added successfully!")
+                    return rx.toast.success("Bank account added successfully!")
                     
                 elif res.status_code == 302 or res.status_code == 301:
                     print("REDIRECT DETECTED - Authentication issue")
@@ -1186,10 +1187,6 @@ class PaymentState(rx.State):
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
         
-        print(f"=== SUBMIT CARD DEBUG ===")
-        print(f"Cookies: {cookies_dict}")
-        print(f"API URL: {API_BASE_URL}/users/credit-card/")
-        
         try:
             async with httpx.AsyncClient() as client:
                 # Prepare the form data with mock provider info
@@ -1202,8 +1199,6 @@ class PaymentState(rx.State):
                     "exp_year": self.exp_year,
                     "is_default": str(self.is_default).lower()
                 }
-                
-                print("Sending mock payment data:", form_data)
                 
                 res = await client.post(
                     f"{API_BASE_URL}/users/payment_methods/add_credit_card/",
@@ -1227,18 +1222,15 @@ class PaymentState(rx.State):
 
                     await self.load_credit_cards()
                     
-                    return rx.toast.success("✅ Credit card added successfully!")
+                    return rx.toast.success("Credit card added successfully!")
                     
                 elif res.status_code == 302 or res.status_code == 301:
-                    print("REDIRECT DETECTED - Authentication issue")
                     self.error_message = "Authentication error. Please log in again."
                     
                 elif res.status_code == 403:
-                    print("FORBIDDEN - CSRF or permission issue")
                     self.error_message = "Permission denied. Please check authentication."
                     
                 elif res.status_code == 404:
-                    print("NOT FOUND - Check your endpoint URL")
                     self.error_message = "API endpoint not found. Check URL configuration."
                     
                 else:
@@ -1246,7 +1238,6 @@ class PaymentState(rx.State):
                         error_data = res.json()
                         self.error_message = error_data.get("error", f"Error: {res.status_code}")
                     except Exception as json_err:
-                        print(f"JSON parse error: {json_err}")
                         self.error_message = f"Server error: {res.status_code} - {res.text[:200]}"
                     
                     self.success_message = ""
@@ -1358,14 +1349,12 @@ class PaymentState(rx.State):
         try:
             async with httpx.AsyncClient() as client:
                 res = await client.delete(
-                    f"{API_BASE_URL}/users/payment_methods/remove_credit_card/{card_id}/",  # ✅ Add trailing slash
+                    f"{API_BASE_URL}/users/payment_methods/remove_credit_card/{card_id}/",
                     cookies=cookies_dict,
                     timeout=10.0
-                    # ✅ REMOVE json={"card_id": card_id} - not needed since ID is in URL
                 )
             
             if res.status_code == 200:
-                print(f"Credit card {card_id} deleted successfully")
                 await self.load_credit_cards()
                 return rx.toast.success("Credit card deleted successfully!")
             else:
@@ -1394,7 +1383,6 @@ class PaymentState(rx.State):
                 )
             
             if res.status_code == 200:
-                print(f"Bank account {account_id} deleted successfully")
                 await self.load_bank_accounts()
                 return rx.toast.success("Bank account deleted successfully!")
             else:
