@@ -54,6 +54,10 @@ class AddressState(rx.State):
 
     async def save_address(self):
         """Save address (add new or update existing)."""
+        if not self.new_address.strip():
+            yield rx.toast.error("No address entered. Please enter an address.")
+            return
+        
         if self.editing_address_id == 0:
             await self.add_address()
         else:
@@ -62,10 +66,6 @@ class AddressState(rx.State):
     async def add_address(self):
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies if auth_state.session_cookies else {}
-
-        if not self.new_address.strip():
-            print("No address entered. Skipping.")
-            return
 
         data = {"address": self.new_address.strip(), "is_default": False}
         print("Sending new address to backend:", data)
@@ -855,9 +855,8 @@ class ProfileState(rx.State):
                     cookies=cookies_dict,
                 )
                 
-                if response.status_code == 200:  # FIXED: Changed from 201 to 200 (backend returns 200)
+                if response.status_code == 200:
                     rx.toast.success("Profile submitted successfully!")
-                    print("Profile success")
                     await self.load_user_profile()
                     self.close_profile_modal()
                 else:
