@@ -301,8 +301,9 @@ class CartState(rx.State):
                             items.append(cart_item)
                     
                     self.cart_items = items
-                    await self.update_navbar_cart_quantity(len(items))
-                    
+                    total_qty = sum(item.quantity for item in self.cart_items)
+                    await self.update_navbar_cart_quantity(total_qty)
+
                 elif response.status_code == 404:
                     self.cart_items = []
                     rx.toast.info("Your cart is empty")
@@ -472,21 +473,27 @@ class CartState(rx.State):
     def total(self) -> int:
         return self.subtotal + self.delivery_fee - self.discount
     
-    def increment_quantity(self, item_id: int):
+    async def increment_quantity(self, item_id: int):
         for i, item in enumerate(self.cart_items):
             if item.id == item_id:
                 updated_item = item.copy()
                 updated_item.quantity += 1
                 self.cart_items[i] = updated_item
                 break
+
+        total_qty = sum(item.quantity for item in self.cart_items)
+        await self.update_navbar_cart_quantity(total_qty)
     
-    def decrement_quantity(self, item_id: int):
+    async def decrement_quantity(self, item_id: int):
         for i, item in enumerate(self.cart_items):
             if item.id == item_id and item.quantity > 1:
                 updated_item = item.copy()
                 updated_item.quantity -= 1
                 self.cart_items[i] = updated_item
                 break
+
+        total_qty = sum(item.quantity for item in self.cart_items)
+        await self.update_navbar_cart_quantity(total_qty)
     
     
     async def place_order(self):
