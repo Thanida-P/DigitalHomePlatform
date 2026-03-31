@@ -40,7 +40,7 @@ function getUrlParams() {
 
 function getApiBase() {
   const params = getUrlParams();
-  return "https://turing.se.kmitl.ac.th/digitalhome/api" || "http://localhost:8001";
+  return params.get("api") || "http://localhost:8001"; 
 }
 
 function getDemoUrl() {
