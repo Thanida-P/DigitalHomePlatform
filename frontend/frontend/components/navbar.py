@@ -4,6 +4,90 @@ import os
 from ..state import AuthState
 from ..config import API_BASE_URL
 
+
+def iframe_message_listener() -> rx.Component:
+    api_base = API_BASE_URL 
+    return rx.script(f"""
+        (function() {{
+            if (window._iframeListenerAttached) return;
+            window._iframeListenerAttached = true;
+
+            async function refreshCartBadge() {{
+                try {{
+                    const resp = await fetch('{api_base}/carts/view/', {{
+                        credentials: 'include',
+                    }});
+                    if (resp.ok) {{
+                        const cartData = await resp.json();
+                        const items = cartData.items || [];
+                        const totalQty = items.reduce((sum, item) => sum + (item.quantity || 1), 0);
+                        window.dispatchEvent(new CustomEvent('cart-updated', {{ detail: {{ quantity: totalQty }} }}));
+                    }}
+                }} catch(err) {{
+                    console.error('Cart refresh error:', err);
+                }}
+            }}
+ 
+            window.addEventListener('message', async function(event) {{
+                const data = event.data;
+                if (!data || !data.type) return;
+
+                if (data.type === 'NAVIGATE') {{
+                    window.location.href = data.url;
+                }}
+                     
+                if (data.type === 'CART_UPDATED') {{
+                    await refreshCartBadge();
+                }}
+
+                if (data.type === 'ADD_TO_CART') {{
+                    try {{
+                        const formData = new FormData();
+                        formData.append('product_id', data.productId);
+                        formData.append('quantity', data.quantity || 1);
+                        formData.append('price_type', data.priceType);
+
+                        const response = await fetch('{api_base}/carts/add_item/', {{
+                            method: 'POST',
+                            body: formData,
+                            credentials: 'include',
+                        }});
+
+                        if (response.ok) {{
+                            await refreshCartBadge();  
+                        }} else {{
+                            const text = await response.text();
+                            
+                        }}
+                    }} catch (err) {{
+                        console.error('Add to cart error:', err);
+                    }}
+                }}
+            }});
+        }})();
+    """)
+
+
+def cart_refresh_listener() -> rx.Component:
+    return rx.script("""
+        (function() {
+            if (window._cartRefreshListenerAttached) return;
+            window._cartRefreshListenerAttached = true;
+
+            window.addEventListener('cart-updated', function(e) {
+                const quantity = e.detail?.quantity ?? 0;
+
+                const badgeBox = document.getElementById('cart-badge-box');
+                if (badgeBox) {
+                    badgeBox.style.display = quantity > 0 ? 'flex' : 'none';
+                    const text = badgeBox.querySelector('[data-cart-badge]');
+                    if (text) text.textContent = quantity;
+                }
+            });
+        })();
+    """)
+
+
 class NavCartState(rx.State):
     total_itmes: int = 0
     total_quantity: int = 0
@@ -82,8 +166,10 @@ def nav_link(label: str, href: str):
 
 
 def navbar_page():
-    return rx.hstack(
-     
+    return rx.fragment(
+        iframe_message_listener(),
+        cart_refresh_listener(),
+        rx.hstack(
         rx.hstack(
             rx.link(
                 "Digital Home",
@@ -154,16 +240,18 @@ def navbar_page():
                     on_click=rx.redirect("/cart"),
                     
                 ),
-                rx.cond(
-                    NavCartState.cart_quantity > 0,
+                rx.box(
+                    
                     rx.box(
                         rx.text(
                             NavCartState.cart_quantity,
+                            data_cart_badge=True,
                             font_size="12px",
                             color="white",
                             font_weight="bold",
                             text_align="center",
                         ),
+                        id="cart-badge-box",
                         position="absolute",
                         top="2px",
                         right="4px",
@@ -171,7 +259,7 @@ def navbar_page():
                         border_radius="9999px",
                         width="18px",
                         height="18px",
-                        display="flex",
+                        display=rx.cond(NavCartState.cart_quantity > 0, "flex", "none"), 
                         align_items="center",
                         justify_content="center",
                         box_shadow="0 0 2px rgba(0,0,0,0.2)",
@@ -179,7 +267,6 @@ def navbar_page():
                 ),
                 position="relative",
             ),
-
             
             rx.cond(
                 AuthState.is_logged_in,
@@ -252,7 +339,7 @@ def navbar_page():
         style=style3,
         on_mount=[AuthState.check_auth, 
                   NavCartState.load_cart_quantity],
-    )
+    ))
 
 
 style1 = {
