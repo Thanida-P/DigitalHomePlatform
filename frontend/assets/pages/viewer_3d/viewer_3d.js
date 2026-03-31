@@ -40,7 +40,7 @@ function getUrlParams() {
 
 function getApiBase() {
   const params = getUrlParams();
-  return "https://turing.se.kmitl.ac.th/digitalhome/api" || "http://localhost:8001";
+  return params.get("api") || "http://localhost:8001"; 
 }
 
 function getDemoUrl() {
@@ -1109,30 +1109,58 @@ function setupControls() {
   // Add to cart
   const addPhysical = document.getElementById("add-physical");
   const addDigital = document.getElementById("add-digital");
+
   if (addPhysical)
-    addPhysical.addEventListener("click", () => {
-      window.parent.postMessage(
-        {
-          type: "ADD_TO_CART",
-          productId: state.productData.id,
-          priceType: "physical",
-          quantity: 1,
-        },
-        "*"
-      );
-    });
+      addPhysical.addEventListener("click", async () => {
+          const api = getApiBase();
+          try {
+              const params = new URLSearchParams();
+              params.append('product_id', state.productData.id);
+              params.append('quantity', 1);
+              params.append('type', 'physical');
+
+              const response = await fetch(`${api}/carts/add_item/`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                  body: params.toString(),
+                  credentials: 'include', 
+              });
+
+              if (response.ok) {
+                  window.parent.postMessage({ type: 'CART_UPDATED' }, '*');
+              } else {
+                  const text = await response.text();
+              }
+          } catch (err) {
+              console.error('Add to cart error:', err);
+          }
+      });
+
   if (addDigital)
-    addDigital.addEventListener("click", () => {
-      window.parent.postMessage(
-        {
-          type: "ADD_TO_CART",
-          productId: state.productData.id,
-          priceType: "digital",
-          quantity: 1,
-        },
-        "*"
-      );
-    });
+      addDigital.addEventListener("click", async () => {
+          const api = getApiBase();
+          try {
+              const params = new URLSearchParams();
+              params.append('product_id', state.productData.id);
+              params.append('quantity', 1);
+              params.append('type', 'digital');
+
+              const response = await fetch(`${api}/carts/add_item/`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                  body: params.toString(),
+                  credentials: 'include',
+              });
+
+              if (response.ok) {
+                  window.parent.postMessage({ type: 'CART_UPDATED' }, '*');
+              } else {
+                  const text = await response.text();
+              }
+          } catch (err) {
+              console.error('Add to cart error:', err);
+          }
+      });
 
   const browseMore = document.getElementById("browse-more");
   if (browseMore)
@@ -1251,7 +1279,7 @@ async function fetchAndRenderTextures(modelId) {
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i];
       try {
-        // Decode base64 → Uint8Array → Blob → Object URL
+       
         const binaryString = atob(entry.file);
         const bytes = new Uint8Array(binaryString.length);
         for (let j = 0; j < binaryString.length; j++) {
@@ -1325,7 +1353,7 @@ function renderTextureSwatches(textures) {
     container.appendChild(option);
   });
 
-  // Auto-select first texture
+
   container.querySelector(".texture-option")?.click();
 }
 
