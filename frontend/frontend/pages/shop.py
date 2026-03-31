@@ -138,7 +138,7 @@ class ShopState(rx.State):
                     cookies =cookies_dict,
                 )
 
-            if response.status_code == 201:
+            if response.status_code in [200, 201]:
                 rx.toast.success("✅ Item added to cart successfully!")
                 nav_state = await self.get_state(NavCartState)
                 await nav_state.load_cart_quantity()
@@ -512,7 +512,7 @@ def shop_content() -> rx.Component:
             
             spacing="4",
             width="100%",
-            on_mount=ShopState.load_products,
+            on_mount=[ShopState.load_products, NavCartState.load_cart_quantity]
         ),
 
 
