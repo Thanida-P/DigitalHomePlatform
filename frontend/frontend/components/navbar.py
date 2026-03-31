@@ -33,11 +33,9 @@ class NavCartState(rx.State):
                     data = response.json()
                     
                     items = data.get('items', [])
-                    total_quantity = len(items)
+                    total_quantity = sum(item.get('quantity', 1) for item in items)
                     
                     self.cart_quantity = total_quantity
-
-                 
                 
                 elif response.status_code == 404:
                     self.cart_quantity = 0

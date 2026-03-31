@@ -338,7 +338,8 @@ class CartState(rx.State):
                 if response.status_code == 200:
                     self.cart_items = [item for item in self.cart_items if item.id != item_id]
                     rx.toast.success("Item removed from cart")
-                    await self.update_navbar_cart_quantity(len(self.cart_items))
+                    total_qty = sum(item.quantity for item in self.cart_items)
+                    await self.update_navbar_cart_quantity(total_qty)
                 elif response.status_code == 404:
                     rx.toast.error("Item not found in cart")
                 else:
@@ -474,26 +475,58 @@ class CartState(rx.State):
         return self.subtotal + self.delivery_fee - self.discount
     
     async def increment_quantity(self, item_id: int):
-        for i, item in enumerate(self.cart_items):
-            if item.id == item_id:
-                updated_item = item.copy()
-                updated_item.quantity += 1
-                self.cart_items[i] = updated_item
-                break
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies or {}
 
-        total_qty = sum(item.quantity for item in self.cart_items)
-        await self.update_navbar_cart_quantity(total_qty)
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.put(
+                    f"{API_BASE_URL}/carts/increase_item/{item_id}/",
+                    cookies=cookies_dict,
+                )
+
+            if response.status_code == 200:
+                for item in self.cart_items:
+                    if item.id == item_id:
+                        item.quantity += 1
+
+                self.cart_items = self.cart_items
+
+                total_qty = sum(item.quantity for item in self.cart_items)
+                await self.update_navbar_cart_quantity(total_qty)
+            else:
+                error = response.json().get("error", "Failed to increase quantity")
+                rx.toast.error(error)
+
+        except Exception as e:
+            rx.toast.error(f"Error: {e}")
     
     async def decrement_quantity(self, item_id: int):
-        for i, item in enumerate(self.cart_items):
-            if item.id == item_id and item.quantity > 1:
-                updated_item = item.copy()
-                updated_item.quantity -= 1
-                self.cart_items[i] = updated_item
-                break
+        auth_state = await self.get_state(AuthState)
+        cookies_dict = auth_state.session_cookies or {}
 
-        total_qty = sum(item.quantity for item in self.cart_items)
-        await self.update_navbar_cart_quantity(total_qty)
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.delete(
+                    f"{API_BASE_URL}/carts/decrease_item/{item_id}/",
+                    cookies=cookies_dict,
+                )
+
+            if response.status_code == 200:
+                for item in self.cart_items:
+                    if item.id == item_id and item.quantity > 1:
+                        item.quantity -= 1
+
+                self.cart_items = self.cart_items
+
+                total_qty = sum(item.quantity for item in self.cart_items)
+                await self.update_navbar_cart_quantity(total_qty)
+            else:
+                error = response.json().get("error", "Failed to decrease quantity")
+                rx.toast.error(error)
+
+        except Exception as e:
+            rx.toast.error(f"Error: {e}")
     
     
     async def place_order(self):
@@ -510,7 +543,6 @@ class CartState(rx.State):
         auth_state = await self.get_state(AuthState)
         cookies_dict = auth_state.session_cookies or {}
         
-        # Parse payment type and method_id
         payment_parts = self.selected_payment.split("_")
         payment_type = "credit_card" if payment_parts[0] == "card" else "bank_account"
         method_id = payment_parts[1]
@@ -1370,7 +1402,7 @@ def cart_content() -> rx.Component:
                             rx.vstack(
                                 rx.foreach(
                                     CartState.cart_items,
-                                    cart_item,
+                                    lambda item: cart_item(item).set(key=item.id),
                                 ),
                                 spacing="4",
                                 width="100%",
