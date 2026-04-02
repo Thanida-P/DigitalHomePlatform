@@ -1,6 +1,7 @@
 import reflex as rx
 import httpx
 import os
+import json
 from typing import Optional, List, Dict
 from urllib.parse import urlencode
 from .config import API_BASE_URL
@@ -159,7 +160,17 @@ class AuthState(rx.State):
         query_string = urlencode({"token": token})
         self.scene_creator_url = f"{SCENE_CREATOR_URL.rstrip('/')}/#/login?{query_string}"
 
-        return rx.call_script(f"window.open('{self.scene_creator_url}', '_blank')")
+        safe_url = json.dumps(self.scene_creator_url)
+        return rx.call_script(
+            f"""
+            const url = {safe_url};
+            const openedWindow = window.open(url, "_blank");
+            // Safari can block async popups; fall back to same-tab navigation.
+            if (!openedWindow || openedWindow.closed || typeof openedWindow.closed === "undefined") {{
+                window.location.href = url;
+            }}
+            """
+        )
         
 
 class ModelState(rx.State):
