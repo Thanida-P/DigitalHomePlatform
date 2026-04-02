@@ -2,6 +2,7 @@ import reflex as rx
 import httpx
 import os
 from typing import Optional, List, Dict
+from urllib.parse import urlencode
 from .config import API_BASE_URL
 
 SCENE_CREATOR_URL = os.getenv("SCENE_CREATOR_URL", "http://localhost:5173")
@@ -155,8 +156,8 @@ class AuthState(rx.State):
         if not token:
             return rx.window_alert("Failed to generate authentication token. Please try logging in again.")
         
-        # Build Scene Creator URL with token
-        self.scene_creator_url = f"{SCENE_CREATOR_URL}/#/login?token={token}"
+        query_string = urlencode({"token": token})
+        self.scene_creator_url = f"{SCENE_CREATOR_URL.rstrip('/')}/#/login?{query_string}"
 
         return rx.call_script(f"window.open('{self.scene_creator_url}', '_blank')")
         
