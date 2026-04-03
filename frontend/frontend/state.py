@@ -1,3 +1,4 @@
+import asyncio
 import reflex as rx
 import httpx
 import os
@@ -13,18 +14,45 @@ class AuthState(rx.State):
     username: str = ""
     is_admin: bool = False
     is_staff: bool = False
-    
-    session_cookies: dict[str, str] = {}
-    
+
+    session_cookies_json: str = rx.LocalStorage("{}", name="dhp_api_session_cookies")
+
     scene_creator_url: str = ""
-    
+
+    @rx.var
+    def session_cookies(self) -> Dict[str, str]:
+        try:
+            raw = self.session_cookies_json
+            if not raw or not str(raw).strip():
+                return {}
+            data = json.loads(raw)
+            if not isinstance(data, dict):
+                return {}
+            return {str(k): str(v) for k, v in data.items()}
+        except (json.JSONDecodeError, TypeError, ValueError):
+            return {}
+
+    def _set_session_cookies(self, cookies: dict) -> None:
+        clean = {str(k): str(v) for k, v in dict(cookies).items()}
+        self.session_cookies_json = json.dumps(clean)
+
+    def _clear_session_cookies(self) -> None:
+        self.session_cookies_json = "{}"
+
+    async def check_auth_on_load(self):
+        """Run auth check twice briefly apart so rx.LocalStorage can hydrate before we trust an empty jar."""
+        await self.check_auth()
+        await asyncio.sleep(0.25)
+        await self.check_auth()
+
     async def check_auth(self):
         """Check if user is authenticated - SENDS COOKIES"""
         try:
+            jar = self.session_cookies
             async with httpx.AsyncClient() as client:
                 response = await client.get(
                     f"{API_BASE_URL}/users/is_logged_in/",
-                    cookies=self.session_cookies,
+                    cookies=jar,
                     timeout=5.0
                 )
                 
@@ -34,13 +62,12 @@ class AuthState(rx.State):
                     self.username = data.get("username") or ""
                     self.is_admin = data.get("is_admin", False)
                     self.is_staff = data.get("is_staff", False)
-                    
-                    
-                    if not self.is_logged_in:
-                        self.session_cookies = {}
+                    if not self.is_logged_in and jar:
+                        self._clear_session_cookies()
                 else:
                     self.is_logged_in = False
-                    self.session_cookies = {}
+                    if jar:
+                        self._clear_session_cookies()
         except Exception as e:
             print(f"❌ Auth check failed: {e}")
             self.is_logged_in = False
@@ -62,8 +89,7 @@ class AuthState(rx.State):
                 if response.status_code == 200:
                     data = response.json()
                     
-                    # 👈 SAVE ALL COOKIES FROM LOGIN RESPONSE
-                    self.session_cookies = dict(response.cookies)
+                    self._set_session_cookies(dict(response.cookies))
                     
                     # Update auth state 
                     self.is_logged_in = True
@@ -93,7 +119,7 @@ class AuthState(rx.State):
             async with httpx.AsyncClient() as client:
                 await client.delete(
                     f"{API_BASE_URL}/users/logout/",
-                    cookies=self.session_cookies,  
+                    cookies=self.session_cookies,
                     timeout=5.0
                 )
 
@@ -104,7 +130,7 @@ class AuthState(rx.State):
         self.username = ""
         self.is_admin = False
         self.is_staff = False
-        self.session_cookies = {}
+        self._clear_session_cookies()
     
         
         return rx.redirect("/")

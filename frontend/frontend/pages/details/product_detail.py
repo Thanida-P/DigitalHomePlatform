@@ -76,8 +76,6 @@ def product_viewer_iframe() -> rx.Component:
                 }}
             }});
         """)
-
-
     )
 
 
