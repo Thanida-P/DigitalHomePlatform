@@ -55,7 +55,7 @@ class AdminDashboardState(rx.State):
         """Logout the admin user"""
         auth_state = await self.get_state(AuthState)
         auth_state.is_logged_in = False
-        auth_state.session_cookies = {}
+        auth_state.session_cookies_json = "{}"
         return rx.redirect("/login")
 
     async def calculate_average_rating(self):

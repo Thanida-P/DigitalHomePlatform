@@ -253,7 +253,7 @@ def login_page() -> rx.Component:
         ),
         height="100vh",
        
-        on_mount=[LoginState.reset_form, AuthState.check_auth],
+        on_mount=[LoginState.reset_form, AuthState.check_auth_on_load],
     )
 
 background_style = {

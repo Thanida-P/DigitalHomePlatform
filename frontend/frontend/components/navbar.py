@@ -337,7 +337,7 @@ def navbar_page():
         ),
         
         style=style3,
-        on_mount=[AuthState.check_auth, 
+        on_mount=[AuthState.check_auth_on_load,
                   NavCartState.load_cart_quantity],
     ))
 
