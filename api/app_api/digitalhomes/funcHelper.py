@@ -220,6 +220,23 @@ def _persist_wallpaper_scene_from_payload(item, item_data):
     item.wallpaper_scene_json = json.dumps(prev) if prev else None
 
 
+def _persist_whiteboard_image_from_payload(item, item_data):
+    name_l = (item.get_name() or "").lower()
+    typ_l = (item.get_type() or "").lower()
+    is_whiteboard = "whiteboard" in name_l or typ_l == "whiteboard"
+    if not is_whiteboard or "whiteboard_image" not in item_data:
+        return
+    prev = {}
+    raw = getattr(item, "wallpaper_scene_json", None)
+    if raw:
+        try:
+            prev = json.loads(raw)
+        except json.JSONDecodeError:
+            prev = {}
+    prev["whiteboard_image"] = item_data["whiteboard_image"]
+    item.wallpaper_scene_json = json.dumps(prev) if prev else None
+
+
 def update_deployed_item(root, item_id, id, item_data):
     key_item = f'item_{int(item_id)}_home_{int(id)}'
     if key_item in root.containerOwnedItems or key_item in root.nonContainerOwnedItems:
@@ -305,6 +322,8 @@ def update_deployed_item(root, item_id, id, item_data):
     if item_data.get('image'):
         item.set_image(item_data['image'])
     _persist_wallpaper_scene_from_payload(item, item_data)
+    _persist_whiteboard_image_from_payload(item, item_data)
+
 
 def apply_transform_simple(mesh, pos, rot, scale):
     # Apply scale
