@@ -620,7 +620,7 @@ def check_overlap(request):
 
             results.append({'model_id': model_id, 'result': overlap_result})
             
-            if overlap_result is True:
+            if overlap_result == True:
                 contain_overlap = True
 
         return JsonResponse({'contain_overlap': contain_overlap, 'results': results}, status=200)
