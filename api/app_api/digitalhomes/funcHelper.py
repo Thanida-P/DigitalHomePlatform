@@ -14,6 +14,17 @@ import trimesh
 import transaction
 import json
 
+def _to_rotation_radians(rot):
+    """
+    Accept rotations in either radians (Three.js) or degrees and normalize to radians.
+    """
+    if not isinstance(rot, (list, tuple)) or len(rot) < 3:
+        return (0.0, 0.0, 0.0)
+    rx, ry, rz = float(rot[0]), float(rot[1]), float(rot[2])
+    if max(abs(rx), abs(ry), abs(rz)) > (2 * np.pi + 1e-6):
+        return tuple(np.deg2rad([rx, ry, rz]))
+    return (rx, ry, rz)
+
 
 def load_mesh(file):
     try:
@@ -332,21 +343,25 @@ def apply_transform_simple(mesh, pos, rot, scale):
     mesh.apply_scale(scale)
     
     # Apply rotation
-    rx, ry, rz = np.deg2rad(rot)
-    rot_matrix = trimesh.transformations.euler_matrix(rx, ry, rz, axes='szyx')
+    rx, ry, rz = _to_rotation_radians(rot)
+    rot_matrix = trimesh.transformations.euler_matrix(rx, ry, rz, axes='sxyz')
     mesh.apply_transform(rot_matrix)
 
     # Apply translation
+    if not isinstance(pos, (list, tuple)) or len(pos) < 3:
+        pos = [0, 0, 0]
     mesh.apply_translation(np.array(pos[:3]))
         
 def check_models_overlap(file1, file2, pos1, pos2, rot1, rot2, scale1, scale2):
     try:
-        if pos1[3] != pos2[3]:
+        time1 = pos1[3] if isinstance(pos1, (list, tuple)) and len(pos1) > 3 else 0
+        time2 = pos2[3] if isinstance(pos2, (list, tuple)) and len(pos2) > 3 else 0
+        if time1 != time2:
             return {
                 'status': 'no_overlap',
                 'reason': 'Different time (m values not equal)',
-                'time1': pos1[3],
-                'time2': pos2[3]
+                'time1': time1,
+                'time2': time2
             }
 
         mesh1 = load_mesh(file1)
